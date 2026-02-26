@@ -4,25 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monta a Rota Aí - Login</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f5f5f5; 
             color: #333;
-            min-height: 100vh;
         }
         .login-container {
             max-width: 400px;
-            margin: 20px auto;
+            margin: 50px auto;
             background: white;
             padding: 30px;
             border-radius: 12px;
@@ -35,7 +26,8 @@
         .logo img {
             width: 120px;
             height: 120px;
-            object-fit: contain;
+            border-radius: 50%;
+            object-fit: cover;
         }
         h2 {
             text-align: center;
@@ -50,7 +42,6 @@
             margin-bottom: 5px;
             color: #666;
             font-size: 14px;
-            user-select: none;
         }
         input {
             width: 100%;
@@ -58,14 +49,12 @@
             border: 1px solid #ddd;
             border-radius: 8px;
             font-size: 16px;
-            user-select: text;
-            -webkit-user-select: text;
         }
         input:focus {
             outline: none;
             border-color: #FF6B35;
         }
-        .btn-primary {
+        button {
             width: 100%;
             padding: 15px;
             background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%);
@@ -75,50 +64,25 @@
             font-size: 16px;
             cursor: pointer;
             margin-top: 10px;
-            touch-action: manipulation;
         }
-        .btn-primary:active {
-            transform: scale(0.98);
-        }
-        .btn-primary:hover {
+        button:hover {
             opacity: 0.9;
-        }
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
         }
         .tabs {
             display: flex;
             margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
         }
         .tab {
             flex: 1;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             cursor: pointer;
-            background: none;
-            border: none;
-            font-size: 16px;
-            color: #666;
-            position: relative;
-            touch-action: manipulation;
-        }
-        .tab:active {
-            transform: scale(0.98);
+            border-bottom: 2px solid #ddd;
         }
         .tab.active {
+            border-bottom-color: #FF6B35;
             color: #FF6B35;
             font-weight: bold;
-        }
-        .tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: #FF6B35;
         }
         .tab-content {
             display: none;
@@ -133,13 +97,11 @@
         }
         .user-type label {
             flex: 1;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
             border: 2px solid #ddd;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
-            user-select: none;
         }
         .user-type input:checked + label {
             border-color: #FF6B35;
@@ -147,8 +109,6 @@
         }
         .user-type input { display: none; }
         .hidden { display: none !important; }
-        .error { color: #e74c3c; font-size: 14px; margin-top: 10px; text-align: center; }
-        .success { color: #27ae60; font-size: 14px; margin-top: 10px; text-align: center; }
         
         /* Dashboard Styles */
         .header {
@@ -161,13 +121,14 @@
         .header img {
             width: 80px;
             height: 80px;
-            object-fit: contain;
+            border-radius: 50%;
             margin-bottom: 10px;
+            object-fit: cover;
         }
         .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
         .cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -178,11 +139,10 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             cursor: pointer;
             transition: transform 0.2s;
-            touch-action: manipulation;
         }
-        .card:active { transform: scale(0.98); }
+        .card:hover { transform: translateY(-3px); }
         .card h3 { font-size: 14px; color: #666; margin-bottom: 10px; }
-        .card .value { font-size: 28px; font-weight: bold; color: #FF6B35; }
+        .card .value { font-size: 32px; font-weight: bold; color: #FF6B35; }
         .menu {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -195,10 +155,8 @@
             text-align: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             cursor: pointer;
-            transition: transform 0.2s;
-            touch-action: manipulation;
         }
-        .menu-item:active { transform: scale(0.98); }
+        .menu-item:hover { transform: translateY(-2px); }
         .menu-item .icon { font-size: 32px; margin-bottom: 10px; }
         .logout {
             position: absolute;
@@ -210,11 +168,7 @@
             border-radius: 6px;
             cursor: pointer;
             border: none;
-            font-size: 14px;
-            touch-action: manipulation;
-        }
-        .logout:active {
-            transform: scale(0.95);
+            width: auto;
         }
     </style>
 </head>
@@ -224,48 +178,46 @@
 <div id="login-screen" class="login-container">
     <div class="logo">
         <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
-        <h2 style="color: #004E89; margin-top: 10px;">Monta a Rota Aí</h2>
+        <h2>Monta a Rota Aí</h2>
     </div>
     
     <div class="tabs">
-        <button type="button" class="tab active" id="tab-login" onclick="switchTab('login')">Entrar</button>
-        <button type="button" class="tab" id="tab-register" onclick="switchTab('register')">Cadastrar</button>
+        <div class="tab active" onclick="switchTab('login')">Entrar</div>
+        <div class="tab" onclick="switchTab('register')">Cadastrar</div>
     </div>
 
     <!-- LOGIN -->
     <div id="login-tab" class="tab-content active">
+        <div class="user-type">
+            <label><input type="radio" name="login-type" value="admin" checked> <span>👑 Admin</span></label>
+            <label><input type="radio" name="login-type" value="loja"> <span>🏪 Loja</span></label>
+            <label><input type="radio" name="login-type" value="entregador"> <span>🛵 Entregador</span></label>
+        </div>
         <div class="form-group">
             <label>Email</label>
-            <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+            <input type="email" id="login-email" placeholder="seu@email.com">
         </div>
         <div class="form-group">
             <label>Senha</label>
-            <input type="password" id="login-senha" placeholder="••••••" autocomplete="current-password">
+            <input type="password" id="login-senha" placeholder="••••••">
         </div>
-        <button type="button" class="btn-primary" onclick="fazerLogin()" id="btn-login">Entrar</button>
-        <div id="login-error" class="error"></div>
+        <button onclick="fazerLogin()">Entrar</button>
     </div>
 
     <!-- CADASTRO -->
     <div id="register-tab" class="tab-content">
         <div class="user-type">
-            <label>
-                <input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()">
-                <span>🏪 Loja</span>
-            </label>
-            <label>
-                <input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()">
-                <span>🛵 Entregador</span>
-            </label>
+            <label><input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()"> <span>🏪 Loja</span></label>
+            <label><input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()"> <span>🛵 Entregador</span></label>
         </div>
         
         <div class="form-group">
-            <label>Nome completo</label>
-            <input type="text" id="reg-nome" placeholder="Seu nome">
+            <label>Nome</label>
+            <input type="text" id="reg-nome" placeholder="Nome completo">
         </div>
         <div class="form-group">
             <label>Email</label>
-            <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email">
+            <input type="email" id="reg-email" placeholder="seu@email.com">
         </div>
         <div class="form-group">
             <label>Telefone</label>
@@ -273,7 +225,7 @@
         </div>
         <div class="form-group">
             <label>Senha</label>
-            <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres">
         </div>
         
         <!-- Campos específicos Loja -->
@@ -287,8 +239,8 @@
                 <input type="text" id="reg-cnpj" placeholder="00.000.000/0000-00">
             </div>
             <div class="form-group">
-                <label>Endereço completo</label>
-                <input type="text" id="reg-endereco" placeholder="Rua, número, bairro, cidade">
+                <label>Endereço</label>
+                <input type="text" id="reg-endereco" placeholder="Rua, número, bairro">
             </div>
         </div>
 
@@ -303,58 +255,56 @@
                 <input type="text" id="reg-placa" placeholder="ABC-1234">
             </div>
             <div class="form-group">
-                <label>Chave Pix</label>
-                <input type="text" id="reg-pix" placeholder="CPF, email ou telefone">
+                <label>Pix para pagamento</label>
+                <input type="text" id="reg-pix" placeholder="Chave Pix">
             </div>
         </div>
 
-        <button type="button" class="btn-primary" onclick="fazerCadastro()" id="btn-cadastro">Cadastrar</button>
-        <div id="cadastro-error" class="error"></div>
-        <div id="cadastro-success" class="success"></div>
+        <button onclick="fazerCadastro()">Cadastrar</button>
     </div>
 </div>
 
 <!-- DASHBOARD ADMIN -->
 <div id="dashboard-admin" class="hidden">
     <div class="header">
-        <button type="button" class="logout" onclick="fazerLogout()">Sair</button>
+        <button class="logout" onclick="fazerLogout()">Sair</button>
         <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
-        <h1>Dashboard Administrativo</h1>
-        <p id="admin-email" style="font-size: 12px; opacity: 0.8; margin-top: 5px;"></p>
+        <h1>Monta a Rota Aí</h1>
+        <p>Dashboard Administrativo</p>
     </div>
     <div class="container">
         <div class="cards">
             <div class="card">
                 <h3>Entregas Hoje</h3>
-                <div class="value" id="admin-entregas">0</div>
+                <div class="value">0</div>
             </div>
             <div class="card">
                 <h3>Entregadores Online</h3>
-                <div class="value" id="admin-online">0</div>
+                <div class="value">0</div>
             </div>
             <div class="card">
                 <h3>Lojas Ativas</h3>
-                <div class="value" id="admin-lojas">0</div>
+                <div class="value">0</div>
             </div>
             <div class="card">
                 <h3>Faturamento</h3>
-                <div class="value" id="admin-faturamento">R$ 0</div>
+                <div class="value">R$ 0</div>
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">🛵</div>
                 <h3>Entregadores</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">🏪</div>
                 <h3>Lojas</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">📦</div>
                 <h3>Pedidos</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">💰</div>
                 <h3>Financeiro</h3>
             </div>
@@ -365,8 +315,7 @@
 <!-- DASHBOARD LOJA -->
 <div id="dashboard-loja" class="hidden">
     <div class="header">
-        <button type="button" class="logout" onclick="fazerLogout()">Sair</button>
-        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
+        <button class="logout" onclick="fazerLogout()">Sair</button>
         <h1 id="nome-loja-display">Minha Loja</h1>
         <p>Área da Loja</p>
     </div>
@@ -386,19 +335,19 @@
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item" onclick="alert('Scanner OCR em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">📷</div>
                 <h3>Scanear Comanda</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">📋</div>
                 <h3>Meus Pedidos</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">💳</div>
                 <h3>Pagamentos</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">⚙️</div>
                 <h3>Configurações</h3>
             </div>
@@ -409,8 +358,7 @@
 <!-- DASHBOARD ENTREGADOR -->
 <div id="dashboard-entregador" class="hidden">
     <div class="header">
-        <button type="button" class="logout" onclick="fazerLogout()">Sair</button>
-        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
+        <button class="logout" onclick="fazerLogout()">Sair</button>
         <h1 id="nome-entregador-display">Entregador</h1>
         <p>Área do Entregador</p>
     </div>
@@ -430,19 +378,19 @@
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">🚀</div>
                 <h3>Ficar Online</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">📍</div>
                 <h3>Minha Rota</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">💰</div>
                 <h3>Meus Ganhos</h3>
             </div>
-            <div class="menu-item" onclick="alert('Funcionalidade em desenvolvimento')">
+            <div class="menu-item">
                 <div class="icon">⚙️</div>
                 <h3>Configurações</h3>
             </div>
@@ -451,49 +399,12 @@
 </div>
 
 <script>
-// Configuração do Supabase
-const SUPABASE_URL = 'https://dfvjaweyxfenhjgusekq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdmphd2V5eGZlbmhqZ3VzZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMzk4NTMsImV4cCI6MjA4NzYxNTg1M30.MT9pzSQgc3ZNGiIV95DwjVtNvSZI0Lz-SKMkvMys1Kg';
-
-let supabase;
-
-// Inicializa Supabase quando a página carrega
-document.addEventListener('DOMContentLoaded', function() {
-    try {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('Supabase inicializado com sucesso');
-        
-        // Verifica se tem usuário logado
-        const usuario = localStorage.getItem('usuario');
-        if (usuario) {
-            const u = JSON.parse(usuario);
-            mostrarDashboard(u.tipo, u);
-        }
-    } catch (err) {
-        console.error('Erro ao inicializar Supabase:', err);
-    }
-});
-
 function switchTab(tab) {
-    console.log('Clicou na tab:', tab);
-    
-    // Remove active de todas as tabs
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     
-    // Adiciona active na tab clicada
-    if (tab === 'login') {
-        document.getElementById('tab-login').classList.add('active');
-        document.getElementById('login-tab').classList.add('active');
-    } else {
-        document.getElementById('tab-register').classList.add('active');
-        document.getElementById('register-tab').classList.add('active');
-    }
-    
-    // Limpa mensagens
-    document.getElementById('login-error').textContent = '';
-    document.getElementById('cadastro-error').textContent = '';
-    document.getElementById('cadastro-success').textContent = '';
+    event.target.classList.add('active');
+    document.getElementById(tab + '-tab').classList.add('active');
 }
 
 function toggleCadastro() {
@@ -502,220 +413,44 @@ function toggleCadastro() {
     document.getElementById('campos-entregador').classList.toggle('hidden', tipo !== 'entregador');
 }
 
-async function fazerLogin() {
-    const email = document.getElementById('login-email').value.trim();
+function fazerLogin() {
+    const email = document.getElementById('login-email').value;
     const senha = document.getElementById('login-senha').value;
-    const btn = document.getElementById('btn-login');
-    const errorDiv = document.getElementById('login-error');
+    const tipo = document.querySelector('input[name="login-type"]:checked').value;
     
     if (!email || !senha) {
-        errorDiv.textContent = 'Preencha email e senha';
+        alert('Preencha email e senha');
         return;
     }
     
-    btn.disabled = true;
-    btn.textContent = 'Entrando...';
-    errorDiv.textContent = '';
-    
-    try {
-        const { data: usuario, error } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('email', email)
-            .single();
-        
-        if (error || !usuario) {
-            errorDiv.textContent = 'Usuário não encontrado';
-            btn.disabled = false;
-            btn.textContent = 'Entrar';
-            return;
-        }
-        
-        if (usuario.status === 'bloqueado') {
-            errorDiv.textContent = 'Usuário bloqueado';
-            btn.disabled = false;
-            btn.textContent = 'Entrar';
-            return;
-        }
-        
-        // Verifica senha (temporariamente aceita 123456 para teste)
-        if (senha !== '123456' && senha !== usuario.senha_hash) {
-            errorDiv.textContent = 'Senha incorreta';
-            btn.disabled = false;
-            btn.textContent = 'Entrar';
-            return;
-        }
-        
-        // Salva no localStorage e mostra dashboard
-        localStorage.setItem('usuario', JSON.stringify(usuario));
-        mostrarDashboard(usuario.tipo, usuario);
-        
-    } catch (err) {
-        console.error('Erro no login:', err);
-        errorDiv.textContent = 'Erro ao fazer login. Tente novamente.';
-        btn.disabled = false;
-        btn.textContent = 'Entrar';
+    // Login simulado - depois conectamos com backend
+    if (senha === '123456') {
+        mostrarDashboard(tipo);
+    } else {
+        alert('Senha incorreta. Use: 123456');
     }
 }
 
-async function fazerCadastro() {
+function fazerCadastro() {
     const tipo = document.querySelector('input[name="register-type"]:checked').value;
-    const nome = document.getElementById('reg-nome').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const telefone = document.getElementById('reg-telefone').value.trim();
-    const senha = document.getElementById('reg-senha').value;
-    
-    const btn = document.getElementById('btn-cadastro');
-    const errorDiv = document.getElementById('cadastro-error');
-    const successDiv = document.getElementById('cadastro-success');
-    
-    // Validações básicas
-    if (!nome || !email || !senha) {
-        errorDiv.textContent = 'Preencha nome, email e senha';
-        return;
-    }
-    
-    if (senha.length < 6) {
-        errorDiv.textContent = 'Senha deve ter no mínimo 6 caracteres';
-        return;
-    }
-    
-    btn.disabled = true;
-    btn.textContent = 'Cadastrando...';
-    errorDiv.textContent = '';
-    successDiv.textContent = '';
-    
-    try {
-        // Verifica se email já existe
-        const { data: existente, error: errorCheck } = await supabase
-            .from('usuarios')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-        
-        if (existente) {
-            errorDiv.textContent = 'Email já cadastrado';
-            btn.disabled = false;
-            btn.textContent = 'Cadastrar';
-            return;
-        }
-        
-        // Prepara dados do usuário
-        const dados = {
-            tipo,
-            nome,
-            email,
-            telefone,
-            senha_hash: senha,
-            status: 'ativo',
-            created_at: new Date().toISOString()
-        };
-        
-        // Adiciona campos específicos
-        if (tipo === 'loja') {
-            dados.nome_loja = document.getElementById('reg-nome-loja').value.trim();
-            dados.cnpj = document.getElementById('reg-cnpj').value.trim();
-            dados.endereco = document.getElementById('reg-endereco').value.trim();
-        } else {
-            dados.cnh = document.getElementById('reg-cnh').value.trim();
-            dados.placa_moto = document.getElementById('reg-placa').value.trim();
-            dados.chave_pix = document.getElementById('reg-pix').value.trim();
-        }
-        
-        // Insere no banco
-        const { data, error } = await supabase
-            .from('usuarios')
-            .insert([dados])
-            .select();
-        
-        if (error) {
-            console.error('Erro Supabase:', error);
-            errorDiv.textContent = 'Erro ao cadastrar: ' + error.message;
-            btn.disabled = false;
-            btn.textContent = 'Cadastrar';
-            return;
-        }
-        
-        // Sucesso!
-        successDiv.textContent = 'Cadastro realizado! Redirecionando...';
-        
-        // Limpa formulário
-        document.getElementById('reg-nome').value = '';
-        document.getElementById('reg-email').value = '';
-        document.getElementById('reg-telefone').value = '';
-        document.getElementById('reg-senha').value = '';
-        
-        // Redireciona para login após 2 segundos
-        setTimeout(() => {
-            switchTab('login');
-            document.getElementById('login-email').value = email;
-            successDiv.textContent = '';
-            btn.disabled = false;
-            btn.textContent = 'Cadastrar';
-        }, 2000);
-        
-    } catch (err) {
-        console.error('Erro no cadastro:', err);
-        errorDiv.textContent = 'Erro ao cadastrar. Tente novamente.';
-        btn.disabled = false;
-        btn.textContent = 'Cadastrar';
-    }
+    alert(`Cadastro de ${tipo} realizado! Faça login.`);
+    switchTab('login');
 }
 
-function mostrarDashboard(tipo, usuario) {
-    // Esconde todas as telas
+function mostrarDashboard(tipo) {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('dashboard-admin').classList.add('hidden');
     document.getElementById('dashboard-loja').classList.add('hidden');
     document.getElementById('dashboard-entregador').classList.add('hidden');
     
-    // Mostra dashboard correto
-    const dashboardId = 'dashboard-' + tipo;
-    const dashboard = document.getElementById(dashboardId);
-    
-    if (dashboard) {
-        dashboard.classList.remove('hidden');
-        
-        // Atualiza informações específicas
-        if (tipo === 'admin') {
-            document.getElementById('admin-email').textContent = usuario.email;
-        } else if (tipo === 'loja') {
-            document.getElementById('nome-loja-display').textContent = usuario.nome_loja || usuario.nome;
-        } else if (tipo === 'entregador') {
-            document.getElementById('nome-entregador-display').textContent = usuario.nome;
-        }
-    } else {
-        // Se tipo não existe, volta para login
-        console.error('Tipo de usuário desconhecido:', tipo);
-        fazerLogout();
-    }
-    
-    // Reseta botão de login
-    const btnLogin = document.getElementById('btn-login');
-    if (btnLogin) {
-        btnLogin.disabled = false;
-        btnLogin.textContent = 'Entrar';
-    }
+    document.getElementById('dashboard-' + tipo).classList.remove('hidden');
 }
 
 function fazerLogout() {
-    localStorage.removeItem('usuario');
-    
-    // Esconde dashboards
+    document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('dashboard-admin').classList.add('hidden');
     document.getElementById('dashboard-loja').classList.add('hidden');
     document.getElementById('dashboard-entregador').classList.add('hidden');
-    
-    // Mostra login
-    document.getElementById('login-screen').classList.remove('hidden');
-    
-    // Limpa campos
-    document.getElementById('login-email').value = '';
-    document.getElementById('login-senha').value = '';
-    document.getElementById('login-error').textContent = '';
-    
-    // Volta para tab de login
-    switchTab('login');
 }
 </script>
 
