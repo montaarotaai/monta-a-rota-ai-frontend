@@ -68,6 +68,10 @@
         button:hover {
             opacity: 0.9;
         }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
         .tabs {
             display: flex;
             margin-bottom: 20px;
@@ -116,7 +120,6 @@
             color: white;
             padding: 20px;
             text-align: center;
-            position: relative;
         }
         .header img {
             width: 80px;
@@ -170,6 +173,76 @@
             border: none;
             width: auto;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .modal-content {
+            background: white;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 600px;
+            position: relative;
+        }
+        .close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            cursor: pointer;
+        }
+        .list-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-online { color: #00C9A7; font-weight: bold; }
+        .btn {
+            background: #FF6B35;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .error-msg {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .success-msg {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -188,6 +261,7 @@
 
     <!-- LOGIN -->
     <div id="login-tab" class="tab-content active">
+        <div id="login-msg"></div>
         <div class="user-type">
             <label><input type="radio" name="login-type" value="admin" checked> <span>👑 Admin</span></label>
             <label><input type="radio" name="login-type" value="loja"> <span>🏪 Loja</span></label>
@@ -201,11 +275,12 @@
             <label>Senha</label>
             <input type="password" id="login-senha" placeholder="••••••">
         </div>
-        <button onclick="fazerLogin()">Entrar</button>
+        <button onclick="fazerLogin()" id="btn-login">Entrar</button>
     </div>
 
     <!-- CADASTRO -->
     <div id="register-tab" class="tab-content">
+        <div id="register-msg"></div>
         <div class="user-type">
             <label><input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()"> <span>🏪 Loja</span></label>
             <label><input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()"> <span>🛵 Entregador</span></label>
@@ -260,13 +335,13 @@
             </div>
         </div>
 
-        <button onclick="fazerCadastro()">Cadastrar</button>
+        <button onclick="fazerCadastro()" id="btn-cadastrar">Cadastrar</button>
     </div>
 </div>
 
 <!-- DASHBOARD ADMIN -->
 <div id="dashboard-admin" class="hidden">
-    <div class="header">
+    <div class="header" style="position: relative;">
         <button class="logout" onclick="fazerLogout()">Sair</button>
         <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
         <h1>Monta a Rota Aí</h1>
@@ -274,37 +349,37 @@
     </div>
     <div class="container">
         <div class="cards">
-            <div class="card">
+            <div class="card" onclick="carregarEntregas()">
                 <h3>Entregas Hoje</h3>
-                <div class="value">0</div>
+                <div class="value" id="entregas-hoje">-</div>
             </div>
-            <div class="card">
+            <div class="card" onclick="carregarEntregadores()">
                 <h3>Entregadores Online</h3>
-                <div class="value">0</div>
+                <div class="value" id="entregadores-online">-</div>
             </div>
-            <div class="card">
+            <div class="card" onclick="carregarLojas()">
                 <h3>Lojas Ativas</h3>
-                <div class="value">0</div>
+                <div class="value" id="lojas-ativas">-</div>
             </div>
             <div class="card">
                 <h3>Faturamento</h3>
-                <div class="value">R$ 0</div>
+                <div class="value" id="faturamento">R$ -</div>
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item">
+            <div class="menu-item" onclick="carregarEntregadores()">
                 <div class="icon">🛵</div>
                 <h3>Entregadores</h3>
             </div>
-            <div class="menu-item">
+            <div class="menu-item" onclick="carregarLojas()">
                 <div class="icon">🏪</div>
                 <h3>Lojas</h3>
             </div>
-            <div class="menu-item">
+            <div class="menu-item" onclick="carregarEntregas()">
                 <div class="icon">📦</div>
                 <h3>Pedidos</h3>
             </div>
-            <div class="menu-item">
+            <div class="menu-item" onclick="openModal('faturamento')">
                 <div class="icon">💰</div>
                 <h3>Financeiro</h3>
             </div>
@@ -314,7 +389,7 @@
 
 <!-- DASHBOARD LOJA -->
 <div id="dashboard-loja" class="hidden">
-    <div class="header">
+    <div class="header" style="position: relative;">
         <button class="logout" onclick="fazerLogout()">Sair</button>
         <h1 id="nome-loja-display">Minha Loja</h1>
         <p>Área da Loja</p>
@@ -323,23 +398,23 @@
         <div class="cards">
             <div class="card">
                 <h3>Pedidos Hoje</h3>
-                <div class="value">0</div>
+                <div class="value" id="pedidos-loja-hoje">-</div>
             </div>
             <div class="card">
                 <h3>Entregadores Disponíveis</h3>
-                <div class="value">0</div>
+                <div class="value" id="entregadores-disponiveis">-</div>
             </div>
             <div class="card">
                 <h3>Taxa por Entrega</h3>
-                <div class="value">R$ 4,50</div>
+                <div class="value" id="taxa-loja">R$ 4,50</div>
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item">
+            <div class="menu-item" onclick="openModal('scanner')">
                 <div class="icon">📷</div>
                 <h3>Scanear Comanda</h3>
             </div>
-            <div class="menu-item">
+            <div class="menu-item" onclick="carregarMeusPedidos()">
                 <div class="icon">📋</div>
                 <h3>Meus Pedidos</h3>
             </div>
@@ -357,7 +432,7 @@
 
 <!-- DASHBOARD ENTREGADOR -->
 <div id="dashboard-entregador" class="hidden">
-    <div class="header">
+    <div class="header" style="position: relative;">
         <button class="logout" onclick="fazerLogout()">Sair</button>
         <h1 id="nome-entregador-display">Entregador</h1>
         <p>Área do Entregador</p>
@@ -366,19 +441,19 @@
         <div class="cards">
             <div class="card">
                 <h3>Entregas Hoje</h3>
-                <div class="value">0</div>
+                <div class="value" id="minhas-entregas">-</div>
             </div>
             <div class="card">
                 <h3>Ganhos Hoje</h3>
-                <div class="value">R$ 0</div>
+                <div class="value" id="meus-ganhos">R$ -</div>
             </div>
             <div class="card">
                 <h3>Avaliação</h3>
-                <div class="value">⭐ 5.0</div>
+                <div class="value" id="minha-avaliacao">⭐ -</div>
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item">
+            <div class="menu-item" onclick="ficarOnline()">
                 <div class="icon">🚀</div>
                 <h3>Ficar Online</h3>
             </div>
@@ -398,13 +473,63 @@
     </div>
 </div>
 
+<!-- MODAIS -->
+<div id="modal-entregadores" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('entregadores')">&times;</span>
+        <h2>🛵 Entregadores</h2>
+        <div id="lista-entregadores"></div>
+    </div>
+</div>
+
+<div id="modal-lojas" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('lojas')">&times;</span>
+        <h2>🏪 Lojas</h2>
+        <div id="lista-lojas"></div>
+    </div>
+</div>
+
+<div id="modal-entregas" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('entregas')">&times;</span>
+        <h2>📦 Pedidos</h2>
+        <div id="lista-entregas"></div>
+    </div>
+</div>
+
+<div id="modal-faturamento" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('faturamento')">&times;</span>
+        <h2>💰 Faturamento</h2>
+        <div id="dados-faturamento"></div>
+    </div>
+</div>
+
 <script>
+// ==========================================
+// CONFIGURAÇÃO - URL DO BACKEND NO RAILWAY
+// ==========================================
+// ⚠️ SUBSTITUA PELA SUA URL DO RAILWAY!
+const API_URL = 'https://monta-a-rota-ai-backend-production.up.railway.app';
+// Se não souber a URL, use o Railway Dashboard para pegar
+
+let usuarioLogado = null;
+let token = localStorage.getItem('token');
+
+// Verifica se já está logado ao carregar
+if (token) {
+    verificarToken();
+}
+
 function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     
     event.target.classList.add('active');
     document.getElementById(tab + '-tab').classList.add('active');
+    document.getElementById('login-msg').innerHTML = '';
+    document.getElementById('register-msg').innerHTML = '';
 }
 
 function toggleCadastro() {
@@ -413,28 +538,156 @@ function toggleCadastro() {
     document.getElementById('campos-entregador').classList.toggle('hidden', tipo !== 'entregador');
 }
 
-function fazerLogin() {
+function showMsg(elementId, msg, isError = true) {
+    const el = document.getElementById(elementId);
+    el.className = isError ? 'error-msg' : 'success-msg';
+    el.textContent = msg;
+}
+
+function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.innerHTML = loading ? '<span class="loading"></span> Processando...' : (btnId === 'btn-login' ? 'Entrar' : 'Cadastrar');
+}
+
+// ==========================================
+// LOGIN REAL COM API
+// ==========================================
+async function fazerLogin() {
     const email = document.getElementById('login-email').value;
     const senha = document.getElementById('login-senha').value;
-    const tipo = document.querySelector('input[name="login-type"]:checked').value;
     
     if (!email || !senha) {
-        alert('Preencha email e senha');
+        showMsg('login-msg', 'Preencha email e senha');
         return;
     }
     
-    // Login simulado - depois conectamos com backend
-    if (senha === '123456') {
-        mostrarDashboard(tipo);
-    } else {
-        alert('Senha incorreta. Use: 123456');
+    setLoading('btn-login', true);
+    
+    try {
+        const response = await fetch(`${API_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, senha })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.erro || 'Erro no login');
+        }
+        
+        // Salva dados
+        token = data.token;
+        usuarioLogado = data.usuario;
+        localStorage.setItem('token', token);
+        localStorage.setItem('usuario', JSON.stringify(usuarioLogado));
+        
+        showMsg('login-msg', 'Login realizado! Redirecionando...', false);
+        
+        // Redireciona para dashboard correto
+        setTimeout(() => {
+            mostrarDashboard(usuarioLogado.papel);
+        }, 500);
+        
+    } catch (error) {
+        showMsg('login-msg', error.message);
+    } finally {
+        setLoading('btn-login', false);
     }
 }
 
-function fazerCadastro() {
+// ==========================================
+// CADASTRO REAL COM API
+// ==========================================
+async function fazerCadastro() {
     const tipo = document.querySelector('input[name="register-type"]:checked').value;
-    alert(`Cadastro de ${tipo} realizado! Faça login.`);
-    switchTab('login');
+    const nome = document.getElementById('reg-nome').value;
+    const email = document.getElementById('reg-email').value;
+    const telefone = document.getElementById('reg-telefone').value;
+    const senha = document.getElementById('reg-senha').value;
+    
+    if (!nome || !email || !senha) {
+        showMsg('register-msg', 'Preencha nome, email e senha');
+        return;
+    }
+    
+    setLoading('btn-cadastrar', true);
+    
+    try {
+        // Primeiro cria o usuário
+        const response = await fetch(`${API_URL}/api/auth/cadastrar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                nome, 
+                email, 
+                senha, 
+                papel: tipo 
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.erro || 'Erro no cadastro');
+        }
+        
+        // Se for loja, cria a loja também
+        if (tipo === 'loja') {
+            const nomeLoja = document.getElementById('reg-nome-loja').value;
+            const cnpj = document.getElementById('reg-cnpj').value;
+            const endereco = document.getElementById('reg-endereco').value;
+            
+            if (nomeLoja) {
+                await fetch(`${API_URL}/api/lojas`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${data.token || token}`
+                    },
+                    body: JSON.stringify({
+                        nome: nomeLoja,
+                        cnpj,
+                        endereco,
+                        telefone,
+                        email
+                    })
+                });
+            }
+        }
+        
+        showMsg('register-msg', 'Cadastro realizado! Faça login.', false);
+        setTimeout(() => switchTab('login'), 1500);
+        
+    } catch (error) {
+        showMsg('register-msg', error.message);
+    } finally {
+        setLoading('btn-cadastrar', false);
+    }
+}
+
+// ==========================================
+// VERIFICAR TOKEN SALVO
+// ==========================================
+async function verificarToken() {
+    try {
+        const response = await fetch(`${API_URL}/api/lojas`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            usuarioLogado = JSON.parse(localStorage.getItem('usuario'));
+            mostrarDashboard(usuarioLogado.papel);
+        } else {
+            // Token inválido
+            localStorage.removeItem('token');
+            localStorage.removeItem('usuario');
+            token = null;
+        }
+    } catch (e) {
+        console.log('Erro ao verificar token:', e);
+    }
 }
 
 function mostrarDashboard(tipo) {
@@ -444,13 +697,142 @@ function mostrarDashboard(tipo) {
     document.getElementById('dashboard-entregador').classList.add('hidden');
     
     document.getElementById('dashboard-' + tipo).classList.remove('hidden');
+    
+    if (tipo === 'loja') {
+        document.getElementById('nome-loja-display').textContent = usuarioLogado.nome;
+        carregarDadosLoja();
+    } else if (tipo === 'entregador') {
+        document.getElementById('nome-entregador-display').textContent = usuarioLogado.nome;
+        carregarDadosEntregador();
+    } else if (tipo === 'admin') {
+        carregarDadosAdmin();
+    }
 }
 
 function fazerLogout() {
+    usuarioLogado = null;
+    token = null;
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('dashboard-admin').classList.add('hidden');
     document.getElementById('dashboard-loja').classList.add('hidden');
     document.getElementById('dashboard-entregador').classList.add('hidden');
+}
+
+// ==========================================
+// CARREGAR DADOS REAIS DA API
+// ==========================================
+async function carregarDadosAdmin() {
+    try {
+        // Entregadores online
+        const respEnt = await fetch(`${API_URL}/api/entregadores?status=disponivel`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const entregadores = await respEnt.json();
+        document.getElementById('entregadores-online').textContent = Array.isArray(entregadores) ? entregadores.length : '-';
+        
+        // Lojas ativas
+        const respLojas = await fetch(`${API_URL}/api/lojas`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const lojas = await respLojas.json();
+        document.getElementById('lojas-ativas').textContent = Array.isArray(lojas) ? lojas.length : '-';
+        
+    } catch (e) {
+        console.error('Erro ao carregar dados admin:', e);
+    }
+}
+
+async function carregarDadosLoja() {
+    // Implementar: carregar pedidos da loja específica
+}
+
+async function carregarDadosEntregador() {
+    // Implementar: carregar dados do entregador
+}
+
+async function carregarEntregadores() {
+    openModal('entregadores');
+    const lista = document.getElementById('lista-entregadores');
+    lista.innerHTML = '<p>Carregando...</p>';
+    
+    try {
+        const response = await fetch(`${API_URL}/api/entregadores`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const entregadores = await response.json();
+        
+        if (!Array.isArray(entregadores) || entregadores.length === 0) {
+            lista.innerHTML = '<p>Nenhum entregador cadastrado</p>';
+            return;
+        }
+        
+        lista.innerHTML = entregadores.map(e => `
+            <div class="list-item">
+                <div>
+                    <strong>${e.nome}</strong><br>
+                    <small>${e.telefone || 'Sem telefone'}</small>
+                </div>
+                <span class="status-online">${e.status || 'offline'}</span>
+            </div>
+        `).join('');
+        
+    } catch (e) {
+        lista.innerHTML = '<p>Erro ao carregar entregadores</p>';
+    }
+}
+
+async function carregarLojas() {
+    openModal('lojas');
+    const lista = document.getElementById('lista-lojas');
+    lista.innerHTML = '<p>Carregando...</p>';
+    
+    try {
+        const response = await fetch(`${API_URL}/api/lojas`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const lojas = await response.json();
+        
+        if (!Array.isArray(lojas) || lojas.length === 0) {
+            lista.innerHTML = '<p>Nenhuma loja cadastrada</p>';
+            return;
+        }
+        
+        lista.innerHTML = lojas.map(l => `
+            <div class="list-item">
+                <div>
+                    <strong>${l.nome}</strong><br>
+                    <small>${l.endereco || 'Sem endereço'}</small>
+                </div>
+                <span>${l.telefone || ''}</span>
+            </div>
+        `).join('');
+        
+    } catch (e) {
+        lista.innerHTML = '<p>Erro ao carregar lojas</p>';
+    }
+}
+
+async function carregarEntregas() {
+    openModal('entregas');
+    document.getElementById('lista-entregas').innerHTML = '<p>Carregando pedidos...</p>';
+    // Implementar: buscar pedidos da API
+}
+
+function openModal(tipo) {
+    document.getElementById('modal-' + tipo).style.display = 'block';
+}
+
+function closeModal(tipo) {
+    document.getElementById('modal-' + tipo).style.display = 'none';
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
 }
 </script>
 
