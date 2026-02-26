@@ -17,6 +17,13 @@
             padding: 20px;
             text-align: center;
         }
+        .header img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+            object-fit: cover;
+        }
         .header h1 { font-size: 24px; margin-bottom: 5px; }
         .header p { font-size: 14px; opacity: 0.9; }
         .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
@@ -31,6 +38,12 @@
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
         }
         .card h3 { font-size: 14px; color: #666; margin-bottom: 10px; }
         .card .value { font-size: 32px; font-weight: bold; color: #FF6B35; }
@@ -47,54 +60,253 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             text-decoration: none;
             color: #333;
+            cursor: pointer;
         }
         .menu-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .menu-item .icon { font-size: 32px; margin-bottom: 10px; }
         .menu-item h3 { font-size: 16px; }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .modal-content {
+            background: white;
+            margin: 20px auto;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 600px;
+            position: relative;
+        }
+        .close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+        }
+        .close:hover { color: #333; }
+        .list-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .list-item:last-child { border-bottom: none; }
+        .status-online { color: #00C9A7; font-weight: bold; }
+        .status-offline { color: #999; }
+        .btn {
+            background: #FF6B35;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn:hover { background: #e55a2b; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🚀 Monta a Rota Aí</h1>
+        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
+        <h1>Monta a Rota Aí</h1>
         <p>Dashboard Administrativo</p>
     </div>
+    
     <div class="container">
         <div class="cards">
-            <div class="card">
+            <div class="card" onclick="openModal('entregas')">
                 <h3>Entregas Hoje</h3>
-                <div class="value">0</div>
+                <div class="value" id="entregas-hoje">0</div>
             </div>
-            <div class="card">
+            <div class="card" onclick="openModal('entregadores')">
                 <h3>Entregadores Online</h3>
-                <div class="value">0</div>
+                <div class="value" id="entregadores-online">0</div>
             </div>
-            <div class="card">
+            <div class="card" onclick="openModal('lojas')">
                 <h3>Lojas Ativas</h3>
-                <div class="value">0</div>
+                <div class="value" id="lojas-ativas">0</div>
             </div>
-            <div class="card">
+            <div class="card" onclick="openModal('faturamento')">
                 <h3>Faturamento</h3>
-                <div class="value">R$ 0</div>
+                <div class="value" id="faturamento">R$ 0</div>
             </div>
         </div>
+        
         <div class="menu">
-            <a href="#" class="menu-item">
+            <div class="menu-item" onclick="openModal('entregadores')">
                 <div class="icon">🛵</div>
                 <h3>Entregadores</h3>
-            </a>
-            <a href="#" class="menu-item">
+            </div>
+            <div class="menu-item" onclick="openModal('lojas')">
                 <div class="icon">🏪</div>
                 <h3>Lojas</h3>
-            </a>
-            <a href="#" class="menu-item">
+            </div>
+            <div class="menu-item" onclick="openModal('entregas')">
                 <div class="icon">📦</div>
                 <h3>Pedidos</h3>
-            </a>
-            <a href="#" class="menu-item">
+            </div>
+            <div class="menu-item" onclick="openModal('faturamento')">
                 <div class="icon">💰</div>
                 <h3>Financeiro</h3>
-            </a>
+            </div>
         </div>
     </div>
+
+    <!-- Modal Entregas -->
+    <div id="modal-entregas" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('entregas')">&times;</span>
+            <h2>📦 Entregas de Hoje</h2>
+            <div id="lista-entregas">
+                <p style="color: #999; text-align: center; padding: 20px;">Nenhuma entrega hoje</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Entregadores -->
+    <div id="modal-entregadores" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('entregadores')">&times;</span>
+            <h2>🛵 Entregadores Online</h2>
+            <div id="lista-entregadores">
+                <p style="color: #999; text-align: center; padding: 20px;">Nenhum entregador online</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Lojas -->
+    <div id="modal-lojas" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('lojas')">&times;</span>
+            <h2>🏪 Lojas Ativas</h2>
+            <div id="lista-lojas">
+                <p style="color: #999; text-align: center; padding: 20px;">Nenhuma loja ativa</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Faturamento -->
+    <div id="modal-faturamento" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('faturamento')">&times;</span>
+            <h2>💰 Faturamento</h2>
+            <div style="margin: 20px 0;">
+                <div class="card" style="margin-bottom: 15px;">
+                    <h3>Faturamento Hoje</h3>
+                    <div class="value">R$ 0</div>
+                </div>
+                <div class="card" style="margin-bottom: 15px;">
+                    <h3>Faturamento Semana</h3>
+                    <div class="value">R$ 0</div>
+                </div>
+                <div class="card">
+                    <h3>Faturamento Mês</h3>
+                    <div class="value">R$ 0</div>
+                </div>
+            </div>
+            <button class="btn" style="width: 100%; padding: 15px; font-size: 16px;">
+                Ver Relatório Completo
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Dados mockados - depois conectamos com o backend
+        let dados = {
+            entregas: [],
+            entregadores: [
+                { nome: "João Silva", status: "online", localizacao: "Rua A, 123" },
+                { nome: "Pedro Santos", status: "offline", localizacao: "-" },
+                { nome: "Maria Oliveira", status: "online", localizacao: "Av. B, 456" }
+            ],
+            lojas: [
+                { nome: "Pizzaria do Zé", status: "ativa", pedidos: 5 },
+                { nome: "Hamburgueria Top", status: "ativa", pedidos: 3 },
+                { nome: "Sushi Bar", status: "inativa", pedidos: 0 }
+            ]
+        };
+
+        function openModal(tipo) {
+            document.getElementById('modal-' + tipo).style.display = 'block';
+            if (tipo === 'entregadores') carregarEntregadores();
+            if (tipo === 'lojas') carregarLojas();
+        }
+
+        function closeModal(tipo) {
+            document.getElementById('modal-' + tipo).style.display = 'none';
+        }
+
+        function carregarEntregadores() {
+            const container = document.getElementById('lista-entregadores');
+            if (dados.entregadores.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Nenhum entregador online</p>';
+                return;
+            }
+            
+            container.innerHTML = dados.entregadores.map(e => `
+                <div class="list-item">
+                    <div>
+                        <strong>${e.nome}</strong><br>
+                        <small>${e.localizacao}</small>
+                    </div>
+                    <span class="${e.status === 'online' ? 'status-online' : 'status-offline'}">
+                        ${e.status === 'online' ? '🟢 Online' : '⚪ Offline'}
+                    </span>
+                </div>
+            `).join('');
+            
+            document.getElementById('entregadores-online').textContent = 
+                dados.entregadores.filter(e => e.status === 'online').length;
+        }
+
+        function carregarLojas() {
+            const container = document.getElementById('lista-lojas');
+            if (dados.lojas.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">Nenhuma loja ativa</p>';
+                return;
+            }
+            
+            container.innerHTML = dados.lojas.map(l => `
+                <div class="list-item">
+                    <div>
+                        <strong>${l.nome}</strong><br>
+                        <small>${l.pedidos} pedidos hoje</small>
+                    </div>
+                    <span class="${l.status === 'ativa' ? 'status-online' : 'status-offline'}">
+                        ${l.status === 'ativa' ? '🟢 Ativa' : '⚪ Inativa'}
+                    </span>
+                </div>
+            `).join('');
+            
+            document.getElementById('lojas-ativas').textContent = 
+                dados.lojas.filter(l => l.status === 'ativa').length;
+        }
+
+        // Fechar modal clicando fora
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // Atualizar contadores ao carregar
+        window.onload = function() {
+            document.getElementById('entregadores-online').textContent = 
+                dados.entregadores.filter(e => e.status === 'online').length;
+            document.getElementById('lojas-ativas').textContent = 
+                dados.lojas.filter(l => l.status === 'ativa').length;
+        }
+    </script>
 </body>
 </html>
