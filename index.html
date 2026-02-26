@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monta a Rota Aí - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5; 
+            color: #333;
+        }
+        .header {
+            background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .card h3 { font-size: 14px; color: #666; margin-bottom: 10px; }
+        .card .value { font-size: 32px; font-weight: bold; color: #FF6B35; }
+        .menu {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .menu-item {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: #333;
+        }
+        .menu-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .menu-item .icon { font-size: 32px; margin-bottom: 10px; }
+        .menu-item h3 { font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Monta a Rota Aí</h1>
+        <p>Dashboard Administrativo</p>
+    </div>
+    <div class="container">
+        <div class="cards">
+            <div class="card">
+                <h3>Entregas Hoje</h3>
+                <div class="value">0</div>
+            </div>
+            <div class="card">
+                <h3>Entregadores Online</h3>
+                <div class="value">0</div>
+            </div>
+            <div class="card">
+                <h3>Lojas Ativas</h3>
+                <div class="value">0</div>
+            </div>
+            <div class="card">
+                <h3>Faturamento</h3>
+                <div class="value">R$ 0</div>
+            </div>
+        </div>
+        <div class="menu">
+            <a href="#" class="menu-item">
+                <div class="icon">🛵</div>
+                <h3>Entregadores</h3>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="icon">🏪</div>
+                <h3>Lojas</h3>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="icon">📦</div>
+                <h3>Pedidos</h3>
+            </a>
+            <a href="#" class="menu-item">
+                <div class="icon">💰</div>
+                <h3>Financeiro</h3>
+            </a>
+        </div>
+    </div>
+</body>
+</html>
