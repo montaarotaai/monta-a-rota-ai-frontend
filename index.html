@@ -25,10 +25,9 @@
             margin-bottom: 30px;
         }
         .logo img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
         }
         h2 {
             text-align: center;
@@ -126,11 +125,10 @@
             position: relative;
         }
         .header img {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
             margin-bottom: 10px;
-            object-fit: cover;
         }
         .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
         .cards {
@@ -184,8 +182,7 @@
 <!-- TELA DE LOGIN -->
 <div id="login-screen" class="login-container">
     <div class="logo">
-        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
-        <h2>Monta a Rota Aí</h2>
+        <img src="logo.png" alt="Monta a Rota Aí">
     </div>
     
     <div class="tabs">
@@ -273,9 +270,8 @@
 <div id="dashboard-admin" class="hidden">
     <div class="header">
         <button class="logout" onclick="fazerLogout()">Sair</button>
-        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
-        <h1>Monta a Rota Aí</h1>
-        <p>Dashboard Administrativo</p>
+        <img src="logo.png" alt="Monta a Rota Aí">
+        <h1>Dashboard Administrativo</h1>
         <p id="admin-email" style="font-size: 12px; opacity: 0.8;"></p>
     </div>
     <div class="container">
@@ -322,6 +318,7 @@
 <div id="dashboard-loja" class="hidden">
     <div class="header">
         <button class="logout" onclick="fazerLogout()">Sair</button>
+        <img src="logo.png" alt="Monta a Rota Aí">
         <h1 id="nome-loja-display">Minha Loja</h1>
         <p>Área da Loja</p>
     </div>
@@ -365,6 +362,7 @@
 <div id="dashboard-entregador" class="hidden">
     <div class="header">
         <button class="logout" onclick="fazerLogout()">Sair</button>
+        <img src="logo.png" alt="Monta a Rota Aí">
         <h1 id="nome-entregador-display">Entregador</h1>
         <p>Área do Entregador</p>
     </div>
@@ -444,7 +442,6 @@ async function fazerLogin() {
     errorDiv.textContent = '';
     
     try {
-        // Busca usuário no banco
         const { data: usuario, error } = await supabase
             .from('usuarios')
             .select('*')
@@ -459,14 +456,12 @@ async function fazerLogin() {
         }
         
         if (usuario.status === 'bloqueado') {
-            errorDiv.textContent = 'Usuário bloqueado. Entre em contato com o suporte.';
+            errorDiv.textContent = 'Usuário bloqueado';
             btn.disabled = false;
             btn.textContent = 'Entrar';
             return;
         }
         
-        // Verifica senha (em produção usar bcrypt)
-        // Por enquanto compara direto (você vai inserir com hash no banco)
         if (senha !== '123456' && senha !== usuario.senha_hash) {
             errorDiv.textContent = 'Senha incorreta';
             btn.disabled = false;
@@ -474,14 +469,11 @@ async function fazerLogin() {
             return;
         }
         
-        // Salva sessão
         localStorage.setItem('usuario', JSON.stringify(usuario));
-        
-        // Mostra dashboard
         mostrarDashboard(usuario.tipo, usuario);
         
     } catch (err) {
-        errorDiv.textContent = 'Erro ao fazer login: ' + err.message;
+        errorDiv.textContent = 'Erro ao fazer login';
         btn.disabled = false;
         btn.textContent = 'Entrar';
     }
@@ -509,7 +501,6 @@ async function fazerCadastro() {
     successDiv.textContent = '';
     
     try {
-        // Verifica se email já existe
         const { data: existente } = await supabase
             .from('usuarios')
             .select('id')
@@ -523,13 +514,12 @@ async function fazerCadastro() {
             return;
         }
         
-        // Prepara dados
         const dados = {
             tipo,
             nome,
             email,
             telefone,
-            senha_hash: senha, // Em produção usar bcrypt
+            senha_hash: senha,
             status: 'ativo'
         };
         
@@ -543,13 +533,12 @@ async function fazerCadastro() {
             dados.chave_pix = document.getElementById('reg-pix').value;
         }
         
-        // Insere no banco
         const { error } = await supabase
             .from('usuarios')
             .insert([dados]);
         
         if (error) {
-            errorDiv.textContent = 'Erro ao cadastrar: ' + error.message;
+            errorDiv.textContent = 'Erro ao cadastrar';
             btn.disabled = false;
             btn.textContent = 'Cadastrar';
             return;
@@ -559,7 +548,7 @@ async function fazerCadastro() {
         setTimeout(() => switchTab('login'), 2000);
         
     } catch (err) {
-        errorDiv.textContent = 'Erro: ' + err.message;
+        errorDiv.textContent = 'Erro no cadastro';
         btn.disabled = false;
         btn.textContent = 'Cadastrar';
     }
@@ -581,7 +570,6 @@ function mostrarDashboard(tipo, usuario) {
         document.getElementById('nome-entregador-display').textContent = usuario.nome;
     }
     
-    // Reset botão login
     document.getElementById('btn-login').disabled = false;
     document.getElementById('btn-login').textContent = 'Entrar';
 }
@@ -596,7 +584,6 @@ function fazerLogout() {
     document.getElementById('login-senha').value = '';
 }
 
-// Verifica se já está logado ao carregar
 window.onload = function() {
     const usuario = localStorage.getItem('usuario');
     if (usuario) {
