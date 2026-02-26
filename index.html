@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monta a Rota Aí - Login</title>
+    <title>Monta a Rota A\u00ed</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -34,9 +35,7 @@
             color: #004E89;
             margin-bottom: 20px;
         }
-        .form-group {
-            margin-bottom: 15px;
-        }
+        .form-group { margin-bottom: 15px; }
         label {
             display: block;
             margin-bottom: 5px;
@@ -50,10 +49,7 @@
             border-radius: 8px;
             font-size: 16px;
         }
-        input:focus {
-            outline: none;
-            border-color: #FF6B35;
-        }
+        input:focus { outline: none; border-color: #FF6B35; }
         button {
             width: 100%;
             padding: 15px;
@@ -65,40 +61,24 @@
             cursor: pointer;
             margin-top: 10px;
         }
-        button:hover {
-            opacity: 0.9;
-        }
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .tabs { display: flex; margin-bottom: 20px; }
         .tab {
             flex: 1;
             padding: 10px;
             text-align: center;
             cursor: pointer;
             border-bottom: 2px solid #ddd;
+            background: none;
+            color: #333;
+            font-size: 15px;
+            margin-top: 0;
         }
-        .tab.active {
-            border-bottom-color: #FF6B35;
-            color: #FF6B35;
-            font-weight: bold;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .user-type {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
+        .tab.active { border-bottom-color: #FF6B35; color: #FF6B35; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .user-type { display: flex; gap: 10px; margin-bottom: 15px; }
         .user-type label {
             flex: 1;
             padding: 10px;
@@ -106,20 +86,34 @@
             border: 2px solid #ddd;
             border-radius: 8px;
             cursor: pointer;
+            margin-bottom: 0;
         }
-        .user-type input:checked + label {
-            border-color: #FF6B35;
-            background: #fff5f2;
-        }
+        .user-type input:checked + label { border-color: #FF6B35; background: #fff5f2; }
         .user-type input { display: none; }
         .hidden { display: none !important; }
-        
-        /* Dashboard Styles */
+        .error-msg {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .success-msg {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        /* Dashboard */
         .header {
             background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%);
             color: white;
             padding: 20px;
             text-align: center;
+            position: relative;
         }
         .header img {
             width: 80px;
@@ -131,7 +125,7 @@
         .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
         .cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -158,6 +152,7 @@
             text-align: center;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             cursor: pointer;
+            transition: transform 0.2s;
         }
         .menu-item:hover { transform: translateY(-2px); }
         .menu-item .icon { font-size: 32px; margin-bottom: 10px; }
@@ -176,10 +171,8 @@
         .modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0,0,0,0.5);
             z-index: 1000;
             overflow-y: auto;
@@ -194,8 +187,7 @@
         }
         .close {
             position: absolute;
-            top: 10px;
-            right: 15px;
+            top: 10px; right: 15px;
             font-size: 28px;
             cursor: pointer;
         }
@@ -206,43 +198,6 @@
             justify-content: space-between;
             align-items: center;
         }
-        .status-online { color: #00C9A7; font-weight: bold; }
-        .btn {
-            background: #FF6B35;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .error-msg {
-            background: #ffebee;
-            color: #c62828;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        .success-msg {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
     </style>
 </head>
 <body>
@@ -250,589 +205,9 @@
 <!-- TELA DE LOGIN -->
 <div id="login-screen" class="login-container">
     <div class="logo">
-        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
-        <h2>Monta a Rota Aí</h2>
+        <img src="logo.png" alt="Monta a Rota A\u00ed" onerror="this.style.display='none'">
+        <h2>Monta a Rota A\u00ed</h2>
     </div>
     
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('login')">Entrar</div>
-        <div class="tab" onclick="switchTab('register')">Cadastrar</div>
-    </div>
-
-    <!-- LOGIN -->
-    <div id="login-tab" class="tab-content active">
-        <div id="login-msg"></div>
-        <div class="user-type">
-            <label><input type="radio" name="login-type" value="admin" checked> <span>👑 Admin</span></label>
-            <label><input type="radio" name="login-type" value="loja"> <span>🏪 Loja</span></label>
-            <label><input type="radio" name="login-type" value="entregador"> <span>🛵 Entregador</span></label>
-        </div>
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="login-email" placeholder="seu@email.com">
-        </div>
-        <div class="form-group">
-            <label>Senha</label>
-            <input type="password" id="login-senha" placeholder="••••••">
-        </div>
-        <button onclick="fazerLogin()" id="btn-login">Entrar</button>
-    </div>
-
-    <!-- CADASTRO -->
-    <div id="register-tab" class="tab-content">
-        <div id="register-msg"></div>
-        <div class="user-type">
-            <label><input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()"> <span>🏪 Loja</span></label>
-            <label><input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()"> <span>🛵 Entregador</span></label>
-        </div>
         
-        <div class="form-group">
-            <label>Nome</label>
-            <input type="text" id="reg-nome" placeholder="Nome completo">
-        </div>
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="reg-email" placeholder="seu@email.com">
-        </div>
-        <div class="form-group">
-            <label>Telefone</label>
-            <input type="tel" id="reg-telefone" placeholder="(11) 99999-9999">
-        </div>
-        <div class="form-group">
-            <label>Senha</label>
-            <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres">
-        </div>
-        
-        <!-- Campos específicos Loja -->
-        <div id="campos-loja">
-            <div class="form-group">
-                <label>Nome da Loja</label>
-                <input type="text" id="reg-nome-loja" placeholder="Ex: Pizzaria do Zé">
-            </div>
-            <div class="form-group">
-                <label>CNPJ</label>
-                <input type="text" id="reg-cnpj" placeholder="00.000.000/0000-00">
-            </div>
-            <div class="form-group">
-                <label>Endereço</label>
-                <input type="text" id="reg-endereco" placeholder="Rua, número, bairro">
-            </div>
-        </div>
-
-        <!-- Campos específicos Entregador -->
-        <div id="campos-entregador" class="hidden">
-            <div class="form-group">
-                <label>CNH</label>
-                <input type="text" id="reg-cnh" placeholder="Número da CNH">
-            </div>
-            <div class="form-group">
-                <label>Placa da Moto</label>
-                <input type="text" id="reg-placa" placeholder="ABC-1234">
-            </div>
-            <div class="form-group">
-                <label>Pix para pagamento</label>
-                <input type="text" id="reg-pix" placeholder="Chave Pix">
-            </div>
-        </div>
-
-        <button onclick="fazerCadastro()" id="btn-cadastrar">Cadastrar</button>
-    </div>
-</div>
-
-<!-- DASHBOARD ADMIN -->
-<div id="dashboard-admin" class="hidden">
-    <div class="header" style="position: relative;">
-        <button class="logout" onclick="fazerLogout()">Sair</button>
-        <img src="logo.png" alt="Monta a Rota Aí" onerror="this.style.display='none'">
-        <h1>Monta a Rota Aí</h1>
-        <p>Dashboard Administrativo</p>
-    </div>
-    <div class="container">
-        <div class="cards">
-            <div class="card" onclick="carregarEntregas()">
-                <h3>Entregas Hoje</h3>
-                <div class="value" id="entregas-hoje">-</div>
-            </div>
-            <div class="card" onclick="carregarEntregadores()">
-                <h3>Entregadores Online</h3>
-                <div class="value" id="entregadores-online">-</div>
-            </div>
-            <div class="card" onclick="carregarLojas()">
-                <h3>Lojas Ativas</h3>
-                <div class="value" id="lojas-ativas">-</div>
-            </div>
-            <div class="card">
-                <h3>Faturamento</h3>
-                <div class="value" id="faturamento">R$ -</div>
-            </div>
-        </div>
-        <div class="menu">
-            <div class="menu-item" onclick="carregarEntregadores()">
-                <div class="icon">🛵</div>
-                <h3>Entregadores</h3>
-            </div>
-            <div class="menu-item" onclick="carregarLojas()">
-                <div class="icon">🏪</div>
-                <h3>Lojas</h3>
-            </div>
-            <div class="menu-item" onclick="carregarEntregas()">
-                <div class="icon">📦</div>
-                <h3>Pedidos</h3>
-            </div>
-            <div class="menu-item" onclick="openModal('faturamento')">
-                <div class="icon">💰</div>
-                <h3>Financeiro</h3>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- DASHBOARD LOJA -->
-<div id="dashboard-loja" class="hidden">
-    <div class="header" style="position: relative;">
-        <button class="logout" onclick="fazerLogout()">Sair</button>
-        <h1 id="nome-loja-display">Minha Loja</h1>
-        <p>Área da Loja</p>
-    </div>
-    <div class="container">
-        <div class="cards">
-            <div class="card">
-                <h3>Pedidos Hoje</h3>
-                <div class="value" id="pedidos-loja-hoje">-</div>
-            </div>
-            <div class="card">
-                <h3>Entregadores Disponíveis</h3>
-                <div class="value" id="entregadores-disponiveis">-</div>
-            </div>
-            <div class="card">
-                <h3>Taxa por Entrega</h3>
-                <div class="value" id="taxa-loja">R$ 4,50</div>
-            </div>
-        </div>
-        <div class="menu">
-            <div class="menu-item" onclick="openModal('scanner')">
-                <div class="icon">📷</div>
-                <h3>Scanear Comanda</h3>
-            </div>
-            <div class="menu-item" onclick="carregarMeusPedidos()">
-                <div class="icon">📋</div>
-                <h3>Meus Pedidos</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">💳</div>
-                <h3>Pagamentos</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">⚙️</div>
-                <h3>Configurações</h3>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- DASHBOARD ENTREGADOR -->
-<div id="dashboard-entregador" class="hidden">
-    <div class="header" style="position: relative;">
-        <button class="logout" onclick="fazerLogout()">Sair</button>
-        <h1 id="nome-entregador-display">Entregador</h1>
-        <p>Área do Entregador</p>
-    </div>
-    <div class="container">
-        <div class="cards">
-            <div class="card">
-                <h3>Entregas Hoje</h3>
-                <div class="value" id="minhas-entregas">-</div>
-            </div>
-            <div class="card">
-                <h3>Ganhos Hoje</h3>
-                <div class="value" id="meus-ganhos">R$ -</div>
-            </div>
-            <div class="card">
-                <h3>Avaliação</h3>
-                <div class="value" id="minha-avaliacao">⭐ -</div>
-            </div>
-        </div>
-        <div class="menu">
-            <div class="menu-item" onclick="ficarOnline()">
-                <div class="icon">🚀</div>
-                <h3>Ficar Online</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">📍</div>
-                <h3>Minha Rota</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">💰</div>
-                <h3>Meus Ganhos</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">⚙️</div>
-                <h3>Configurações</h3>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAIS -->
-<div id="modal-entregadores" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal('entregadores')">&times;</span>
-        <h2>🛵 Entregadores</h2>
-        <div id="lista-entregadores"></div>
-    </div>
-</div>
-
-<div id="modal-lojas" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal('lojas')">&times;</span>
-        <h2>🏪 Lojas</h2>
-        <div id="lista-lojas"></div>
-    </div>
-</div>
-
-<div id="modal-entregas" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal('entregas')">&times;</span>
-        <h2>📦 Pedidos</h2>
-        <div id="lista-entregas"></div>
-    </div>
-</div>
-
-<div id="modal-faturamento" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal('faturamento')">&times;</span>
-        <h2>💰 Faturamento</h2>
-        <div id="dados-faturamento"></div>
-    </div>
-</div>
-
-<script>
-// ==========================================
-// CONFIGURAÇÃO - URL DO BACKEND NO RAILWAY
-// ==========================================
-const API_URL = 'https://monta-a-rota-ai-backend-production.up.railway.app';
-
-let usuarioLogado = null;
-let token = localStorage.getItem('token');
-
-// Verifica se já está logado ao carregar
-if (token) {
-    verificarToken();
-}
-
-function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    
-    event.target.classList.add('active');
-    document.getElementById(tab + '-tab').classList.add('active');
-    document.getElementById('login-msg').innerHTML = '';
-    document.getElementById('register-msg').innerHTML = '';
-}
-
-function toggleCadastro() {
-    const tipo = document.querySelector('input[name="register-type"]:checked').value;
-    document.getElementById('campos-loja').classList.toggle('hidden', tipo !== 'loja');
-    document.getElementById('campos-entregador').classList.toggle('hidden', tipo !== 'entregador');
-}
-
-function showMsg(elementId, msg, isError = true) {
-    const el = document.getElementById(elementId);
-    el.className = isError ? 'error-msg' : 'success-msg';
-    el.textContent = msg;
-}
-
-function setLoading(btnId, loading) {
-    const btn = document.getElementById(btnId);
-    btn.disabled = loading;
-    btn.innerHTML = loading ? '<span class="loading"></span> Processando...' : (btnId === 'btn-login' ? 'Entrar' : 'Cadastrar');
-}
-
-// ==========================================
-// LOGIN REAL COM API
-// ==========================================
-async function fazerLogin() {
-    const email = document.getElementById('login-email').value;
-    const senha = document.getElementById('login-senha').value;
-    
-    if (!email || !senha) {
-        showMsg('login-msg', 'Preencha email e senha');
-        return;
-    }
-    
-    setLoading('btn-login', true);
-    
-    try {
-        const response = await fetch(`${API_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, senha })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.erro || 'Erro no login');
-        }
-        
-        // Salva dados
-        token = data.token;
-        usuarioLogado = data.usuario;
-        localStorage.setItem('token', token);
-        localStorage.setItem('usuario', JSON.stringify(usuarioLogado));
-        
-        showMsg('login-msg', 'Login realizado! Redirecionando...', false);
-        
-        // Redireciona para dashboard correto
-        setTimeout(() => {
-            mostrarDashboard(usuarioLogado.papel);
-        }, 500);
-        
-    } catch (error) {
-        showMsg('login-msg', error.message);
-    } finally {
-        setLoading('btn-login', false);
-    }
-}
-
-// ==========================================
-// CADASTRO REAL COM API
-// ==========================================
-async function fazerCadastro() {
-    const tipo = document.querySelector('input[name="register-type"]:checked').value;
-    const nome = document.getElementById('reg-nome').value;
-    const email = document.getElementById('reg-email').value;
-    const telefone = document.getElementById('reg-telefone').value;
-    const senha = document.getElementById('reg-senha').value;
-    
-    if (!nome || !email || !senha) {
-        showMsg('register-msg', 'Preencha nome, email e senha');
-        return;
-    }
-    
-    setLoading('btn-cadastrar', true);
-    
-    try {
-        // Primeiro cria o usuário
-        const response = await fetch(`${API_URL}/api/auth/cadastrar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                nome, 
-                email, 
-                senha, 
-                papel: tipo 
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.erro || 'Erro no cadastro');
-        }
-        
-        // Se for loja, cria a loja também
-        if (tipo === 'loja') {
-            const nomeLoja = document.getElementById('reg-nome-loja').value;
-            const cnpj = document.getElementById('reg-cnpj').value;
-            const endereco = document.getElementById('reg-endereco').value;
-            
-            if (nomeLoja) {
-                await fetch(`${API_URL}/api/lojas`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${data.token || token}`
-                    },
-                    body: JSON.stringify({
-                        nome: nomeLoja,
-                        cnpj,
-                        endereco,
-                        telefone,
-                        email
-                    })
-                });
-            }
-        }
-        
-        showMsg('register-msg', 'Cadastro realizado! Faça login.', false);
-        setTimeout(() => switchTab('login'), 1500);
-        
-    } catch (error) {
-        showMsg('register-msg', error.message);
-    } finally {
-        setLoading('btn-cadastrar', false);
-    }
-}
-
-// ==========================================
-// VERIFICAR TOKEN SALVO
-// ==========================================
-async function verificarToken() {
-    try {
-        const response = await fetch(`${API_URL}/api/lojas`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (response.ok) {
-            usuarioLogado = JSON.parse(localStorage.getItem('usuario'));
-            mostrarDashboard(usuarioLogado.papel);
-        } else {
-            // Token inválido
-            localStorage.removeItem('token');
-            localStorage.removeItem('usuario');
-            token = null;
-        }
-    } catch (e) {
-        console.log('Erro ao verificar token:', e);
-    }
-}
-
-function mostrarDashboard(tipo) {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('dashboard-admin').classList.add('hidden');
-    document.getElementById('dashboard-loja').classList.add('hidden');
-    document.getElementById('dashboard-entregador').classList.add('hidden');
-    
-    document.getElementById('dashboard-' + tipo).classList.remove('hidden');
-    
-    if (tipo === 'loja') {
-        document.getElementById('nome-loja-display').textContent = usuarioLogado.nome;
-        carregarDadosLoja();
-    } else if (tipo === 'entregador') {
-        document.getElementById('nome-entregador-display').textContent = usuarioLogado.nome;
-        carregarDadosEntregador();
-    } else if (tipo === 'admin') {
-        carregarDadosAdmin();
-    }
-}
-
-function fazerLogout() {
-    usuarioLogado = null;
-    token = null;
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
-    
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('dashboard-admin').classList.add('hidden');
-    document.getElementById('dashboard-loja').classList.add('hidden');
-    document.getElementById('dashboard-entregador').classList.add('hidden');
-}
-
-// ==========================================
-// CARREGAR DADOS REAIS DA API
-// ==========================================
-async function carregarDadosAdmin() {
-    try {
-        // Entregadores online
-        const respEnt = await fetch(`${API_URL}/api/entregadores?status=disponivel`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const entregadores = await respEnt.json();
-        document.getElementById('entregadores-online').textContent = Array.isArray(entregadores) ? entregadores.length : '-';
-        
-        // Lojas ativas
-        const respLojas = await fetch(`${API_URL}/api/lojas`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const lojas = await respLojas.json();
-        document.getElementById('lojas-ativas').textContent = Array.isArray(lojas) ? lojas.length : '-';
-        
-    } catch (e) {
-        console.error('Erro ao carregar dados admin:', e);
-    }
-}
-
-async function carregarDadosLoja() {
-    // Implementar: carregar pedidos da loja específica
-}
-
-async function carregarDadosEntregador() {
-    // Implementar: carregar dados do entregador
-}
-
-async function carregarEntregadores() {
-    openModal('entregadores');
-    const lista = document.getElementById('lista-entregadores');
-    lista.innerHTML = '<p>Carregando...</p>';
-    
-    try {
-        const response = await fetch(`${API_URL}/api/entregadores`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const entregadores = await response.json();
-        
-        if (!Array.isArray(entregadores) || entregadores.length === 0) {
-            lista.innerHTML = '<p>Nenhum entregador cadastrado</p>';
-            return;
-        }
-        
-        lista.innerHTML = entregadores.map(e => `
-            <div class="list-item">
-                <div>
-                    <strong>${e.nome}</strong><br>
-                    <small>${e.telefone || 'Sem telefone'}</small>
-                </div>
-                <span class="status-online">${e.status || 'offline'}</span>
-            </div>
-        `).join('');
-        
-    } catch (e) {
-        lista.innerHTML = '<p>Erro ao carregar entregadores</p>';
-    }
-}
-
-async function carregarLojas() {
-    openModal('lojas');
-    const lista = document.getElementById('lista-lojas');
-    lista.innerHTML = '<p>Carregando...</p>';
-    
-    try {
-        const response = await fetch(`${API_URL}/api/lojas`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const lojas = await response.json();
-        
-        if (!Array.isArray(lojas) || lojas.length === 0) {
-            lista.innerHTML = '<p>Nenhuma loja cadastrada</p>';
-            return;
-        }
-        
-        lista.innerHTML = lojas.map(l => `
-            <div class="list-item">
-                <div>
-                    <strong>${l.nome}</strong><br>
-                    <small>${l.endereco || 'Sem endereço'}</small>
-                </div>
-                <span>${l.telefone || ''}</span>
-            </div>
-        `).join('');
-        
-    } catch (e) {
-        lista.innerHTML = '<p>Erro ao carregar lojas</p>';
-    }
-}
-
-async function carregarEntregas() {
-    openModal('entregas');
-    document.getElementById('lista-entregas').innerHTML = '<p>Carregando pedidos...</p>';
-    // Implementar: buscar pedidos da API
-}
-
-function openModal(tipo) {
-    document.getElementById('modal-' + tipo).style.display = 'block';
-}
-
-function closeModal(tipo) {
-    document.getElementById('modal-' + tipo).style.display = 'none';
-}
-
-window.onclick = function(event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
-    }
-}
-</script>
-
-</body>
-</html>
