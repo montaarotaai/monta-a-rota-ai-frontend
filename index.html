@@ -3,288 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monta a Rota Ai</title>
+    <title>Monta a Rota A&iacute;</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5; 
-            color: #333;
-        }
-        .login-container {
-            max-width: 400px;
-            margin: 50px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .logo {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .logo img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-        h2 {
-            text-align: center;
-            color: #004E89;
-            margin-bottom: 20px;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+        /* LOGIN */
+        .login-container { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .logo { text-align: center; margin-bottom: 30px; }
+        .logo img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; }
+        h2 { text-align: center; color: #004E89; margin-bottom: 20px; }
         .form-group { margin-bottom: 15px; }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #666;
-            font-size: 14px;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
+        label { display: block; margin-bottom: 5px; color: #666; font-size: 14px; }
+        input[type=text], input[type=email], input[type=password], input[type=tel], input[type=number] {
+            width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px;
         }
         input:focus { outline: none; border-color: #FF6B35; }
-        button {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
+        button { width: 100%; padding: 15px; background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
         button:hover { opacity: 0.9; }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
         .tabs { display: flex; margin-bottom: 20px; }
-        .tab {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            cursor: pointer;
-            border-bottom: 2px solid #ddd;
-            background: none;
-            color: #333;
-            font-size: 15px;
-            margin-top: 0;
-        }
+        .tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; border-bottom: 2px solid #ddd; background: none; color: #333; font-size: 15px; margin-top: 0; }
         .tab.active { border-bottom-color: #FF6B35; color: #FF6B35; font-weight: bold; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .user-type { display: flex; gap: 10px; margin-bottom: 15px; }
-        .user-type label {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-bottom: 0;
-        }
+        .user-type label { flex: 1; padding: 10px; text-align: center; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; margin-bottom: 0; }
         .user-type input:checked + label { border-color: #FF6B35; background: #fff5f2; }
         .user-type input { display: none; }
         .hidden { display: none !important; }
-        .error-msg {
-            background: #ffebee;
-            color: #c62828;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        .success-msg {
-            background: #e8f5e9;
-            color: #2e7d32;
-            padding: 10px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        /* Dashboard */
-        .header {
-            background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            position: relative;
-        }
-        .header img {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            margin-bottom: 10px;
-            object-fit: cover;
-        }
+        .error-msg { background: #ffebee; color: #c62828; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; }
+        .success-msg { background: #e8f5e9; color: #2e7d32; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; }
+
+        /* DASHBOARD */
+        .header { background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%); color: white; padding: 20px; text-align: center; position: relative; }
+        .header img { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 10px; object-fit: cover; }
         .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s; }
         .card:hover { transform: translateY(-3px); }
-        .card h3 { font-size: 14px; color: #666; margin-bottom: 10px; }
-        .card .value { font-size: 32px; font-weight: bold; color: #FF6B35; }
-        .menu {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-        .menu-item {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
+        .card h3 { font-size: 13px; color: #666; margin-bottom: 10px; }
+        .card .value { font-size: 28px; font-weight: bold; color: #FF6B35; }
+        .menu { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .menu-item { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s; }
         .menu-item:hover { transform: translateY(-2px); }
         .menu-item .icon { font-size: 32px; margin-bottom: 10px; }
-        .logout {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            border: none;
-            width: auto;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            overflow-y: auto;
-        }
-        .modal-content {
-            background: white;
-            margin: 20px auto;
-            padding: 20px;
-            border-radius: 12px;
-            max-width: 600px;
-            position: relative;
-        }
-        .close {
-            position: absolute;
-            top: 10px; right: 15px;
-            font-size: 28px;
-            cursor: pointer;
-        }
-        .list-item {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .logout { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; border: none; width: auto; font-size: 14px; }
+
+        /* MODAL */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
+        .modal-content { background: white; margin: 20px auto; padding: 20px; border-radius: 12px; max-width: 600px; position: relative; }
+        .close { position: absolute; top: 10px; right: 15px; font-size: 28px; cursor: pointer; color: #666; }
+        .list-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .list-item:last-child { border-bottom: none; }
+        .btn-sm { background: #FF6B35; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+        .btn-sm.verde { background: #00C9A7; }
+        .btn-sm.vermelho { background: #e74c3c; }
+        .btn-sm.azul { background: #004E89; }
+        .taxa-input { width: 80px; padding: 6px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; text-align: center; }
+        .badge-ativo { background: #e8f5e9; color: #2e7d32; padding: 3px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-bloqueado { background: #ffebee; color: #c62828; padding: 3px 8px; border-radius: 12px; font-size: 12px; }
+        .badge-online { background: #e3f2fd; color: #1565c0; padding: 3px 8px; border-radius: 12px; font-size: 12px; }
+        .section-title { font-size: 16px; font-weight: bold; color: #004E89; margin: 20px 0 10px; }
+
+        /* ENTREGADOR ONLINE TOGGLE */
+        .online-btn { background: #00C9A7; font-size: 18px; padding: 20px; border-radius: 16px; }
+        .online-btn.offline { background: linear-gradient(135deg, #FF6B35 0%, #004E89 100%); }
+
+        /* FOTO PERFIL */
+        .foto-perfil { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid white; cursor: pointer; }
+        .foto-placeholder { width: 100px; height: 100px; border-radius: 50%; background: rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; border: 3px dashed rgba(255,255,255,0.6); margin: 0 auto 10px; }
     </style>
 </head>
 <body>
 
-<!-- TELA DE LOGIN -->
+<!-- LOGIN -->
 <div id="login-screen" class="login-container">
     <div class="logo">
         <img src="logo.png" alt="Monta a Rota A&iacute;" onerror="this.style.display='none'">
         <h2>Monta a Rota A&iacute;</h2>
     </div>
-    
     <div class="tabs">
         <button class="tab active" onclick="switchTab('login', this)">Entrar</button>
         <button class="tab" onclick="switchTab('register', this)">Cadastrar</button>
     </div>
-
-    <!-- LOGIN -->
     <div id="login-tab" class="tab-content active">
         <div id="login-msg"></div>
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="login-email" placeholder="seu@email.com">
-        </div>
-        <div class="form-group">
-            <label>Senha</label>
-            <input type="password" id="login-senha" placeholder="••••••">
-        </div>
+        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="seu@email.com"></div>
+        <div class="form-group"><label>Senha</label><input type="password" id="login-senha" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022"></div>
         <button onclick="fazerLogin()" id="btn-login">Entrar</button>
     </div>
-
-    <!-- CADASTRO -->
     <div id="register-tab" class="tab-content">
         <div id="register-msg"></div>
         <div class="user-type">
-            <label><input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()"> <span>🏪 Loja</span></label>
-            <label><input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()"> <span>🛵 Entregador</span></label>
+            <label><input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()"> <span>\ud83c\udfea Loja</span></label>
+            <label><input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()"> <span>\ud83d\udef5 Entregador</span></label>
         </div>
-        
-        <div class="form-group">
-            <label>Nome</label>
-            <input type="text" id="reg-nome" placeholder="Nome completo">
-        </div>
-        <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="reg-email" placeholder="seu@email.com">
-        </div>
-        <div class="form-group">
-            <label>Telefone</label>
-            <input type="tel" id="reg-telefone" placeholder="(11) 99999-9999">
-        </div>
-        <div class="form-group">
-            <label>Senha</label>
-            <input type="password" id="reg-senha" placeholder="Mínimo 6 caracteres">
-        </div>
-        
-        <!-- Campos Loja -->
+        <div class="form-group"><label>Nome</label><input type="text" id="reg-nome" placeholder="Nome completo"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="seu@email.com"></div>
+        <div class="form-group"><label>Telefone</label><input type="tel" id="reg-telefone" placeholder="(11) 99999-9999"></div>
+        <div class="form-group"><label>Senha</label><input type="password" id="reg-senha" placeholder="M&iacute;nimo 6 caracteres"></div>
         <div id="campos-loja">
-            <div class="form-group">
-                <label>Nome da Loja</label>
-                <input type="text" id="reg-nome-loja" placeholder="Ex: Pizzaria do Zé">
-            </div>
-            <div class="form-group">
-                <label>CNPJ</label>
-                <input type="text" id="reg-cnpj" placeholder="00.000.000/0000-00">
-            </div>
-            <div class="form-group">
-                <label>Endereço</label>
-                <input type="text" id="reg-endereco" placeholder="Rua, número, bairro">
-            </div>
+            <div class="form-group"><label>Nome da Loja</label><input type="text" id="reg-nome-loja" placeholder="Ex: Pizzaria do Z&eacute;"></div>
+            <div class="form-group"><label>CNPJ</label><input type="text" id="reg-cnpj" placeholder="00.000.000/0000-00"></div>
+            <div class="form-group"><label>Endere&ccedil;o</label><input type="text" id="reg-endereco" placeholder="Rua, n&uacute;mero, bairro"></div>
         </div>
-
-        <!-- Campos Entregador -->
         <div id="campos-entregador" class="hidden">
-            <div class="form-group">
-                <label>CNH</label>
-                <input type="text" id="reg-cnh" placeholder="Número da CNH">
-            </div>
-            <div class="form-group">
-                <label>Placa da Moto</label>
-                <input type="text" id="reg-placa" placeholder="ABC-1234">
-            </div>
-            <div class="form-group">
-                <label>Pix para pagamento</label>
-                <input type="text" id="reg-pix" placeholder="Chave Pix">
-            </div>
+            <div class="form-group"><label>CNH</label><input type="text" id="reg-cnh" placeholder="N&uacute;mero da CNH"></div>
+            <div class="form-group"><label>Placa da Moto</label><input type="text" id="reg-placa" placeholder="ABC-1234"></div>
+            <div class="form-group"><label>Pix para pagamento</label><input type="text" id="reg-pix" placeholder="Chave Pix"></div>
         </div>
-
         <button onclick="fazerCadastro()" id="btn-cadastrar">Cadastrar</button>
     </div>
 </div>
@@ -300,31 +129,23 @@
     <div class="container">
         <div class="cards">
             <div class="card" onclick="carregarEntregadores()">
-                <h3>Entregadores Cadastrados</h3>
+                <h3>Entregadores</h3>
                 <div class="value" id="total-entregadores">-</div>
             </div>
             <div class="card" onclick="carregarLojas()">
                 <h3>Lojas Ativas</h3>
                 <div class="value" id="total-lojas">-</div>
             </div>
+            <div class="card">
+                <h3>Cobran&ccedil;as Pendentes</h3>
+                <div class="value" id="total-pendentes">-</div>
+            </div>
         </div>
         <div class="menu">
-            <div class="menu-item" onclick="carregarEntregadores()">
-                <div class="icon">🛵</div>
-                <h3>Entregadores</h3>
-            </div>
-            <div class="menu-item" onclick="carregarLojas()">
-                <div class="icon">🏪</div>
-                <h3>Lojas</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">📦</div>
-                <h3>Pedidos</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">💰</div>
-                <h3>Financeiro</h3>
-            </div>
+            <div class="menu-item" onclick="carregarEntregadores()"><div class="icon">\ud83d\udef5</div><h3>Entregadores</h3></div>
+            <div class="menu-item" onclick="carregarLojas()"><div class="icon">\ud83c\udfea</div><h3>Lojas</h3></div>
+            <div class="menu-item" onclick="abrirFinanceiroAdmin()"><div class="icon">\ud83d\udcb0</div><h3>Financeiro</h3></div>
+            <div class="menu-item" onclick="abrirCobrancas()"><div class="icon">\ud83d\udcc5</div><h3>Cobran&ccedil;as</h3></div>
         </div>
     </div>
 </div>
@@ -334,352 +155,136 @@
     <div class="header">
         <button class="logout" onclick="fazerLogout()">Sair</button>
         <h1 id="nome-loja-display">Minha Loja</h1>
-        <p>Área da Loja</p>
+        <p>\u00c1rea da Loja</p>
     </div>
     <div class="container">
         <div class="cards">
             <div class="card">
-                <h3>Pedidos Hoje</h3>
-                <div class="value">0</div>
+                <h3>Minha taxa/entrega</h3>
+                <div class="value" id="taxa-sistema-loja">R$ -</div>
             </div>
             <div class="card">
-                <h3>Taxa por Entrega</h3>
-                <div class="value">R$ 4,50</div>
+                <h3>Taxa entregador</h3>
+                <div class="value" id="taxa-entregador-loja">R$ -</div>
+            </div>
+            <div class="card">
+                <h3>Entregas Hoje</h3>
+                <div class="value" id="entregas-loja-hoje">0</div>
             </div>
         </div>
+        <!-- Taxa entregador editavel -->
+        <div style="background:white;padding:15px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);margin-bottom:20px;">
+            <p style="font-size:13px;color:#666;margin-bottom:8px;">Definir taxa que pago por entrega ao entregador:</p>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <input type="number" id="nova-taxa-entregador" placeholder="Ex: 5.00" step="0.10" min="0" style="flex:1;">
+                <button onclick="salvarTaxaEntregador()" style="width:auto;padding:10px 15px;margin:0;">Salvar</button>
+            </div>
+            <div id="taxa-msg" style="margin-top:8px;font-size:13px;"></div>
+        </div>
         <div class="menu">
-            <div class="menu-item">
-                <div class="icon">📷</div>
-                <h3>Scanear Comanda</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">📋</div>
-                <h3>Meus Pedidos</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">💳</div>
-                <h3>Pagamentos</h3>
-            </div>
-            <div class="menu-item">
-                <div class="icon">⚙️</div>
-                <h3>Configurações</h3>
-            </div>
+            <div class="menu-item" onclick="abrirScannerLoja()"><div class="icon">\ud83d\udcf7</div><h3>Scanear Comanda</h3></div>
+            <div class="menu-item" onclick="abrirRelatorioLoja()"><div class="icon">\ud83d\udcca</div><h3>Relat&oacute;rio</h3></div>
+            <div class="menu-item" onclick="abrirMapaCalorLoja()"><div class="icon">\ud83d\uddfa\ufe0f</div><h3>Mapa de Calor</h3></div>
+            <div class="menu-item"><div class="icon">\u2699\ufe0f</div><h3>Configura&ccedil;&otilde;es</h3></div>
         </div>
     </div>
 </div>
 
 <!-- DASHBOARD ENTREGADOR -->
 <div id="dashboard-entregador" class="hidden">
-    <div class="header">
-        <button class="logout" onclick="fazerLogout()">Sair</button>
+    <div class="header" style="cursor:pointer;" onclick="abrirFotoPerfil()">
+        <button class="logout" onclick="event.stopPropagation();fazerLogout()">Sair</button>
+        <div id="foto-container">
+            <div class="foto-placeholder" id="foto-placeholder">\ud83d\udc64</div>
+            <img id="foto-entregador" class="foto-perfil hidden" src="" alt="Foto">
+        </div>
         <h1 id="nome-entregador-display">Entregador</h1>
-        <p>Área do Entregador</p>
+        <p>&Aacute;rea do Entregador &bull; <span id="status-online-texto">Offline</span></p>
+        <input type="file" id="input-foto" accept="image/*" class="hidden" onchange="uploadFoto(event)">
     </div>
     <div class="container">
         <div class="cards">
             <div class="card">
                 <h3>Entregas Hoje</h3>
-                <div class="value">0</div>
+                <div class="value" id="minhas-entregas">0</div>
             </div>
             <div class="card">
                 <h3>Ganhos Hoje</h3>
-                <div class="value">R$ 0</div>
+                <div class="value" id="meus-ganhos">R$ 0</div>
             </div>
             <div class="card">
-                <h3>Avaliação</h3>
-                <div class="value">⭐ 5.0</div>
+                <h3>Avalia&ccedil;&atilde;o</h3>
+                <div class="value" id="minha-avaliacao">\u2b50 5.0</div>
             </div>
         </div>
         <div class="menu">
-            <div class="menu-item">
-                <div class="icon">🚀</div>
-                <h3>Ficar Online</h3>
+            <div class="menu-item online-btn offline" id="btn-online-card" onclick="toggleOnline()">
+                <div class="icon" id="icone-online">\ud83d\udfe2</div>
+                <h3 id="texto-online">Ficar Online</h3>
             </div>
-            <div class="menu-item">
-                <div class="icon">📍</div>
+            <div class="menu-item" onclick="abrirRota()">
+                <div class="icon">\ud83d\uddfa\ufe0f</div>
                 <h3>Minha Rota</h3>
             </div>
-            <div class="menu-item">
-                <div class="icon">💰</div>
+            <div class="menu-item" onclick="abrirGanhos()">
+                <div class="icon">\ud83d\udcb5</div>
                 <h3>Meus Ganhos</h3>
             </div>
-            <div class="menu-item">
-                <div class="icon">⚙️</div>
-                <h3>Configurações</h3>
+            <div class="menu-item" onclick="abrirConfiguracoes()">
+                <div class="icon">\u2699\ufe0f</div>
+                <h3>Configura&ccedil;&otilde;es</h3>
             </div>
         </div>
     </div>
 </div>
 
 <!-- MODAIS -->
+<!-- Modal Entregadores (Admin) -->
 <div id="modal-entregadores" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('entregadores')">&times;</span>
-        <h2>🛵 Entregadores</h2>
+        <h2>\ud83d\udef5 Entregadores</h2>
         <div id="lista-entregadores"><p>Carregando...</p></div>
     </div>
 </div>
 
+<!-- Modal Lojas (Admin) -->
 <div id="modal-lojas" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('lojas')">&times;</span>
-        <h2>🏪 Lojas</h2>
+        <h2>\ud83c\udfea Lojas</h2>
         <div id="lista-lojas"><p>Carregando...</p></div>
     </div>
 </div>
 
-<script>
-// ==========================================
-// SUPABASE - CONEXÃO DIRETA
-// ==========================================
-const SUPABASE_URL = 'https://dfvjaweyxfenhjgusekq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdmphd2V5eGZlbmhqZ3VzZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMzk4NTMsImV4cCI6MjA4NzYxNTg1M30.MT9pzSQgc3ZNGiIV95DwjVtNvSZI0Lz-SKMkvMys1Kg';
+<!-- Modal Financeiro Admin -->
+<div id="modal-financeiro-admin" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('financeiro-admin')">&times;</span>
+        <h2>\ud83d\udcb0 Financeiro</h2>
+        <p style="color:#666;font-size:14px;margin-bottom:15px;">Resumo semanal de cobran&ccedil;as por loja</p>
+        <div id="dados-financeiro-admin"><p>Carregando...</p></div>
+    </div>
+</div>
 
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<!-- Modal Cobran\u00e7as Admin -->
+<div id="modal-cobrancas" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('cobrancas')">&times;</span>
+        <h2>\ud83d\udcc5 Cobran&ccedil;as Semanais</h2>
+        <p style="color:#666;font-size:13px;margin-bottom:15px;">Cobran&ccedil;a toda quarta-feira. Taxa definida por loja.</p>
+        <div id="lista-cobrancas"><p>Carregando...</p></div>
+    </div>
+</div>
 
-let usuarioLogado = null;
+<!-- Modal Relat\u00f3rio Loja -->
+<div id="modal-relatorio-loja" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('relatorio-loja')">&times;</span>
+        <h2>\ud83d\udcca Relat&oacute;rio Financeiro</h2>
+        <div id="dados-relatorio-loja"><p>Carregando...</p></div>
+    </div>
+</div>
 
-// Verifica sessão salva ao carregar
-window.onload = function() {
-    const salvo = localStorage.getItem('usuario');
-    if (salvo) {
-        usuarioLogado = JSON.parse(salvo);
-        mostrarDashboard(usuarioLogado.tipo);
-    }
-};
-
-// ==========================================
-// HELPERS
-// ==========================================
-function showMsg(elementId, msg, isError = true) {
-    const el = document.getElementById(elementId);
-    el.className = isError ? 'error-msg' : 'success-msg';
-    el.textContent = msg;
-}
-
-function switchTab(tab, el) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById(tab + '-tab').classList.add('active');
-    document.getElementById('login-msg').innerHTML = '';
-    document.getElementById('register-msg').innerHTML = '';
-}
-
-function toggleCadastro() {
-    const tipo = document.querySelector('input[name="register-type"]:checked').value;
-    document.getElementById('campos-loja').classList.toggle('hidden', tipo !== 'loja');
-    document.getElementById('campos-entregador').classList.toggle('hidden', tipo !== 'entregador');
-}
-
-function openModal(tipo) {
-    document.getElementById('modal-' + tipo).style.display = 'block';
-}
-
-function closeModal(tipo) {
-    document.getElementById('modal-' + tipo).style.display = 'none';
-}
-
-window.onclick = function(e) {
-    if (e.target.classList.contains('modal')) e.target.style.display = 'none';
-};
-
-// ==========================================
-// LOGIN
-// ==========================================
-async function fazerLogin() {
-    const email = document.getElementById('login-email').value.trim();
-    const senha = document.getElementById('login-senha').value;
-    const btn = document.getElementById('btn-login');
-
-    if (!email || !senha) {
-        showMsg('login-msg', 'Preencha email e senha');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Entrando...';
-    document.getElementById('login-msg').innerHTML = '';
-
-    try {
-        const { data: usuario, error } = await db
-            .from('usuarios')
-            .select('*')
-            .eq('email', email)
-            .single();
-
-        if (error || !usuario) {
-            showMsg('login-msg', 'Usuário não encontrado');
-            return;
-        }
-
-        if (usuario.status === 'bloqueado') {
-            showMsg('login-msg', 'Usuário bloqueado. Contate o administrador.');
-            return;
-        }
-
-        if (senha !== usuario.senha_hash) {
-            showMsg('login-msg', 'Senha incorreta');
-            return;
-        }
-
-        usuarioLogado = usuario;
-        localStorage.setItem('usuario', JSON.stringify(usuario));
-        mostrarDashboard(usuario.tipo);
-
-    } catch (err) {
-        showMsg('login-msg', 'Erro ao fazer login: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Entrar';
-    }
-}
-
-// ==========================================
-// CADASTRO
-// ==========================================
-async function fazerCadastro() {
-    const tipo = document.querySelector('input[name="register-type"]:checked').value;
-    const nome = document.getElementById('reg-nome').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const telefone = document.getElementById('reg-telefone').value.trim();
-    const senha = document.getElementById('reg-senha').value;
-    const btn = document.getElementById('btn-cadastrar');
-
-    if (!nome || !email || !senha) {
-        showMsg('register-msg', 'Preencha nome, email e senha');
-        return;
-    }
-
-    if (senha.length < 6) {
-        showMsg('register-msg', 'Senha deve ter no mínimo 6 caracteres');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Cadastrando...';
-    document.getElementById('register-msg').innerHTML = '';
-
-    try {
-        // Verifica se email já existe
-        const { data: existente } = await db
-            .from('usuarios')
-            .select('id')
-            .eq('email', email)
-            .single();
-
-        if (existente) {
-            showMsg('register-msg', 'Este email já está cadastrado');
-            return;
-        }
-
-        const dados = {
-            tipo,
-            nome,
-            email,
-            telefone,
-            senha_hash: senha,
-            status: 'ativo'
-        };
-
-        if (tipo === 'loja') {
-            dados.nome_loja = document.getElementById('reg-nome-loja').value;
-            dados.cnpj = document.getElementById('reg-cnpj').value;
-            dados.endereco = document.getElementById('reg-endereco').value;
-        } else {
-            dados.cnh = document.getElementById('reg-cnh').value;
-            dados.placa_moto = document.getElementById('reg-placa').value;
-            dados.chave_pix = document.getElementById('reg-pix').value;
-        }
-
-        const { error } = await db.from('usuarios').insert([dados]);
-
-        if (error) {
-            showMsg('register-msg', 'Erro ao cadastrar: ' + error.message);
-            return;
-        }
-
-        showMsg('register-msg', '✅ Cadastro realizado! Faça login.', false);
-        setTimeout(() => {
-            document.querySelectorAll('.tab')[0].click();
-        }, 1500);
-
-    } catch (err) {
-        showMsg('register-msg', 'Erro: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Cadastrar';
-    }
-}
-
-// ==========================================
-// DASHBOARD
-// ==========================================
-function mostrarDashboard(tipo) {
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('dashboard-admin').classList.add('hidden');
-    document.getElementById('dashboard-loja').classList.add('hidden');
-    document.getElementById('dashboard-entregador').classList.add('hidden');
-
-    document.getElementById('dashboard-' + tipo).classList.remove('hidden');
-
-    if (tipo === 'loja') {
-        document.getElementById('nome-loja-display').textContent = usuarioLogado.nome_loja || usuarioLogado.nome;
-    } else if (tipo === 'entregador') {
-        document.getElementById('nome-entregador-display').textContent = usuarioLogado.nome;
-    } else if (tipo === 'admin') {
-        carregarDadosAdmin();
-    }
-}
-
-function fazerLogout() {
-    usuarioLogado = null;
-    localStorage.removeItem('usuario');
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('dashboard-admin').classList.add('hidden');
-    document.getElementById('dashboard-loja').classList.add('hidden');
-    document.getElementById('dashboard-entregador').classList.add('hidden');
-    document.getElementById('login-email').value = '';
-    document.getElementById('login-senha').value = '';
-}
-
-async function carregarDadosAdmin() {
-    try {
-        const { data: entregadores } = await db.from('usuarios').select('id').eq('tipo', 'entregador').eq('status', 'ativo');
-        const { data: lojas } = await db.from('usuarios').select('id').eq('tipo', 'loja').eq('status', 'ativo');
-        document.getElementById('total-entregadores').textContent = entregadores ? entregadores.length : 0;
-        document.getElementById('total-lojas').textContent = lojas ? lojas.length : 0;
-    } catch(e) { console.error(e); }
-}
-
-async function carregarEntregadores() {
-    openModal('entregadores');
-    const lista = document.getElementById('lista-entregadores');
-    lista.innerHTML = '<p>Carregando...</p>';
-    const { data, error } = await db.from('usuarios').select('*').eq('tipo', 'entregador');
-    if (error || !data || data.length === 0) { lista.innerHTML = '<p>Nenhum entregador cadastrado</p>'; return; }
-    lista.innerHTML = data.map(e => `
-        <div class="list-item">
-            <div><strong>${e.nome}</strong><br><small>${e.telefone || 'Sem telefone'}</small></div>
-            <span>${e.status || 'ativo'}</span>
-        </div>
-    `).join('');
-}
-
-async function carregarLojas() {
-    openModal('lojas');
-    const lista = document.getElementById('lista-lojas');
-    lista.innerHTML = '<p>Carregando...</p>';
-    const { data, error } = await db.from('usuarios').select('*').eq('tipo', 'loja');
-    if (error || !data || data.length === 0) { lista.innerHTML = '<p>Nenhuma loja cadastrada</p>'; return; }
-    lista.innerHTML = data.map(l => `
-        <div class="list-item">
-            <div><strong>${l.nome_loja || l.nome}</strong><br><small>${l.endereco || 'Sem endereço'}</small></div>
-            <span>${l.telefone || ''}</span>
-        </div>
-    `).join('');
-}
-</script>
-
-</body>
-</html>
+<!-- Modal Ganhos Entregador -->
+<div id="modal-ganhos" class
