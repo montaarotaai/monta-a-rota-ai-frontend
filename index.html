@@ -385,6 +385,11 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="p-bairro" oninput="atualizarValorCorrida()"></div><div class="fg"><label>Cidade</label><input type="text" id="p-cidade" value="Ribeirao Preto"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="p-comp" placeholder="Ex: Apto 12 Torre 2"></div>
   <div class="fg"><label>Observacoes</label><input type="text" id="p-obs"></div>
+  <div id="p-codconf-area" class="hidden" style="margin-bottom:11px;background:#f3e5f5;border-radius:8px;padding:10px;">
+    <label style="font-size:11px;font-weight:700;color:#6a1b9a;text-transform:uppercase;letter-spacing:.5px;">&#128273; Codigo iFood detectado</label>
+    <input type="text" id="p-cod-conf" placeholder="" style="width:100%;margin-top:5px;padding:9px;border:1.5px solid #ce93d8;border-radius:8px;font-size:16px;letter-spacing:4px;font-weight:700;color:#6a1b9a;">
+    <p style="font-size:10px;color:#888;margin-top:3px;">Este codigo sera exibido ao entregador para confirmacao.</p>
+  </div>
   <div id="p-valor-corrida" class="hidden" style="margin:10px 0;padding:10px;background:#e8f5e9;border-radius:8px;text-align:center;">
     <p style="font-size:11px;color:#666;">Valor estimado da corrida</p>
     <p id="p-valor-txt" style="font-size:22px;font-weight:700;color:#2e7d32;"></p>
@@ -484,7 +489,7 @@ let mapas={admin:null,loja:null};
 let mrks={admin:{},loja:{}};
 let tooltips={admin:{},loja:{}};
 let seg={admin:false,loja:false};
-let ivs={rast:null,mAdm:null,mLj:null,alerta:null};
+let ivs={rast:null,rastPush:null,mAdm:null,mLj:null,alerta:null};
 let gpsOk=false;
 let myLat=null,myLng=null;
 let lojaGeoCache={lat:null,lng:null};
@@ -499,41 +504,49 @@ window.onload=()=>{
 
 function iniciarGPS(){
   if(!navigator.geolocation)return;
-  // watchPosition - continuously tracks position silently
-  navigator.geolocation.watchPosition(
+  // Tenta silenciosamente uma vez ao carregar o app
+  navigator.geolocation.getCurrentPosition(
     p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;$('gps-banner').classList.add('hidden');},
     err=>{
-      // Apenas mostra banner se o usuario BLOQUEOU explicitamente (code 1)
-      // code 2 = indisponivel, code 3 = timeout — nao mostrar banner
+      // Só mostra banner se o usuario BLOQUEOU (code 1 = PERMISSION_DENIED)
+      // Timeout (3) ou indisponivel (2) = não mostrar, tentar de novo depois
       if(err.code===1)$('gps-banner').classList.remove('hidden');
     },
-    {enableHighAccuracy:true,timeout:15000,maximumAge:10000}
-  );
-  // Tenta imediatamente
-  navigator.geolocation.getCurrentPosition(
-    p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;},
-    err=>{if(err.code===1)$('gps-banner').classList.remove('hidden');},
-    {enableHighAccuracy:true,timeout:8000,maximumAge:30000}
+    {enableHighAccuracy:false,timeout:10000,maximumAge:60000}
   );
 }
 
 function pedirGPS(){
   $('gps-banner').classList.add('hidden');
-  iniciarGPS();
+  if(!navigator.geolocation)return;
+  navigator.geolocation.getCurrentPosition(
+    p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;},
+    err=>{if(err.code===1)$('gps-banner').classList.remove('hidden');}
+  );
 }
 
-// Obter posicao atual em tempo real (promise)
+// Obter posicao atual (promise com timeout)
 function obterPosicaoAgora(){
   return new Promise((resolve,reject)=>{
-    if(myLat&&myLng){resolve({lat:myLat,lng:myLng});return;} // usa cache recente
+    // Se temos posicao recente em cache, usar ela
+    if(myLat&&myLng){resolve({lat:myLat,lng:myLng});return;}
     if(!navigator.geolocation){reject('sem_gps');return;}
+    const timer=setTimeout(()=>{
+      if(myLat&&myLng)resolve({lat:myLat,lng:myLng});
+      else reject('timeout');
+    },8000);
     navigator.geolocation.getCurrentPosition(
-      p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;resolve({lat:p.coords.latitude,lng:p.coords.longitude});},
-      ()=>{
-        if(myLat&&myLng)resolve({lat:myLat,lng:myLng});
-        else reject('sem_posicao');
+      p=>{
+        clearTimeout(timer);
+        gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;
+        resolve({lat:p.coords.latitude,lng:p.coords.longitude});
       },
-      {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+      err=>{
+        clearTimeout(timer);
+        if(myLat&&myLng)resolve({lat:myLat,lng:myLng});
+        else reject(err.code===1?'bloqueado':'indisponivel');
+      },
+      {enableHighAccuracy:true,timeout:7000,maximumAge:30000}
     );
   });
 }
@@ -660,7 +673,12 @@ function sair(){
   $('pg-login').classList.remove('hidden');
   $('l-email').value='';$('l-senha').value='';
 }
-function pararIvs(){Object.keys(ivs).forEach(k=>{if(ivs[k]){clearInterval(ivs[k]);ivs[k]=null;}});}
+function pararIvs(){
+  // rast usa watchPosition, nao setInterval
+  if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
+  // os demais sao setInterval
+  ['rastPush','mAdm','mLj','alerta'].forEach(k=>{if(ivs[k]){clearInterval(ivs[k]);ivs[k]=null;}});
+}
 
 // ============ MAPA ============
 function criarMapa(tipo){
@@ -723,13 +741,13 @@ async function initAdmin(){
   admTab('painel',document.querySelector('.adm-tab'));
   await carregarDadosAdmin();
   criarMapa('admin');await pullAdm();
-  ivs.mAdm=setInterval(pullAdm,12000);
+  ivs.mAdm=setInterval(pullAdm,8000);
   await carregarAdmImpersonar();
 }
 
 async function carregarDadosAdmin(){
-  const{data:e}=await db.from('usuarios').select('id').eq('tipo','entregador').eq('status','ativo');
-  const{data:l}=await db.from('usuarios').select('id').eq('tipo','loja').eq('status','ativo');
+  const{data:e}=await db.from('usuarios').select('id').eq('tipo','entregador')
+  const{data:l}=await db.from('usuarios').select('id').eq('tipo','loja')
   const{data:on}=await db.from('usuarios').select('id').eq('tipo','entregador').eq('online',true);
   const{data:rota}=await db.from('entregas').select('id').eq('status','em_rota');
   $('adm-cnt-ent').textContent=e?e.length:0;
@@ -959,7 +977,7 @@ async function initLoja(){
   if(U.loja_lat&&U.loja_lng){lojaGeoCache={lat:U.loja_lat,lng:U.loja_lng};}
   else if(U.endereco){geocode(U.endereco).then(g=>{if(g){lojaGeoCache=g;db.from('usuarios').update({loja_lat:g.lat,loja_lng:g.lng}).eq('id',U.id);}});}
   criarMapa('loja');await pullLj();
-  ivs.mLj=setInterval(pullLj,12000);
+  ivs.mLj=setInterval(pullLj,8000);
 }
 
 async function pullLj(){
@@ -1022,8 +1040,10 @@ function abrirNovoPedido(){
   openM('pedido');
   ['ocr-camera','ocr-galeria'].forEach(id=>{const e=$(id);if(e)e.value='';});
   $('ocr-prev').classList.add('hidden');$('ocr-load').classList.add('hidden');
-  ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp'].forEach(id=>{const e=$(id);if(e)e.value='';});
-  $('p-cidade').value='Ribeirao Preto';clearM('ped-msg');$('p-valor-corrida').classList.add('hidden');
+  ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp','p-cod-conf'].forEach(id=>{const e=$(id);if(e)e.value='';});
+  $('p-cidade').value='Ribeirao Preto';
+  const ca=$('p-codconf-area');if(ca)ca.classList.add('hidden');
+  clearM('ped-msg');$('p-valor-corrida').classList.add('hidden');
   window._pedidoGeo=null;
 }
 
@@ -1042,31 +1062,166 @@ async function lerComanda(event){
 }
 
 function parseOcr(text){
-  const linhas=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  const full=text;
-  // Pedido numero
-  const pm=full.match(/(?:pedido|order|nro?|numero|#|cod)\.?\s*:?\s*([A-Z0-9\-]{3,15})/i)||full.match(/\b(\d{3,6})\b/);
-  if(pm&&pm[1])$('p-num').value=pm[1];
-  // Telefone
-  const tel=full.match(/(?:\(?\d{2}\)?[\s\-]?)?(?:9[\s\-]?\d{4}|[2-9]\d{3})[\s\-]?\d{4}/);
-  if(tel)$('p-tel').value=tel[0].replace(/[^\d]/g,'');
-  // Rua
-  const ruaM=full.match(/(?:rua|r\.\s|av(?:enida)?\.?\s|avenida\s|alameda\s|al\.\s|travessa\s|tv\.\s)([^,\n\r]{3,40})[,\s]+n?[°o]?[\s]*?(\d{1,6})/i);
-  if(ruaM){$('p-rua').value=ruaM[0].match(/^[\w\s\.]+/)[0].trim();$('p-nend').value=ruaM[2];}
-  // Bairro
-  const bairroM=full.match(/(?:bairro|bro\.?)\s*:?\s*([\w\s]{3,30})/i);
-  if(bairroM)$('p-bairro').value=bairroM[1].trim().split('\n')[0];
-  // Nome cliente - linha apos "cliente", "entregar", "destinatario"
-  for(let i=0;i<linhas.length;i++){
-    if(/(?:cliente|para|entregar|destinat)/i.test(linhas[i])&&linhas[i+1]&&linhas[i+1].length>2&&linhas[i+1].length<60&&!/rua|av\.?|\d{4}/i.test(linhas[i+1])){
-      $('p-cli').value=linhas[i+1];break;
+  // =========================================================
+  // PRE-PROCESSAMENTO: juntar todas as linhas em uma string
+  // única para evitar problemas de quebra de linha do OCR
+  // =========================================================
+  const linhas=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+  
+  // Versão joined: tudo numa linha (resolve quebras como "TOLED\nO PRADO")
+  const full=linhas.join(' ');
+  
+  console.log('[OCR] Texto processado:', full.substring(0,300));
+
+  // =========================================================
+  // 1. NUMERO DO PEDIDO
+  // Prioridade ALTA: "Pedido: X" explícito (ex: "Pedido: 4")
+  // =========================================================
+  let numPed='';
+  // Busca "Pedido: N" — numero pode ser curto (4) ou longo (4100)
+  const mPed=full.match(/\bpedido\s*[:#]?\s*(\d{1,8})\b/i);
+  if(mPed)numPed=mPed[1];
+  
+  // Se não achou "Pedido:", busca número grande sozinho no início da comanda
+  // (iFood: "5823" em destaque grande)
+  if(!numPed){
+    for(const l of linhas){
+      const trimmed=l.trim();
+      // Linha que é SÓ um número de 3-6 dígitos (número de pedido iFood)
+      if(/^\d{3,6}$/.test(trimmed)&&parseInt(trimmed)>100){numPed=trimmed;break;}
     }
   }
-  // Complemento
-  const compM=full.match(/(?:apto?\.?|apartamento|bloco|torre|sala|loja|casa)\s+[\w\d]+/i);
-  if(compM)$('p-comp').value=compM[0];
-  // Tentar calcular corrida apos OCR
-  setTimeout(atualizarValorCorrida,500);
+  if(numPed)$('p-num').value=numPed;
+
+  // =========================================================
+  // 2. CODIGO DE CONFIRMACAO IFOOD
+  // "CODIGO DE COLETA PARCEIRA: 3027"
+  // =========================================================
+  const mCodColeta=full.match(/c[oó]digo\s+de\s+coleta\s+parceira\s*:?\s*(\d{2,8})/i);
+  window._ocrCodConf=mCodColeta?mCodColeta[1]:'';
+
+  // =========================================================
+  // 3. NOME DO CLIENTE
+  // Padrão Stone: "Cliente: NOME SOBRENOME" (pode quebrar linha)
+  // Padrão iFood: linha isolada após "Localizador:" ou "Primeiro pedido!"
+  // =========================================================
+  let nomeCliente='';
+  
+  // Tenta "Cliente: ..."
+  const mCli=full.match(/cliente\s*:\s*([A-ZÁÀÂÃÉÈÊÍÓÔÕÚÇÜA-Za-záàâãéèêíóôõúçü][^:=*0-9\n]{2,80}?)(?=\s*(?:enderec|bairro|tel|cidade|pedido|obs|rua)\s*:|$)/i);
+  if(mCli){
+    nomeCliente=mCli[1].trim().replace(/\s+/g,' ');
+    // Remove se ficou lixo (só maiúsculas bagunçadas)
+    if(nomeCliente.length>2)$('p-cli').value=nomeCliente;
+  }
+  
+  // Fallback iFood: procura linha de nome puro após marcadores
+  if(!nomeCliente||nomeCliente.length<3){
+    let passouMarca=false;
+    for(let i=0;i<linhas.length;i++){
+      if(/localizador|primeiro\s+pedido|entrega\s+prev/i.test(linhas[i]))passouMarca=true;
+      if(passouMarca){
+        const l=linhas[i].trim();
+        // Linha de nome: tem letras, sem ':=*', sem começar com número, entre 5-60 chars
+        if(l.length>=5&&l.length<=60&&
+           /^[A-ZÁÀÂÃÉÈÊÍÓÔÕÚÇÜa-z]/.test(l)&&
+           !/[:=*\d]{2}/.test(l)&&
+           !/^(enderec|bairro|cidade|rua|comp|data|obs|local|cod|ped|tel|itens|prod)/i.test(l)&&
+           !/^(iFood|steak|expedi|confer|cupom|pagar|valor|taxa|total|paga|0800|entrega)/i.test(l)){
+          $('p-cli').value=l;
+          break;
+        }
+      }
+    }
+  }
+
+  // =========================================================
+  // 4. ENDEREÇO
+  // Stone: "Endereco: AV. LUIZ EDUARDO TOLED O PRADO, 4100 – QUADRA 13 LOTE 8"
+  // iFood: "Endereco: Rua Florencio Rosario, 175"
+  // =========================================================
+  
+  // Busca "Endereco:" no texto joined — captura tudo até o próximo campo conhecido
+  const mEnd=full.match(/endere[çc]o\s*:\s*([A-Za-z].{4,120}?)(?=\s*(?:comp|bairro|cidade|telefone|cep|obs|pedido|iten|produto)\s*[:\-]|$)/i);
+  if(mEnd){
+    let endStr=mEnd[1].trim().replace(/\s+/g,' ');
+    console.log('[OCR] Endereço raw:', endStr);
+    
+    // Extrai número: o primeiro número após vírgula/traço/espaço
+    // Ex: "AV LUIZ EDUARDO TOLEDO PRADO, 4100 – QUADRA..."
+    // Ex: "Rua Florencio Rosario, 175"
+    const mNumEnd=endStr.match(/[,\s]+(\d{1,6})\s*(?:[-–]|$|\s+(?:quadra|lote|bloco|ap|casa|andar|\d))/i)
+                  ||endStr.match(/,\s*n?[°o]?\s*(\d{1,6})/i)
+                  ||endStr.match(/\s(\d{1,6})\s*$/);
+    
+    if(mNumEnd){
+      $('p-nend').value=mNumEnd[1];
+      // Rua = tudo antes do número e seu separador
+      const posNum=endStr.indexOf(mNumEnd[0]);
+      let rua=endStr.substring(0,posNum).trim().replace(/\s+/g,' ');
+      $('p-rua').value=rua;
+    } else {
+      $('p-rua').value=endStr.split(/[,\-–]/)[0].trim();
+    }
+    
+    // Complemento dentro do endereço (QUADRA X LOTE Y)
+    const mCompEnd=endStr.match(/\b(quadra\s+\d+(?:\s+lote\s+\d+)?)/i);
+    if(mCompEnd)$('p-comp').value=mCompEnd[1];
+  } else {
+    // Fallback: busca "Rua X, N" ou "Av. X, N" direto
+    const mRuaDir=full.match(/((?:rua|r\.\s|av\.?\s|avenida\s|al(?:ameda)?\.\s)[A-Za-záàâã][^,\n]{2,40})[,\s]+(\d{1,6})/i);
+    if(mRuaDir){$('p-rua').value=mRuaDir[1].trim();$('p-nend').value=mRuaDir[2];}
+  }
+
+  // =========================================================
+  // 5. COMPLEMENTO (Comp: Ap802)
+  // =========================================================
+  const mComp=full.match(/\bcomp(?:lemento)?\s*:\s*([A-Za-z0-9][^\s,:\n]{1,30})/i);
+  if(mComp)$('p-comp').value=mComp[1].trim();
+
+  // =========================================================
+  // 6. BAIRRO
+  // Stone: "Bairro: GOLF"
+  // iFood: "Bairro: Subsetor Sul - 7 (S-7)" → limpar para "Subsetor Sul"
+  // =========================================================
+  const mBairro=full.match(/bairro\s*:\s*([A-Za-záàâãéèêíóôõúçü][^:=\n\r]{2,50}?)(?=\s*(?:cidade|telefone|cep|comp|obs|rua|ender|pedido)\s*[:\-]|$)/i);
+  if(mBairro){
+    let b=mBairro[1].trim().replace(/\s+/g,' ');
+    // Remove sufixos: "- 7 (S-7)", "- SP", "(S-7)"
+    b=b.replace(/\s*[-–]\s*\d[^a-zA-Z]*$/, '').replace(/\s*\([^)]*\)/,'').trim();
+    // Remove "SP", "CEP", etc. no final
+    b=b.replace(/\s*[-–]?\s*(?:SP|RJ|MG|PR|SC|RS|CE|BA)\s*$/,'').trim();
+    if(b.length>1)$('p-bairro').value=b;
+  }
+
+  // =========================================================
+  // 7. TELEFONE
+  // Stone: "Telefone: 66 – 0 169848252" (66 é o DDD, 169848252 vem depois)
+  // iFood: "0800 705 4050 ID: 77919871" (o ID é o que interessa para Localizador)
+  // Busca o padrão "Telefone: ..." e extrai o número mais longo
+  // =========================================================
+  const mTelLabel=full.match(/telefone\s*:\s*([\d\s\-–()]+)/i);
+  if(mTelLabel){
+    // Extrai só dígitos
+    const digits=mTelLabel[1].replace(/\D/g,'');
+    // Pega os últimos 9-11 dígitos (número real, sem código internacional)
+    if(digits.length>=8){
+      const tel=digits.length>11?digits.slice(-11):digits;
+      $('p-tel').value=tel;
+    }
+  } else {
+    // Fallback: DDD 16/66/17/14/19 + número
+    const mTelDDD=full.match(/\b((?:16|66|17|14|19|11|21|31)\s*[\s\-]?\s*9?\d{4}[\s\-]?\d{4})\b/);
+    if(mTelDDD)$('p-tel').value=mTelDDD[1].replace(/\D/g,'');
+  }
+
+  // Trigger cálculo do valor da corrida
+  setTimeout(atualizarValorCorrida,800);
+  
+  console.log('[OCR] Resultado:',{
+    num:$('p-num').value,cli:$('p-cli').value,tel:$('p-tel').value,
+    rua:$('p-rua').value,nend:$('p-nend').value,bairro:$('p-bairro').value,comp:$('p-comp').value
+  });
 }
 
 async function salvarPedido(){
@@ -1087,7 +1242,7 @@ async function salvarPedido(){
     lat_entrega:geo?geo.lat:null,lng_entrega:geo?geo.lng:null,
     status:'pendente',status_detalhado:'pendente',ordem_rota:99,
     pedido_pronto:false,
-    codigo_confirmacao:''
+    codigo_confirmacao:window._ocrCodConf||''
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){showM('ped-msg','Erro: '+error.message);return;}
@@ -1101,7 +1256,7 @@ async function salvarPedido(){
 async function otimizarRotaInteligente(){
   const{data:peds}=await db.from('entregas').select('*').eq('loja_id',U.id).eq('status','pendente').order('created_at');
   if(!peds||!peds.length){alert('Sem pedidos pendentes.');return;}
-  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id).eq('status','ativo');
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id)
   const onlineEnts=(assoc||[]).filter(a=>a.e&&a.e.online);
   if(!onlineEnts.length){alert('Nenhum entregador online vinculado.');return;}
   // Verificar quais entregadores estao livres (sem pedidos em_rota)
@@ -1154,7 +1309,7 @@ async function carregarPedidos(){
   const{data}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',U.id).neq('status','entregue').neq('status','cancelado').order('ordem_rota');
   if(!data||!data.length){$('rota-lst').innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem pedidos. Use "Novo Pedido".</p>';return;}
   // Buscar entregadores disponiveis
-  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id).eq('status','ativo');
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id)
   const onlineList=(assoc||[]).filter(a=>a.e&&a.e.online);
   $('rota-lst').innerHTML=data.map((e,i)=>{
     const stDet=e.status_detalhado||e.status;
@@ -1365,21 +1520,67 @@ async function toggleOnline(){
   U.online=novo;if(!novo)U.loja_ativa_id=null;
   localStorage.setItem('u',JSON.stringify(U));
   atuBtnOn(novo);
-  if(novo)inicRast();else{if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}}
+  if(novo)inicRast();
+  else{
+    if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
+    if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
+  }
   if(!novo)carregarLojaAtiva();
 }
 
 function inicRast(){
-  if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
+  // Para watches anteriores
+  if(ivs.rast!=null){
+    try{navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);}catch(e){}
+    ivs.rast=null;
+  }
+  if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
   if(!navigator.geolocation)return;
-  ivs.rast=navigator.geolocation.watchPosition(
-    p=>{
-      myLat=p.coords.latitude;myLng=p.coords.longitude;gpsOk=true;
-      $('gps-banner').classList.add('hidden');
-      if(U&&U.online)db.from('usuarios').update({latitude:p.coords.latitude,longitude:p.coords.longitude}).eq('id',U.id);
-    },
+
+  const salvarPos=(lat,lng)=>{
+    const mudou=!myLat||Math.abs(lat-myLat)>0.00001||Math.abs(lng-myLng)>0.00001;
+    myLat=lat;myLng=lng;gpsOk=true;
+    $('gps-banner').classList.add('hidden');
+    // Só salva se posicao mudou (economiza requisicoes)
+    if(mudou&&U&&U.online){
+      db.from('usuarios').update({latitude:lat,longitude:lng}).eq('id',U.id);
+    }
+  };
+
+  // ESTRATEGIA 1: watchPosition (atualiza quando o dispositivo detecta movimento)
+  try{
+    ivs.rast=navigator.geolocation.watchPosition(
+      p=>salvarPos(p.coords.latitude,p.coords.longitude),
+      err=>{
+        if(err.code===1)$('gps-banner').classList.remove('hidden');
+        // Em caso de timeout/erro, tenta via getCurrentPosition no próximo ciclo
+      },
+      {enableHighAccuracy:true,timeout:30000,maximumAge:0,distanceFilter:10}
+    );
+  }catch(e){ivs.rast=null;}
+
+  // ESTRATEGIA 2: getCurrentPosition a cada 15s como garantia
+  // (watchPosition pode parar quando browser vai ao background)
+  ivs.rastPush=setInterval(()=>{
+    if(!U||!U.online)return;
+    navigator.geolocation.getCurrentPosition(
+      p=>salvarPos(p.coords.latitude,p.coords.longitude),
+      err=>{
+        // Falhou ao pegar posicao nova, mas se temos cache, envia mesmo assim
+        if(myLat&&myLng&&U&&U.online){
+          db.from('usuarios').update({latitude:myLat,longitude:myLng}).eq('id',U.id);
+        }
+        if(err.code===1)$('gps-banner').classList.remove('hidden');
+      },
+      {enableHighAccuracy:true,timeout:8000,maximumAge:20000}
+    );
+  },15000);
+
+  // Pega posicao imediatamente ao entrar online
+  navigator.geolocation.getCurrentPosition(
+    p=>salvarPos(p.coords.latitude,p.coords.longitude),
     err=>{if(err.code===1)$('gps-banner').classList.remove('hidden');},
-    {enableHighAccuracy:true,timeout:20000,maximumAge:5000}
+    {enableHighAccuracy:true,timeout:10000,maximumAge:5000}
   );
 }
 
