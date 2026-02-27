@@ -10,69 +10,65 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f5f5;color:#333;}
-.login-container{max-width:400px;margin:50px auto;background:white;padding:30px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
-.logo{text-align:center;margin-bottom:30px;}
-.logo img{width:110px;height:110px;border-radius:50%;object-fit:cover;}
-h2{text-align:center;color:#004E89;margin-bottom:20px;}
-.form-group{margin-bottom:15px;}
-label{display:block;margin-bottom:5px;color:#666;font-size:14px;}
-input[type=text],input[type=email],input[type=password],input[type=tel],input[type=number],select,textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:15px;}
-textarea{resize:vertical;min-height:80px;}
+.login-container{max-width:400px;margin:40px auto;background:white;padding:28px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
+.logo{text-align:center;margin-bottom:25px;}
+.logo img{width:100px;height:100px;border-radius:50%;object-fit:cover;}
+h2{text-align:center;color:#004E89;margin-bottom:18px;}
+.form-group{margin-bottom:13px;}
+label{display:block;margin-bottom:4px;color:#666;font-size:13px;}
+input[type=text],input[type=email],input[type=password],input[type=tel],input[type=number],input[type=time],select,textarea{width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;font-size:15px;background:white;}
+textarea{resize:vertical;min-height:70px;}
 input:focus,select:focus,textarea:focus{outline:none;border-color:#FF6B35;}
-button{width:100%;padding:14px;background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin-top:10px;}
-button:hover{opacity:0.9;}
-button:disabled{opacity:0.6;cursor:not-allowed;}
-.tabs{display:flex;margin-bottom:20px;}
-.tab{flex:1;padding:10px;text-align:center;cursor:pointer;border-bottom:2px solid #ddd;background:none;color:#333;font-size:15px;margin-top:0;}
+button{width:100%;padding:13px;background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;margin-top:8px;}
+button:hover{opacity:0.9;}button:disabled{opacity:0.6;cursor:not-allowed;}
+.tabs{display:flex;margin-bottom:18px;}
+.tab{flex:1;padding:10px;text-align:center;cursor:pointer;border-bottom:2px solid #ddd;background:none;color:#333;font-size:14px;margin-top:0;}
 .tab.active{border-bottom-color:#FF6B35;color:#FF6B35;font-weight:bold;}
-.tab-content{display:none;}
-.tab-content.active{display:block;}
-.user-type{display:flex;gap:10px;margin-bottom:15px;}
+.tab-content{display:none;}.tab-content.active{display:block;}
+.user-type{display:flex;gap:10px;margin-bottom:13px;}
 .user-type label{flex:1;padding:10px;text-align:center;border:2px solid #ddd;border-radius:8px;cursor:pointer;margin-bottom:0;}
 .user-type input:checked+label{border-color:#FF6B35;background:#fff5f2;}
 .user-type input{display:none;}
 .hidden{display:none!important;}
-.error-msg{background:#ffebee;color:#c62828;padding:10px;border-radius:8px;margin-bottom:15px;font-size:14px;}
-.success-msg{background:#e8f5e9;color:#2e7d32;padding:10px;border-radius:8px;margin-bottom:15px;font-size:14px;}
-.header{background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);color:white;padding:20px;text-align:center;position:relative;}
-.header img{width:80px;height:80px;border-radius:50%;margin-bottom:10px;object-fit:cover;}
-.container{padding:20px;max-width:1200px;margin:0 auto;}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:15px;margin-bottom:20px;}
-.card{background:white;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);cursor:pointer;transition:transform 0.2s;}
-.card:hover{transform:translateY(-3px);}
-.card h3{font-size:13px;color:#666;margin-bottom:10px;}
-.card .value{font-size:26px;font-weight:bold;color:#FF6B35;}
-.menu{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;}
-.menu-item{background:white;padding:20px;border-radius:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);cursor:pointer;transition:transform 0.2s;}
+.error-msg{background:#ffebee;color:#c62828;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;}
+.success-msg{background:#e8f5e9;color:#2e7d32;padding:10px;border-radius:8px;margin-bottom:12px;font-size:13px;}
+.header{background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);color:white;padding:18px;text-align:center;position:relative;}
+.container{padding:16px;max-width:1000px;margin:0 auto;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px;}
+.card{background:white;padding:16px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);cursor:pointer;transition:transform .2s;}
+.card:hover{transform:translateY(-2px);}
+.card h3{font-size:12px;color:#888;margin-bottom:8px;}
+.card .value{font-size:24px;font-weight:bold;color:#FF6B35;}
+.menu{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.menu-item{background:white;padding:18px;border-radius:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);cursor:pointer;transition:transform .2s;}
 .menu-item:hover{transform:translateY(-2px);}
-.menu-item .icon{font-size:30px;margin-bottom:8px;}
-.menu-item h3{font-size:14px;}
-.logout{position:absolute;top:15px;right:15px;background:rgba(255,255,255,0.2);color:white;padding:7px 14px;border-radius:6px;cursor:pointer;border:none;width:auto;font-size:13px;margin-top:0;}
+.menu-item .icon{font-size:28px;margin-bottom:7px;}
+.menu-item h3{font-size:13px;}
+.logout{position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.2);color:white;padding:7px 13px;border-radius:6px;cursor:pointer;border:none;width:auto;font-size:13px;margin-top:0;}
 .modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:1000;overflow-y:auto;}
-.modal-content{background:white;margin:15px auto;padding:20px;border-radius:12px;max-width:620px;position:relative;}
-.close{position:absolute;top:10px;right:15px;font-size:28px;cursor:pointer;color:#666;}
-.list-item{padding:14px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.modal-content{background:white;margin:12px auto;padding:18px;border-radius:12px;max-width:620px;position:relative;}
+.close{position:absolute;top:10px;right:14px;font-size:26px;cursor:pointer;color:#666;}
+.list-item{padding:13px;border-bottom:1px solid #eee;}
 .list-item:last-child{border-bottom:none;}
-.btn-sm{background:#FF6B35;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;margin-top:0;width:auto;}
-.btn-sm.verde{background:#00C9A7;}
-.btn-sm.vermelho{background:#e74c3c;}
-.btn-sm.azul{background:#004E89;}
-.btn-sm.cinza{background:#888;}
-.taxa-input{width:75px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:14px;text-align:center;}
-.badge-ativo{background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;font-size:12px;}
-.badge-bloqueado{background:#ffebee;color:#c62828;padding:3px 8px;border-radius:12px;font-size:12px;}
-.badge-pendente{background:#fff8e1;color:#f57f17;padding:3px 8px;border-radius:12px;font-size:12px;}
-.badge-entregue{background:#e8f5e9;color:#2e7d32;padding:3px 8px;border-radius:12px;font-size:12px;}
-.foto-placeholder{width:85px;height:85px;border-radius:50%;background:rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:34px;cursor:pointer;border:3px dashed rgba(255,255,255,0.6);margin:0 auto 10px;}
-.foto-perfil{width:85px;height:85px;border-radius:50%;object-fit:cover;border:3px solid white;margin-bottom:10px;}
-#mapa-loja{height:300px;border-radius:10px;margin-top:10px;}
-.entrega-card{background:#f9f9f9;border-radius:8px;padding:12px;margin-bottom:10px;border-left:4px solid #FF6B35;}
+.btn-sm{background:#FF6B35;color:white;border:none;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;margin-top:0;width:auto;}
+.btn-sm.verde{background:#00C9A7;}.btn-sm.vermelho{background:#e74c3c;}.btn-sm.azul{background:#004E89;}.btn-sm.cinza{background:#888;}
+.taxa-input{width:72px;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:13px;text-align:center;}
+.badge-ativo{background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;}
+.badge-bloqueado{background:#ffebee;color:#c62828;padding:2px 8px;border-radius:10px;font-size:11px;}
+.badge-pendente{background:#fff8e1;color:#f57f17;padding:2px 8px;border-radius:10px;font-size:11px;}
+.badge-entregue{background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;}
+.badge-em_rota{background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:10px;font-size:11px;}
+.foto-placeholder{width:82px;height:82px;border-radius:50%;background:rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;border:3px dashed rgba(255,255,255,0.6);margin:0 auto 8px;}
+.foto-perfil{width:82px;height:82px;border-radius:50%;object-fit:cover;border:3px solid white;margin-bottom:8px;}
+#mapa-loja{height:280px;border-radius:10px;margin-top:8px;}
+.entrega-card{background:#f9f9f9;border-radius:8px;padding:11px;margin-bottom:9px;border-left:4px solid #FF6B35;}
 .entrega-card.em-rota{border-left-color:#004E89;}
-.entrega-card.entregue{border-left-color:#00C9A7;opacity:0.7;}
-.secao{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.08);padding:15px;margin-bottom:15px;}
-.secao h3{font-size:15px;color:#004E89;margin-bottom:12px;font-weight:600;}
-.config-section{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #eee;}
-.config-section:last-child{border-bottom:none;}
+.secao{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);padding:14px;margin-bottom:14px;}
+.secao h3{font-size:14px;color:#004E89;margin-bottom:11px;font-weight:600;}
+.config-section{margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #eee;}
+.config-section:last-child{border-bottom:none;margin-bottom:0;}
+.addr-grid{display:grid;grid-template-columns:2fr 1fr;gap:10px;}
+.addr-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 </style>
 </head>
 <body>
@@ -99,18 +95,26 @@ button:disabled{opacity:0.6;cursor:not-allowed;}
       <label><input type="radio" name="register-type" value="loja" checked onchange="toggleCadastro()"> <span>&#127978; Loja</span></label>
       <label><input type="radio" name="register-type" value="entregador" onchange="toggleCadastro()"> <span>&#128757; Entregador</span></label>
     </div>
-    <div class="form-group"><label>Nome completo</label><input type="text" id="reg-nome" placeholder="Seu nome"></div>
-    <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="seu@email.com"></div>
-    <div class="form-group"><label>Telefone</label><input type="tel" id="reg-telefone" placeholder="(11) 99999-9999"></div>
+    <div class="form-group"><label>Nome completo</label><input type="text" id="reg-nome"></div>
+    <div class="form-group"><label>Email</label><input type="email" id="reg-email"></div>
+    <div class="form-group"><label>Telefone</label><input type="tel" id="reg-telefone" placeholder="(16) 99999-9999"></div>
     <div class="form-group"><label>Senha</label><input type="password" id="reg-senha" placeholder="Minimo 6 caracteres"></div>
     <div id="campos-loja">
-      <div class="form-group"><label>Nome da Loja</label><input type="text" id="reg-nome-loja" placeholder="Ex: Pizzaria do Ze"></div>
+      <div class="form-group"><label>Nome da Loja</label><input type="text" id="reg-nome-loja"></div>
       <div class="form-group"><label>CNPJ</label><input type="text" id="reg-cnpj" placeholder="00.000.000/0000-00"></div>
-      <div class="form-group"><label>Endereco</label><input type="text" id="reg-endereco" placeholder="Rua, numero, bairro, cidade"></div>
+      <div class="addr-grid">
+        <div class="form-group"><label>Rua / Avenida</label><input type="text" id="reg-rua" placeholder="Rua Benjamin Constant"></div>
+        <div class="form-group"><label>Numero</label><input type="text" id="reg-numero" placeholder="241"></div>
+      </div>
+      <div class="addr-grid2">
+        <div class="form-group"><label>Bairro</label><input type="text" id="reg-bairro" placeholder="Centro"></div>
+        <div class="form-group"><label>Cidade</label><input type="text" id="reg-cidade" value="Ribeirao Preto"></div>
+      </div>
+      <div class="form-group"><label>Complemento</label><input type="text" id="reg-complemento" placeholder="Sala 2, Loja A..."></div>
     </div>
     <div id="campos-entregador" class="hidden">
       <div class="form-group"><label>Placa da Moto</label><input type="text" id="reg-placa" placeholder="ABC-1234"></div>
-      <div class="form-group"><label>Chave Pix</label><input type="text" id="reg-pix" placeholder="Chave Pix para pagamento"></div>
+      <div class="form-group"><label>Chave Pix</label><input type="text" id="reg-pix" placeholder="CPF, email ou telefone"></div>
     </div>
     <button onclick="fazerCadastro()" id="btn-cadastrar">Cadastrar</button>
   </div>
@@ -151,30 +155,25 @@ button:disabled{opacity:0.6;cursor:not-allowed;}
       <div class="card"><h3>Taxa Entregador</h3><div class="value" id="taxa-entregador-loja">-</div></div>
       <div class="card"><h3>Entregas Hoje</h3><div class="value" id="entregas-hoje-loja">0</div></div>
     </div>
-
-    <!-- Taxa entregador -->
     <div class="secao">
-      <h3>&#128176; Minha taxa por entrega ao entregador</h3>
+      <h3>&#128176; Taxa por entrega ao entregador</h3>
       <div style="display:flex;gap:10px;align-items:center;">
         <input type="number" id="nova-taxa-entregador" placeholder="R$ 0,00" step="0.10" min="0" style="flex:1;">
-        <button onclick="salvarTaxaEntregador()" style="width:auto;padding:10px 16px;margin:0;font-size:14px;">Salvar</button>
+        <button onclick="salvarTaxaEntregador()" style="width:auto;padding:10px 16px;margin:0;font-size:13px;">Salvar</button>
       </div>
-      <div id="taxa-msg" style="margin-top:6px;font-size:13px;"></div>
+      <div id="taxa-msg" style="margin-top:5px;font-size:13px;"></div>
     </div>
-
-    <!-- Mapa entregadores online -->
     <div class="secao">
       <h3>&#128205; Entregadores Online Agora</h3>
       <div id="mapa-loja"></div>
       <div id="lista-online-loja" style="margin-top:10px;"></div>
     </div>
-
     <div class="menu">
       <div class="menu-item" onclick="abrirScannerComanda()"><div class="icon">&#128247;</div><h3>Scanear Comanda</h3></div>
       <div class="menu-item" onclick="abrirEntregasLoja()"><div class="icon">&#128230;</div><h3>Pedidos / Rota</h3></div>
       <div class="menu-item" onclick="abrirRelatorioLoja()"><div class="icon">&#128202;</div><h3>Relatorio</h3></div>
       <div class="menu-item" onclick="abrirGerenciarEntregadores()"><div class="icon">&#128101;</div><h3>Entregadores</h3></div>
-      <div class="menu-item" onclick="abrirConfiguracoesLoja()"><div class="icon">&#9881;</div><h3>Configuracoes</h3></div>
+      <div class="menu-item" onclick="abrirConfiguracoesLoja()" style="grid-column:1/-1;"><div class="icon">&#9881;</div><h3>Configuracoes</h3></div>
     </div>
   </div>
 </div>
@@ -185,10 +184,10 @@ button:disabled{opacity:0.6;cursor:not-allowed;}
     <button class="logout" onclick="event.stopPropagation();fazerLogout()">Sair</button>
     <div onclick="abrirFotoPerfil()" style="cursor:pointer;">
       <div class="foto-placeholder" id="foto-placeholder">&#128100;</div>
-      <img id="foto-entregador" class="foto-perfil hidden" src="" alt="Foto">
+      <img id="foto-entregador" class="foto-perfil hidden" src="" alt="">
     </div>
     <h1 id="nome-entregador-display">Entregador</h1>
-    <p>&bull; <span id="status-online-texto">Offline</span></p>
+    <p><span id="status-online-texto">&#9899; Offline</span></p>
     <input type="file" id="input-foto" accept="image/*" class="hidden" onchange="uploadFoto(event)">
   </div>
   <div class="container">
@@ -201,165 +200,164 @@ button:disabled{opacity:0.6;cursor:not-allowed;}
         <div class="icon" id="icone-online">&#128994;</div>
         <h3 id="texto-online">Ficar Online</h3>
       </div>
-      <div class="menu-item" onclick="abrirRotaEntregador()">
-        <div class="icon">&#127758;</div>
-        <h3>Minha Rota</h3>
-      </div>
-      <div class="menu-item" onclick="abrirGanhos()">
-        <div class="icon">&#128181;</div>
-        <h3>Meus Ganhos</h3>
-      </div>
-      <div class="menu-item" onclick="abrirConfiguracoes()">
-        <div class="icon">&#9881;</div>
-        <h3>Configuracoes</h3>
-      </div>
+      <div class="menu-item" onclick="abrirRotaEntregador()"><div class="icon">&#127758;</div><h3>Minha Rota</h3></div>
+      <div class="menu-item" onclick="abrirGanhos()"><div class="icon">&#128181;</div><h3>Meus Ganhos</h3></div>
+      <div class="menu-item" onclick="abrirConfiguracoes()"><div class="icon">&#9881;</div><h3>Configuracoes</h3></div>
     </div>
   </div>
 </div>
 
-<!-- ===== MODAIS ===== -->
-
-<!-- Admin: Entregadores -->
+<!-- MODAIS -->
 <div id="modal-entregadores" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('entregadores')">&times;</span>
   <h2>Entregadores</h2>
   <div id="lista-entregadores"><p>Carregando...</p></div>
 </div></div>
 
-<!-- Admin: Lojas -->
 <div id="modal-lojas" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('lojas')">&times;</span>
   <h2>Lojas</h2>
   <div id="lista-lojas"><p>Carregando...</p></div>
 </div></div>
 
-<!-- Admin: Financeiro -->
 <div id="modal-financeiro-admin" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('financeiro-admin')">&times;</span>
   <h2>Financeiro Geral</h2>
   <div id="dados-financeiro-admin"></div>
 </div></div>
 
-<!-- Admin: Cobranças -->
 <div id="modal-cobrancas" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('cobrancas')">&times;</span>
   <h2>Cobrancas Semanais</h2>
   <div id="lista-cobrancas"></div>
 </div></div>
 
-<!-- Loja: Scanner Comanda -->
+<!-- Scanner -->
 <div id="modal-scanner" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('scanner')">&times;</span>
   <h2>&#128247; Scanear Comanda</h2>
-  <p style="color:#666;font-size:13px;margin-bottom:12px;">Tire uma foto da comanda ou selecione da galeria. O sistema extraira automaticamente os dados do cliente.</p>
-  <div style="text-align:center;margin-bottom:15px;">
-    <button onclick="document.getElementById('foto-comanda').click()" style="width:auto;padding:12px 24px;">&#128247; Tirar/Selecionar Foto</button>
+  <p style="color:#666;font-size:13px;margin-bottom:12px;">Tire foto da comanda. A IA extrai os dados automaticamente.</p>
+  <div style="text-align:center;margin-bottom:14px;">
+    <button onclick="document.getElementById('foto-comanda').click()" style="width:auto;padding:11px 22px;">&#128247; Tirar / Selecionar Foto</button>
     <input type="file" id="foto-comanda" accept="image/*" capture="environment" class="hidden" onchange="processarComanda(event)">
   </div>
-  <div id="scanner-loading" class="hidden" style="text-align:center;padding:20px;">
-    <p>&#129300; Lendo comanda com IA...</p>
-  </div>
+  <div id="scanner-loading" class="hidden" style="text-align:center;padding:20px;"><p>&#129300; Lendo com IA...</p></div>
   <div id="dados-comanda" class="hidden">
     <div class="secao">
-      <h3>Dados Extraidos</h3>
+      <h3>Dados Extraidos — confirme antes de salvar</h3>
       <div class="form-group"><label>Numero do Pedido</label><input type="text" id="ped-numero"></div>
       <div class="form-group"><label>Nome do Cliente</label><input type="text" id="ped-cliente"></div>
       <div class="form-group"><label>Telefone</label><input type="text" id="ped-telefone"></div>
-      <div class="form-group"><label>Endereco de Entrega</label><textarea id="ped-endereco"></textarea></div>
-      <div class="form-group"><label>Observacoes</label><input type="text" id="ped-obs"></div>
+      <div class="addr-grid">
+        <div class="form-group"><label>Rua / Avenida</label><input type="text" id="ped-rua"></div>
+        <div class="form-group"><label>Numero</label><input type="text" id="ped-num-end"></div>
+      </div>
+      <div class="addr-grid2">
+        <div class="form-group"><label>Bairro</label><input type="text" id="ped-bairro"></div>
+        <div class="form-group"><label>Cidade</label><input type="text" id="ped-cidade"></div>
+      </div>
+      <div class="form-group"><label>Complemento (apto, bloco, torre...)</label><input type="text" id="ped-complemento" placeholder="Ex: Torre 2 Bloco 4 Apto 12"></div>
+      <div class="form-group"><label>Observacoes do Pedido</label><input type="text" id="ped-obs"></div>
     </div>
-    <button onclick="salvarEntrega()">&#10004; Confirmar e Adicionar Rota</button>
+    <button onclick="salvarEntrega()">&#10004; Confirmar e Adicionar a Rota</button>
   </div>
 </div></div>
 
-<!-- Loja: Entregas / Rota -->
+<!-- Entregas/Rota Loja -->
 <div id="modal-entregas-loja" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('entregas-loja')">&times;</span>
-  <h2>&#128230; Pedidos e Rota Inteligente</h2>
+  <h2>&#128230; Pedidos e Rota</h2>
   <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
-    <button onclick="otimizarRota()" style="width:auto;padding:8px 16px;background:#004E89;font-size:13px;">&#129302; Otimizar Rota</button>
-    <button onclick="enviarRotaEntregador()" style="width:auto;padding:8px 16px;background:#00C9A7;font-size:13px;">&#128757; Enviar ao Entregador</button>
+    <button onclick="otimizarRota()" style="width:auto;padding:8px 14px;background:#004E89;font-size:13px;">&#129302; Otimizar Rota</button>
+    <button onclick="enviarRotaEntregador()" style="width:auto;padding:8px 14px;background:#00C9A7;font-size:13px;">&#128757; Enviar ao Entregador</button>
   </div>
   <div id="lista-entregas-loja"></div>
 </div></div>
 
-<!-- Loja: Relatorio -->
+<!-- Relatorio Loja -->
 <div id="modal-relatorio-loja" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('relatorio-loja')">&times;</span>
   <h2>&#128202; Relatorio Financeiro</h2>
-  <div style="display:flex;gap:8px;margin-bottom:15px;flex-wrap:wrap;">
-    <select id="filtro-periodo" onchange="carregarRelatorioLoja()" style="flex:1;">
-      <option value="hoje">Hoje</option>
-      <option value="semana">Esta semana</option>
-      <option value="mes">Este mes</option>
-    </select>
-  </div>
+  <select id="filtro-periodo" onchange="carregarRelatorioLoja()" style="margin-bottom:14px;">
+    <option value="hoje">Hoje</option>
+    <option value="semana">Esta semana</option>
+    <option value="mes">Este mes</option>
+  </select>
   <div id="dados-relatorio-loja"></div>
 </div></div>
 
-<!-- Loja: Gerenciar Entregadores -->
+<!-- Gerenciar Entregadores -->
 <div id="modal-gerenciar-ent" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('gerenciar-ent')">&times;</span>
   <h2>&#128101; Meus Entregadores</h2>
   <div class="secao">
-    <h3>Adicionar Entregador</h3>
+    <h3>Adicionar por email</h3>
     <div style="display:flex;gap:8px;">
       <input type="email" id="email-entregador" placeholder="email@entregador.com" style="flex:1;">
-      <button onclick="adicionarEntregador()" style="width:auto;padding:10px 14px;margin:0;font-size:13px;">Adicionar</button>
+      <button onclick="adicionarEntregador()" style="width:auto;padding:10px 13px;margin:0;font-size:13px;">Adicionar</button>
     </div>
     <div id="msg-add-ent" style="margin-top:6px;font-size:13px;"></div>
   </div>
   <div id="lista-meus-ent"></div>
 </div></div>
 
-<!-- Loja: Configuracoes -->
+<!-- Config Loja -->
 <div id="modal-config-loja" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('config-loja')">&times;</span>
   <h2>&#9881; Configuracoes da Loja</h2>
   <div class="config-section">
-    <h3 style="margin-bottom:12px;color:#004E89;">Dados da Loja</h3>
+    <p style="font-weight:600;color:#004E89;margin-bottom:12px;">Dados da Loja</p>
     <div class="form-group"><label>Nome da Loja</label><input type="text" id="cfg-nome-loja"></div>
     <div class="form-group"><label>Telefone</label><input type="tel" id="cfg-tel-loja"></div>
-    <div class="form-group"><label>Endereco</label><input type="text" id="cfg-end-loja"></div>
     <div class="form-group"><label>CNPJ</label><input type="text" id="cfg-cnpj-loja"></div>
   </div>
   <div class="config-section">
-    <h3 style="margin-bottom:12px;color:#004E89;">Horario de Funcionamento</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div class="form-group"><label>Abertura</label><input type="time" id="cfg-abertura" style="padding:10px;"></div>
-      <div class="form-group"><label>Fechamento</label><input type="time" id="cfg-fechamento" style="padding:10px;"></div>
+    <p style="font-weight:600;color:#004E89;margin-bottom:12px;">Endereco</p>
+    <div class="addr-grid">
+      <div class="form-group"><label>Rua / Avenida</label><input type="text" id="cfg-rua"></div>
+      <div class="form-group"><label>Numero</label><input type="text" id="cfg-numero"></div>
+    </div>
+    <div class="addr-grid2">
+      <div class="form-group"><label>Bairro</label><input type="text" id="cfg-bairro"></div>
+      <div class="form-group"><label>Cidade</label><input type="text" id="cfg-cidade"></div>
+    </div>
+    <div class="form-group"><label>Complemento</label><input type="text" id="cfg-complemento" placeholder="Sala, Loja, Bloco..."></div>
+  </div>
+  <div class="config-section">
+    <p style="font-weight:600;color:#004E89;margin-bottom:12px;">Horario de Funcionamento</p>
+    <div class="addr-grid2">
+      <div class="form-group"><label>Abertura</label><input type="time" id="cfg-abertura"></div>
+      <div class="form-group"><label>Fechamento</label><input type="time" id="cfg-fechamento"></div>
     </div>
   </div>
   <div class="config-section">
-    <h3 style="margin-bottom:12px;color:#004E89;">Seguranca</h3>
-    <div class="form-group"><label>Nova Senha (deixe em branco para nao alterar)</label><input type="password" id="cfg-senha-loja" placeholder="Nova senha"></div>
+    <p style="font-weight:600;color:#004E89;margin-bottom:12px;">Seguranca</p>
+    <div class="form-group"><label>Nova Senha (em branco = nao alterar)</label><input type="password" id="cfg-senha-loja" placeholder="Nova senha"></div>
   </div>
   <div id="cfg-loja-msg"></div>
   <button onclick="salvarConfigLoja()">Salvar Alteracoes</button>
 </div></div>
 
-<!-- Entregador: Ganhos -->
+<!-- Ganhos Entregador -->
 <div id="modal-ganhos" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('ganhos')">&times;</span>
   <h2>&#128181; Meus Ganhos</h2>
-  <div style="display:flex;gap:8px;margin-bottom:15px;">
-    <select id="filtro-ganhos" onchange="carregarGanhos()" style="flex:1;">
-      <option value="hoje">Hoje</option>
-      <option value="semana">Esta semana</option>
-      <option value="mes">Este mes</option>
-    </select>
-  </div>
+  <select id="filtro-ganhos" onchange="carregarGanhos()" style="margin-bottom:14px;">
+    <option value="hoje">Hoje</option>
+    <option value="semana">Esta semana</option>
+    <option value="mes">Este mes</option>
+  </select>
   <div id="dados-ganhos"></div>
 </div></div>
 
-<!-- Entregador: Rota -->
+<!-- Rota Entregador -->
 <div id="modal-rota-ent" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('rota-ent')">&times;</span>
   <h2>&#127758; Minhas Entregas</h2>
   <div id="lista-rota-ent"></div>
 </div></div>
 
-<!-- Entregador: Configuracoes -->
+<!-- Config Entregador -->
 <div id="modal-configuracoes" class="modal"><div class="modal-content">
   <span class="close" onclick="closeModal('configuracoes')">&times;</span>
   <h2>&#9881; Meus Dados</h2>
@@ -367,7 +365,7 @@ button:disabled{opacity:0.6;cursor:not-allowed;}
   <div class="form-group"><label>Telefone</label><input type="tel" id="conf-telefone"></div>
   <div class="form-group"><label>Placa da Moto</label><input type="text" id="conf-placa"></div>
   <div class="form-group"><label>Chave Pix</label><input type="text" id="conf-pix"></div>
-  <div class="form-group"><label>Nova Senha (deixe em branco para nao alterar)</label><input type="password" id="conf-senha" placeholder="Nova senha"></div>
+  <div class="form-group"><label>Nova Senha (em branco = nao alterar)</label><input type="password" id="conf-senha"></div>
   <div id="conf-msg"></div>
   <button onclick="salvarConfiguracoes()">Salvar Dados</button>
 </div></div>
@@ -377,50 +375,54 @@ const SUPABASE_URL='https://dfvjaweyxfenhjgusekq.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdmphd2V5eGZlbmhqZ3VzZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMzk4NTMsImV4cCI6MjA4NzYxNTg1M30.MT9pzSQgc3ZNGiIV95DwjVtNvSZI0Lz-SKMkvMys1Kg';
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
+// Ribeirao Preto coords
+const RP_LAT=-21.1767;
+const RP_LNG=-47.8208;
+
 let usuarioLogado=null;
 let mapaLoja=null;
-let marcadoresEntregadores={};
+let marcadores={};
 let intervaloRastreamento=null;
 let intervaloMapa=null;
 
-window.onload=function(){
+window.onload=()=>{
   const s=localStorage.getItem('usuario');
   if(s){usuarioLogado=JSON.parse(s);mostrarDashboard(usuarioLogado.tipo);}
 };
 
-// HELPERS
 function showMsg(id,msg,isError=true){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.className=isError?'error-msg':'success-msg';
-  el.textContent=msg;
+  const el=document.getElementById(id);if(!el)return;
+  el.className=isError?'error-msg':'success-msg';el.textContent=msg;
 }
 function switchTab(tab,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById(tab+'-tab').classList.add('active');
-  document.getElementById('login-msg').innerHTML='';
-  document.getElementById('register-msg').innerHTML='';
+  el.classList.add('active');document.getElementById(tab+'-tab').classList.add('active');
+  document.getElementById('login-msg').innerHTML='';document.getElementById('register-msg').innerHTML='';
 }
 function toggleCadastro(){
-  const tipo=document.querySelector('input[name="register-type"]:checked').value;
-  document.getElementById('campos-loja').classList.toggle('hidden',tipo!=='loja');
-  document.getElementById('campos-entregador').classList.toggle('hidden',tipo!=='entregador');
+  const t=document.querySelector('input[name="register-type"]:checked').value;
+  document.getElementById('campos-loja').classList.toggle('hidden',t!=='loja');
+  document.getElementById('campos-entregador').classList.toggle('hidden',t!=='entregador');
 }
-function openModal(tipo){document.getElementById('modal-'+tipo).style.display='block';}
-function closeModal(tipo){document.getElementById('modal-'+tipo).style.display='none';}
-window.onclick=function(e){if(e.target.classList.contains('modal'))e.target.style.display='none';};
+function openModal(t){document.getElementById('modal-'+t).style.display='block';}
+function closeModal(t){document.getElementById('modal-'+t).style.display='none';}
+window.onclick=e=>{if(e.target.classList.contains('modal'))e.target.style.display='none';};
 function formatReal(v){return'R$ '+parseFloat(v||0).toFixed(2).replace('.',',');}
 function dataHoje(){return new Date().toISOString().split('T')[0];}
-function inicioDia(d){const dt=new Date(d||Date.now());dt.setHours(0,0,0,0);return dt.toISOString();}
-function fimDia(d){const dt=new Date(d||Date.now());dt.setHours(23,59,59,999);return dt.toISOString();}
+function inicioDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
+function fimDia(){const d=new Date();d.setHours(23,59,59,999);return d.toISOString();}
 function inicioPeriodo(p){
   const n=new Date();
-  if(p==='hoje'){n.setHours(0,0,0,0);}
+  if(p==='hoje')n.setHours(0,0,0,0);
   else if(p==='semana'){n.setDate(n.getDate()-n.getDay());n.setHours(0,0,0,0);}
   else{n.setDate(1);n.setHours(0,0,0,0);}
   return n.toISOString();
+}
+function montarEndereco(rua,num,bairro,cidade,complemento){
+  let e=[rua,num,bairro,cidade].filter(Boolean).join(', ');
+  if(complemento)e+=' — '+complemento;
+  return e||'Sem endereco';
 }
 
 // LOGIN
@@ -435,8 +437,7 @@ async function fazerLogin(){
     if(error||!u){showMsg('login-msg','Usuario nao encontrado');return;}
     if(u.status==='bloqueado'){showMsg('login-msg','Acesso bloqueado. Contate o administrador.');return;}
     if(senha!==u.senha_hash){showMsg('login-msg','Senha incorreta');return;}
-    usuarioLogado=u;
-    localStorage.setItem('usuario',JSON.stringify(u));
+    usuarioLogado=u;localStorage.setItem('usuario',JSON.stringify(u));
     mostrarDashboard(u.tipo);
   }catch(err){showMsg('login-msg','Erro: '+err.message);}
   finally{btn.disabled=false;btn.textContent='Entrar';}
@@ -456,11 +457,16 @@ async function fazerCadastro(){
   try{
     const{data:ex}=await db.from('usuarios').select('id').eq('email',email).single();
     if(ex){showMsg('register-msg','Email ja cadastrado');return;}
-    const dados={tipo,nome,email,telefone,senha_hash:senha,status:'ativo',taxa_sistema:0.50,taxa_entrega:0,online:false};
+    const rua=document.getElementById('reg-rua')?document.getElementById('reg-rua').value:'';
+    const num=document.getElementById('reg-numero')?document.getElementById('reg-numero').value:'';
+    const bairro=document.getElementById('reg-bairro')?document.getElementById('reg-bairro').value:'';
+    const cidade=document.getElementById('reg-cidade')?document.getElementById('reg-cidade').value:'Ribeirao Preto';
+    const comp=document.getElementById('reg-complemento')?document.getElementById('reg-complemento').value:'';
+    const dados={tipo,nome,email,telefone,senha_hash:senha,status:'ativo',taxa_sistema:0.50,taxa_entrega:0,online:false,
+      cidade,endereco:montarEndereco(rua,num,bairro,cidade,comp)};
     if(tipo==='loja'){
       dados.nome_loja=document.getElementById('reg-nome-loja').value;
       dados.cnpj=document.getElementById('reg-cnpj').value;
-      dados.endereco=document.getElementById('reg-endereco').value;
     }else{
       dados.placa_moto=document.getElementById('reg-placa').value;
       dados.chave_pix=document.getElementById('reg-pix').value;
@@ -477,31 +483,22 @@ async function fazerCadastro(){
 function mostrarDashboard(tipo){
   ['login-screen','dashboard-admin','dashboard-loja','dashboard-entregador'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('dashboard-'+tipo).classList.remove('hidden');
-  if(tipo==='loja'){
-    document.getElementById('nome-loja-display').textContent=usuarioLogado.nome_loja||usuarioLogado.nome;
-    carregarDadosLoja();
-  }else if(tipo==='entregador'){
-    document.getElementById('nome-entregador-display').textContent=usuarioLogado.nome;
-    carregarDadosEntregador();
-  }else if(tipo==='admin'){
-    carregarDadosAdmin();
-  }
+  if(tipo==='loja'){document.getElementById('nome-loja-display').textContent=usuarioLogado.nome_loja||usuarioLogado.nome;carregarDadosLoja();}
+  else if(tipo==='entregador'){document.getElementById('nome-entregador-display').textContent=usuarioLogado.nome;carregarDadosEntregador();}
+  else if(tipo==='admin')carregarDadosAdmin();
 }
 
 function fazerLogout(){
   if(intervaloRastreamento)clearInterval(intervaloRastreamento);
   if(intervaloMapa)clearInterval(intervaloMapa);
-  // marca offline
-  if(usuarioLogado&&usuarioLogado.online){
-    db.from('usuarios').update({online:false}).eq('id',usuarioLogado.id);
-  }
+  if(usuarioLogado&&usuarioLogado.online)db.from('usuarios').update({online:false}).eq('id',usuarioLogado.id);
   usuarioLogado=null;localStorage.removeItem('usuario');
   ['dashboard-admin','dashboard-loja','dashboard-entregador'].forEach(id=>document.getElementById(id).classList.add('hidden'));
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('login-email').value='';document.getElementById('login-senha').value='';
 }
 
-// ==================== ADMIN ====================
+// ===== ADMIN =====
 async function carregarDadosAdmin(){
   const{data:e}=await db.from('usuarios').select('id').eq('tipo','entregador').eq('status','ativo');
   const{data:l}=await db.from('usuarios').select('id').eq('tipo','loja').eq('status','ativo');
@@ -514,25 +511,21 @@ async function carregarEntregadores(){
   const lista=document.getElementById('lista-entregadores');
   lista.innerHTML='<p>Carregando...</p>';
   const{data}=await db.from('usuarios').select('*').eq('tipo','entregador');
-  if(!data||!data.length){lista.innerHTML='<p>Nenhum entregador cadastrado</p>';return;}
+  if(!data||!data.length){lista.innerHTML='<p>Nenhum entregador</p>';return;}
   lista.innerHTML=data.map(e=>`
-    <div class="list-item" style="flex-direction:column;align-items:flex-start;">
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
-        <div>
-          <strong>${e.nome}</strong><br>
-          <small>Tel: ${e.telefone||'-'} | Placa: ${e.placa_moto||'-'}</small><br>
-          <small>Pix: ${e.chave_pix||'-'}</small>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">
-          <span style="font-size:12px;">${e.online?'&#128994; Online':'&#9899; Offline'}</span>
-          <span class="${e.status==='ativo'?'badge-ativo':'badge-bloqueado'}">${e.status}</span>
-          <button class="btn-sm ${e.status==='ativo'?'vermelho':'verde'}" onclick="toggleStatus('${e.id}','${e.status}','entregadores')">
-            ${e.status==='ativo'?'Bloquear':'Ativar'}
-          </button>
-        </div>
+    <div class="list-item">
+      <div style="flex:1;">
+        <strong>${e.nome}</strong><br>
+        <small>Tel: ${e.telefone||'-'} | Placa: ${e.placa_moto||'-'}</small><br>
+        <small>Pix: ${e.chave_pix||'-'} | ${e.online?'&#128994; Online':'&#9899; Offline'}</small>
       </div>
-    </div>
-  `).join('');
+      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">
+        <span class="${e.status==='ativo'?'badge-ativo':'badge-bloqueado'}">${e.status}</span>
+        <button class="btn-sm ${e.status==='ativo'?'vermelho':'verde'}" onclick="toggleStatus('${e.id}','${e.status}','entregadores')">
+          ${e.status==='ativo'?'Bloquear':'Ativar'}
+        </button>
+      </div>
+    </div>`).join('');
 }
 
 async function carregarLojas(){
@@ -542,8 +535,8 @@ async function carregarLojas(){
   const{data}=await db.from('usuarios').select('*').eq('tipo','loja');
   if(!data||!data.length){lista.innerHTML='<p>Nenhuma loja</p>';return;}
   lista.innerHTML=data.map(l=>`
-    <div class="list-item" style="flex-direction:column;align-items:flex-start;">
-      <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:10px;">
+    <div class="list-item" style="flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:8px;">
         <div>
           <strong>${l.nome_loja||l.nome}</strong><br>
           <small>${l.endereco||''} | Tel: ${l.telefone||'-'}</small>
@@ -551,20 +544,19 @@ async function carregarLojas(){
         <span class="${l.status==='ativo'?'badge-ativo':'badge-bloqueado'}">${l.status}</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <label style="font-size:13px;color:#666;">Taxa/entrega: R$</label>
+        <label style="font-size:12px;color:#666;">Taxa R$</label>
         <input type="number" class="taxa-input" id="taxa-${l.id}" value="${parseFloat(l.taxa_sistema||0.50).toFixed(2)}" step="0.01" min="0">
         <button class="btn-sm azul" onclick="salvarTaxaLoja('${l.id}')">Salvar</button>
         <button class="btn-sm ${l.status==='ativo'?'vermelho':'verde'}" onclick="toggleStatus('${l.id}','${l.status}','lojas')">
           ${l.status==='ativo'?'Bloquear':'Ativar'}
         </button>
       </div>
-      <small id="msg-taxa-${l.id}" style="color:#27ae60;margin-top:4px;"></small>
-    </div>
-  `).join('');
+      <small id="msg-taxa-${l.id}" style="color:#27ae60;margin-top:3px;"></small>
+    </div>`).join('');
 }
 
-async function toggleStatus(id,statusAtual,modal){
-  const novo=statusAtual==='ativo'?'bloqueado':'ativo';
+async function toggleStatus(id,st,modal){
+  const novo=st==='ativo'?'bloqueado':'ativo';
   await db.from('usuarios').update({status:novo}).eq('id',id);
   if(modal==='lojas')carregarLojas();else carregarEntregadores();
   carregarDadosAdmin();
@@ -573,9 +565,8 @@ async function toggleStatus(id,statusAtual,modal){
 async function salvarTaxaLoja(id){
   const val=parseFloat(document.getElementById('taxa-'+id).value);
   await db.from('usuarios').update({taxa_sistema:val}).eq('id',id);
-  const msg=document.getElementById('msg-taxa-'+id);
-  msg.textContent='Taxa salva!';
-  setTimeout(()=>{msg.textContent='';},2000);
+  const m=document.getElementById('msg-taxa-'+id);
+  m.textContent='Salvo!';setTimeout(()=>{m.textContent='';},2000);
 }
 
 async function abrirFinanceiroAdmin(){
@@ -587,8 +578,7 @@ async function abrirFinanceiroAdmin(){
     <div class="list-item">
       <div><strong>${l.nome_loja||l.nome}</strong><br><small>Taxa: ${formatReal(l.taxa_sistema)}/entrega</small></div>
       <span class="${l.status==='ativo'?'badge-ativo':'badge-bloqueado'}">${l.status}</span>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 async function abrirCobrancas(){
@@ -598,32 +588,29 @@ async function abrirCobrancas(){
   const hoje=new Date();
   const d=(3-hoje.getDay()+7)%7||7;
   const prox=new Date(hoje);prox.setDate(hoje.getDate()+d);
-  el.innerHTML=`<p style="margin-bottom:15px;">Proxima cobranca: <strong>${prox.toLocaleDateString('pt-BR')}</strong></p>`+
+  el.innerHTML=`<p style="margin-bottom:12px;">Proxima cobranca: <strong>${prox.toLocaleDateString('pt-BR')}</strong></p>`+
     (lojas||[]).map(l=>`
       <div class="list-item">
         <div><strong>${l.nome_loja||l.nome}</strong><br><small>Taxa: ${formatReal(l.taxa_sistema)}/entrega</small></div>
         <span class="${l.status==='ativo'?'badge-ativo':'badge-bloqueado'}">${l.status}</span>
-      </div>
-    `).join('');
+      </div>`).join('');
 }
 
-// ==================== LOJA ====================
+// ===== LOJA =====
 async function carregarDadosLoja(){
-  const{data}=await db.from('usuarios').select('taxa_sistema,taxa_entrega').eq('id',usuarioLogado.id).single();
+  const{data}=await db.from('usuarios').select('*').eq('id',usuarioLogado.id).single();
   if(data){
     document.getElementById('taxa-sistema-loja').textContent=formatReal(data.taxa_sistema);
     document.getElementById('taxa-entregador-loja').textContent=formatReal(data.taxa_entrega);
     document.getElementById('nova-taxa-entregador').value=parseFloat(data.taxa_entrega||0).toFixed(2);
-    usuarioLogado.taxa_sistema=data.taxa_sistema;
-    usuarioLogado.taxa_entrega=data.taxa_entrega;
+    usuarioLogado={...usuarioLogado,...data};
+    localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
   }
-  // Entregas hoje
-  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',usuarioLogado.id)
-    .gte('created_at',inicioDia()).lte('created_at',fimDia());
+  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',usuarioLogado.id).gte('created_at',inicioDia()).lte('created_at',fimDia());
   document.getElementById('entregas-hoje-loja').textContent=ent?ent.length:0;
-  // Inicializa mapa
   inicializarMapaLoja();
   atualizarMapaLoja();
+  if(intervaloMapa)clearInterval(intervaloMapa);
   intervaloMapa=setInterval(atualizarMapaLoja,15000);
 }
 
@@ -640,61 +627,51 @@ async function salvarTaxaEntregador(){
 
 function inicializarMapaLoja(){
   if(mapaLoja)return;
-  const el=document.getElementById('mapa-loja');
-  if(!el)return;
-  mapaLoja=L.map('mapa-loja').setView([-15.78,-47.92],12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OpenStreetMap'}).addTo(mapaLoja);
+  const el=document.getElementById('mapa-loja');if(!el)return;
+  // Centraliza em Ribeirao Preto
+  mapaLoja=L.map('mapa-loja').setView([RP_LAT,RP_LNG],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(mapaLoja);
 }
 
 async function atualizarMapaLoja(){
   if(!mapaLoja)return;
-  // Busca entregadores associados a esta loja que estao online
   const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',usuarioLogado.id).eq('status','ativo');
-  if(!assoc||!assoc.length){
-    document.getElementById('lista-online-loja').innerHTML='<p style="color:#999;font-size:13px;">Nenhum entregador online</p>';
-    return;
-  }
+  const listaEl=document.getElementById('lista-online-loja');
+  if(!assoc||!assoc.length){listaEl.innerHTML='<p style="color:#999;font-size:13px;margin-top:8px;">Nenhum entregador associado.</p>';return;}
   const ids=assoc.map(a=>a.entregador_id);
   const{data:ents}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude,online').in('id',ids).eq('online',true);
-  
-  // Remove marcadores antigos
-  Object.values(marcadoresEntregadores).forEach(m=>m.remove());
-  marcadoresEntregadores={};
-  
-  if(!ents||!ents.length){
-    document.getElementById('lista-online-loja').innerHTML='<p style="color:#999;font-size:13px;">Nenhum entregador online agora</p>';
-    return;
-  }
-  
-  const listaHTML=ents.map(e=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #eee;">
-      <span style="color:#00C9A7;font-size:18px;">&#128994;</span>
+  Object.values(marcadores).forEach(m=>m.remove());marcadores={};
+  if(!ents||!ents.length){listaEl.innerHTML='<p style="color:#999;font-size:13px;margin-top:8px;">Nenhum entregador online agora.</p>';return;}
+  listaEl.innerHTML=ents.map(e=>`
+    <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #eee;">
+      <span style="color:#00C9A7;font-size:16px;">&#128994;</span>
       <div><strong>${e.nome}</strong><br><small>Tel: ${e.telefone||'-'}</small></div>
-    </div>
-  `).join('');
-  document.getElementById('lista-online-loja').innerHTML=listaHTML;
-  
+    </div>`).join('');
   const bounds=[];
   ents.forEach(e=>{
     if(e.latitude&&e.longitude){
-      const icone=L.divIcon({html:`<div style="background:#00C9A7;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">&#128757;</div>`,iconSize:[32,32],iconAnchor:[16,16],className:''});
-      const m=L.marker([e.latitude,e.longitude],{icon:icone}).addTo(mapaLoja)
-        .bindPopup(`<strong>${e.nome}</strong><br>Tel: ${e.telefone||'-'}`);
-      marcadoresEntregadores[e.id]=m;
+      const icon=L.divIcon({html:`<div style="background:#FF6B35;color:white;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:17px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);">&#128757;</div>`,iconSize:[34,34],iconAnchor:[17,17],className:''});
+      marcadores[e.id]=L.marker([e.latitude,e.longitude],{icon}).addTo(mapaLoja).bindPopup(`<strong>${e.nome}</strong><br>${e.telefone||''}`);
       bounds.push([e.latitude,e.longitude]);
     }
   });
-  if(bounds.length)mapaLoja.fitBounds(bounds,{padding:[30,30]});
+  if(bounds.length)mapaLoja.fitBounds(bounds,{padding:[40,40]});
+  else mapaLoja.setView([RP_LAT,RP_LNG],13);
   setTimeout(()=>mapaLoja.invalidateSize(),200);
 }
 
-// Scanner de Comanda com Claude API
+// Scanner
+async function abrirScannerComanda(){
+  openModal('scanner');
+  document.getElementById('dados-comanda').classList.add('hidden');
+  document.getElementById('scanner-loading').classList.add('hidden');
+  document.getElementById('foto-comanda').value='';
+}
+
 async function processarComanda(event){
-  const file=event.target.files[0];
-  if(!file)return;
+  const file=event.target.files[0];if(!file)return;
   document.getElementById('scanner-loading').classList.remove('hidden');
   document.getElementById('dados-comanda').classList.add('hidden');
-  
   const reader=new FileReader();
   reader.onload=async function(e){
     const base64=e.target.result.split(',')[1];
@@ -704,30 +681,32 @@ async function processarComanda(event){
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          model:'claude-sonnet-4-20250514',
-          max_tokens:1000,
-          messages:[{
-            role:'user',
-            content:[
-              {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
-              {type:'text',text:'Analise esta comanda/pedido de delivery. Extraia APENAS as informacoes em formato JSON: {"numero_pedido":"","cliente_nome":"","cliente_telefone":"","endereco_entrega":"","observacoes":""}. Se nao encontrar algum campo, deixe vazio. Responda APENAS o JSON, sem explicacoes.'}
-            ]
-          }]
+          model:'claude-sonnet-4-20250514',max_tokens:1000,
+          messages:[{role:'user',content:[
+            {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+            {type:'text',text:'Analise esta comanda/pedido. Extraia em JSON: {"numero_pedido":"","cliente_nome":"","cliente_telefone":"","endereco_rua":"","endereco_numero":"","endereco_bairro":"","endereco_cidade":"Ribeirao Preto","endereco_complemento":"","observacoes":""}. Responda APENAS o JSON.'}
+          ]}]
         })
       });
       const result=await resp.json();
-      let texto=result.content[0].text.trim();
-      texto=texto.replace(/```json|```/g,'').trim();
-      const dados=JSON.parse(texto);
-      document.getElementById('ped-numero').value=dados.numero_pedido||'';
-      document.getElementById('ped-cliente').value=dados.cliente_nome||'';
-      document.getElementById('ped-telefone').value=dados.cliente_telefone||'';
-      document.getElementById('ped-endereco').value=dados.endereco_entrega||'';
-      document.getElementById('ped-obs').value=dados.observacoes||'';
+      let txt=result.content[0].text.trim().replace(/```json|```/g,'').trim();
+      const d=JSON.parse(txt);
+      document.getElementById('ped-numero').value=d.numero_pedido||'';
+      document.getElementById('ped-cliente').value=d.cliente_nome||'';
+      document.getElementById('ped-telefone').value=d.cliente_telefone||'';
+      document.getElementById('ped-rua').value=d.endereco_rua||'';
+      document.getElementById('ped-num-end').value=d.endereco_numero||'';
+      document.getElementById('ped-bairro').value=d.endereco_bairro||'';
+      document.getElementById('ped-cidade').value=d.endereco_cidade||'Ribeirao Preto';
+      document.getElementById('ped-complemento').value=d.endereco_complemento||'';
+      document.getElementById('ped-obs').value=d.observacoes||'';
       document.getElementById('dados-comanda').classList.remove('hidden');
     }catch(err){
-      alert('Nao foi possivel ler a comanda automaticamente. Preencha os dados manualmente.');
+      // Fallback: campos em branco para preenchimento manual
+      ['ped-numero','ped-cliente','ped-telefone','ped-rua','ped-num-end','ped-bairro','ped-obs','ped-complemento'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('ped-cidade').value='Ribeirao Preto';
       document.getElementById('dados-comanda').classList.remove('hidden');
+      alert('Nao foi possivel ler automaticamente. Preencha manualmente.');
     }finally{
       document.getElementById('scanner-loading').classList.add('hidden');
     }
@@ -736,22 +715,28 @@ async function processarComanda(event){
 }
 
 async function salvarEntrega(){
-  const endereco=document.getElementById('ped-endereco').value.trim();
-  if(!endereco){alert('Informe o endereco de entrega');return;}
+  const rua=document.getElementById('ped-rua').value.trim();
+  const num=document.getElementById('ped-num-end').value.trim();
+  const bairro=document.getElementById('ped-bairro').value.trim();
+  const cidade=document.getElementById('ped-cidade').value.trim()||'Ribeirao Preto';
+  const comp=document.getElementById('ped-complemento').value.trim();
+  if(!rua){alert('Informe pelo menos a rua de entrega');return;}
+  const endFull=montarEndereco(rua,num,bairro,cidade,comp);
   const dados={
     loja_id:usuarioLogado.id,
     numero_pedido:document.getElementById('ped-numero').value,
     cliente_nome:document.getElementById('ped-cliente').value,
     cliente_telefone:document.getElementById('ped-telefone').value,
-    endereco_entrega:endereco,
+    endereco_entrega:endFull,
+    endereco_rua:rua,endereco_numero:num,endereco_bairro:bairro,
+    endereco_cidade:cidade,endereco_complemento:comp,
     valor_sistema:parseFloat(usuarioLogado.taxa_sistema||0),
     valor_entregador:parseFloat(usuarioLogado.taxa_entrega||0),
-    status:'pendente',
-    ordem_rota:99
+    status:'pendente',ordem_rota:99
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){alert('Erro ao salvar: '+error.message);return;}
-  alert('Entrega adicionada com sucesso!');
+  alert('Entrega adicionada!');
   closeModal('scanner');
   document.getElementById('foto-comanda').value='';
   document.getElementById('dados-comanda').classList.add('hidden');
@@ -759,69 +744,48 @@ async function salvarEntrega(){
   document.getElementById('entregas-hoje-loja').textContent=ent?ent.length:0;
 }
 
-async function abrirScannerComanda(){
-  openModal('scanner');
-  document.getElementById('dados-comanda').classList.add('hidden');
-  document.getElementById('scanner-loading').classList.add('hidden');
-  document.getElementById('foto-comanda').value='';
-}
-
 async function abrirEntregasLoja(){
   openModal('entregas-loja');
-  await carregarEntregasLoja();
+  carregarEntregasLoja();
 }
 
 async function carregarEntregasLoja(){
   const lista=document.getElementById('lista-entregas-loja');
   lista.innerHTML='<p>Carregando...</p>';
-  const{data,error}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',usuarioLogado.id).neq('status','entregue').order('ordem_rota');
-  if(error||!data||!data.length){lista.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Nenhum pedido pendente.<br>Scaneie uma comanda para adicionar.</p>';return;}
+  const{data}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',usuarioLogado.id).neq('status','entregue').order('ordem_rota');
+  if(!data||!data.length){lista.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Nenhum pedido pendente.</p>';return;}
   lista.innerHTML=data.map((e,i)=>`
     <div class="entrega-card ${e.status==='em_rota'?'em-rota':''}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
-        <div>
-          <strong>${i+1}. ${e.numero_pedido?'Pedido #'+e.numero_pedido:e.cliente_nome||'Sem nome'}</strong>
-          ${e.entregador?`<span style="font-size:12px;color:#004E89;margin-left:6px;">(${e.entregador.nome})</span>`:''}
-        </div>
-        <span class="${e.status==='pendente'?'badge-pendente':'badge-ativo'}">${e.status}</span>
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+        <strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+        <span class="badge-${e.status}">${e.status}</span>
       </div>
       <p style="font-size:13px;color:#555;">&#128205; ${e.endereco_entrega}</p>
-      ${e.cliente_nome?`<p style="font-size:12px;color:#888;">&#128100; ${e.cliente_nome} ${e.cliente_telefone?'| &#128222; '+e.cliente_telefone:''}</p>`:''}
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+      ${e.cliente_nome?`<p style="font-size:12px;color:#888;">&#128100; ${e.cliente_nome}${e.cliente_telefone?' | &#128222; '+e.cliente_telefone:''}</p>`:''}
+      ${e.entregador?`<p style="font-size:12px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
+      <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap;">
         <button class="btn-sm verde" onclick="marcarEntregue('${e.id}')">&#10003; Entregue</button>
         <button class="btn-sm vermelho" onclick="cancelarEntrega('${e.id}')">Cancelar</button>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 async function otimizarRota(){
-  const{data}=await db.from('entregas').select('*').eq('loja_id',usuarioLogado.id).eq('status','pendente');
-  if(!data||!data.length){alert('Sem pedidos pendentes para otimizar.');return;}
-  // Algoritmo greedy simples por proximidade (usando posicao da loja ou primeiro ponto)
-  // Ordem por adicao + otimizacao simples
-  for(let i=0;i<data.length;i++){
-    await db.from('entregas').update({ordem_rota:i+1}).eq('id',data[i].id);
-  }
-  alert('Rota otimizada! Os pedidos foram reordenados.');
-  carregarEntregasLoja();
+  const{data}=await db.from('entregas').select('id').eq('loja_id',usuarioLogado.id).eq('status','pendente');
+  if(!data||!data.length){alert('Sem pedidos pendentes.');return;}
+  for(let i=0;i<data.length;i++)await db.from('entregas').update({ordem_rota:i+1}).eq('id',data[i].id);
+  alert('Rota otimizada!');carregarEntregasLoja();
 }
 
 async function enviarRotaEntregador(){
-  // Busca entregador online associado a esta loja
   const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,entregador:entregador_id(nome,online)').eq('loja_id',usuarioLogado.id).eq('status','ativo');
-  const online=assoc?assoc.filter(a=>a.entregador&&a.entregador.online):[];
+  const online=(assoc||[]).filter(a=>a.entregador&&a.entregador.online);
   if(!online.length){alert('Nenhum entregador online disponivel.');return;}
-  // Pega entregas pendentes
   const{data:ents}=await db.from('entregas').select('id').eq('loja_id',usuarioLogado.id).eq('status','pendente');
   if(!ents||!ents.length){alert('Sem pedidos pendentes.');return;}
-  // Atribui ao primeiro entregador online
   const entId=online[0].entregador_id;
-  for(const e of ents){
-    await db.from('entregas').update({entregador_id:entId,status:'em_rota'}).eq('id',e.id);
-  }
-  alert(`Rota enviada para ${online[0].entregador.nome}!`);
-  carregarEntregasLoja();
+  for(const e of ents)await db.from('entregas').update({entregador_id:entId,status:'em_rota'}).eq('id',e.id);
+  alert(`Rota enviada para ${online[0].entregador.nome}!`);carregarEntregasLoja();
 }
 
 async function marcarEntregue(id){
@@ -833,14 +797,10 @@ async function marcarEntregue(id){
 
 async function cancelarEntrega(id){
   if(!confirm('Cancelar esta entrega?'))return;
-  await db.from('entregas').delete().eq('id',id);
-  carregarEntregasLoja();
+  await db.from('entregas').delete().eq('id',id);carregarEntregasLoja();
 }
 
-async function abrirRelatorioLoja(){
-  openModal('relatorio-loja');
-  carregarRelatorioLoja();
-}
+async function abrirRelatorioLoja(){openModal('relatorio-loja');carregarRelatorioLoja();}
 
 async function carregarRelatorioLoja(){
   const periodo=document.getElementById('filtro-periodo').value;
@@ -849,92 +809,82 @@ async function carregarRelatorioLoja(){
   el.innerHTML='<p>Carregando...</p>';
   const{data:entregas}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',usuarioLogado.id).gte('created_at',inicio);
   if(!entregas||!entregas.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Nenhuma entrega no periodo.</p>';return;}
-  
-  const totalSistema=entregas.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
-  const totalEntregador=entregas.reduce((s,e)=>s+parseFloat(e.valor_entregador||0),0);
-  
-  // Agrupa por entregador
+  const totSis=entregas.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
+  const totEnt=entregas.reduce((s,e)=>s+parseFloat(e.valor_entregador||0),0);
   const porEnt={};
   entregas.forEach(e=>{
-    const key=e.entregador_id||'sem_entregador';
-    const nome=e.entregador?e.entregador.nome:'Sem entregador';
-    if(!porEnt[key])porEnt[key]={nome,entregas:[],total:0};
-    porEnt[key].entregas.push(e);
-    porEnt[key].total+=parseFloat(e.valor_entregador||0);
+    const k=e.entregador_id||'sem';
+    if(!porEnt[k]){porEnt[k]={nome:e.entregador?e.entregador.nome:'Sem entregador',lista:[],total:0};}
+    porEnt[k].lista.push(e);porEnt[k].total+=parseFloat(e.valor_entregador||0);
   });
-  
   el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:15px;">
-      <div style="background:#fff3e0;padding:12px;border-radius:8px;text-align:center;">
-        <p style="font-size:11px;color:#888;">Total Entregas</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+      <div style="background:#fff3e0;padding:11px;border-radius:8px;text-align:center;">
+        <p style="font-size:11px;color:#888;">Entregas</p>
         <p style="font-size:22px;font-weight:bold;color:#FF6B35;">${entregas.length}</p>
       </div>
-      <div style="background:#e3f2fd;padding:12px;border-radius:8px;text-align:center;">
-        <p style="font-size:11px;color:#888;">Custo Sistema</p>
-        <p style="font-size:18px;font-weight:bold;color:#004E89;">${formatReal(totalSistema)}</p>
+      <div style="background:#e3f2fd;padding:11px;border-radius:8px;text-align:center;">
+        <p style="font-size:11px;color:#888;">Sistema</p>
+        <p style="font-size:16px;font-weight:bold;color:#004E89;">${formatReal(totSis)}</p>
       </div>
-      <div style="background:#e8f5e9;padding:12px;border-radius:8px;text-align:center;">
-        <p style="font-size:11px;color:#888;">A Pagar Ent.</p>
-        <p style="font-size:18px;font-weight:bold;color:#00C9A7;">${formatReal(totalEntregador)}</p>
+      <div style="background:#e8f5e9;padding:11px;border-radius:8px;text-align:center;">
+        <p style="font-size:11px;color:#888;">Entregadores</p>
+        <p style="font-size:16px;font-weight:bold;color:#00C9A7;">${formatReal(totEnt)}</p>
       </div>
     </div>
     ${Object.values(porEnt).map(g=>`
       <div class="secao">
-        <h3>&#128757; ${g.nome} &mdash; Total: ${formatReal(g.total)}</h3>
-        ${g.entregas.map((e,i)=>`
-          <div style="padding:8px 0;border-bottom:1px solid #eee;font-size:13px;">
-            <strong>${i+1}. ${e.numero_pedido?'Pedido #'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
-            <span class="${e.status==='entregue'?'badge-entregue':'badge-pendente'}" style="margin-left:6px;">${e.status}</span><br>
-            <span style="color:#555;">&#128205; ${e.endereco_entrega}</span><br>
-            <span style="color:#888;">Sistema: ${formatReal(e.valor_sistema)} | Entregador: ${formatReal(e.valor_entregador)}</span>
-          </div>
-        `).join('')}
-      </div>
-    `).join('')}
-  `;
+        <h3>&#128757; ${g.nome} &mdash; ${formatReal(g.total)}</h3>
+        ${g.lista.map((e,i)=>`
+          <div style="padding:7px 0;border-bottom:1px solid #eee;font-size:13px;">
+            <div style="display:flex;justify-content:space-between;">
+              <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega '+(i+1)}</strong>
+              <span class="badge-${e.status}">${e.status}</span>
+            </div>
+            <p style="color:#555;margin:2px 0;">&#128205; ${e.endereco_entrega}</p>
+            <p style="color:#888;">Sist: ${formatReal(e.valor_sistema)} | Ent: ${formatReal(e.valor_entregador)}</p>
+          </div>`).join('')}
+      </div>`).join('')}`;
 }
 
 async function abrirGerenciarEntregadores(){
-  openModal('gerenciar-ent');
-  carregarMeusEntregadores();
+  openModal('gerenciar-ent');carregarMeusEntregadores();
 }
 
 async function carregarMeusEntregadores(){
   const lista=document.getElementById('lista-meus-ent');
   lista.innerHTML='<p>Carregando...</p>';
   const{data:assoc}=await db.from('loja_entregadores').select('*,entregador:entregador_id(id,nome,telefone,placa_moto,online,status)').eq('loja_id',usuarioLogado.id);
-  if(!assoc||!assoc.length){lista.innerHTML='<p style="color:#999;margin-top:10px;">Nenhum entregador associado ainda.</p>';return;}
+  if(!assoc||!assoc.length){lista.innerHTML='<p style="color:#999;margin-top:10px;">Nenhum entregador vinculado ainda.</p>';return;}
   lista.innerHTML=assoc.map(a=>`
-    <div class="list-item">
+    <div class="list-item" style="display:flex;justify-content:space-between;align-items:center;">
       <div>
         <strong>${a.entregador?a.entregador.nome:'Removido'}</strong><br>
         <small>Tel: ${a.entregador?a.entregador.telefone||'-':'-'} | Placa: ${a.entregador?a.entregador.placa_moto||'-':'-'}</small><br>
         <small>${a.entregador&&a.entregador.online?'&#128994; Online':'&#9899; Offline'}</small>
       </div>
       <button class="btn-sm vermelho" onclick="removerEntregador('${a.id}')">Remover</button>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 async function adicionarEntregador(){
   const email=document.getElementById('email-entregador').value.trim();
   const msg=document.getElementById('msg-add-ent');
-  if(!email){msg.textContent='Digite o email do entregador';return;}
+  if(!email){msg.textContent='Digite o email';return;}
   const{data:ent}=await db.from('usuarios').select('id,nome').eq('email',email).eq('tipo','entregador').single();
   if(!ent){msg.style.color='#c62828';msg.textContent='Entregador nao encontrado com este email.';return;}
   const{error}=await db.from('loja_entregadores').insert([{loja_id:usuarioLogado.id,entregador_id:ent.id}]);
-  if(error&&error.code==='23505'){msg.style.color='#f57f17';msg.textContent='Este entregador ja esta associado.';return;}
+  if(error&&error.code==='23505'){msg.style.color='#f57f17';msg.textContent='Ja associado.';return;}
   if(error){msg.style.color='#c62828';msg.textContent='Erro: '+error.message;return;}
-  msg.style.color='#2e7d32';msg.textContent='Entregador '+ent.nome+' adicionado!';
+  msg.style.color='#2e7d32';msg.textContent=ent.nome+' adicionado!';
   document.getElementById('email-entregador').value='';
   setTimeout(()=>{msg.textContent='';},3000);
   carregarMeusEntregadores();
 }
 
-async function removerEntregador(assocId){
-  if(!confirm('Remover este entregador?'))return;
-  await db.from('loja_entregadores').delete().eq('id',assocId);
-  carregarMeusEntregadores();
+async function removerEntregador(id){
+  if(!confirm('Remover?'))return;
+  await db.from('loja_entregadores').delete().eq('id',id);carregarMeusEntregadores();
 }
 
 async function abrirConfiguracoesLoja(){
@@ -943,35 +893,48 @@ async function abrirConfiguracoesLoja(){
   if(data){
     document.getElementById('cfg-nome-loja').value=data.nome_loja||'';
     document.getElementById('cfg-tel-loja').value=data.telefone||'';
-    document.getElementById('cfg-end-loja').value=data.endereco||'';
     document.getElementById('cfg-cnpj-loja').value=data.cnpj||'';
-    document.getElementById('cfg-abertura').value=data.horario_abertura||'';
-    document.getElementById('cfg-fechamento').value=data.horario_fechamento||'';
+    // Parse endereco se tiver
+    document.getElementById('cfg-rua').value=data.endereco_rua||'';
+    document.getElementById('cfg-numero').value=data.endereco_numero||'';
+    document.getElementById('cfg-bairro').value=data.endereco_bairro||'';
+    document.getElementById('cfg-cidade').value=data.cidade||data.endereco_cidade||'Ribeirao Preto';
+    document.getElementById('cfg-complemento').value=data.endereco_complemento||'';
+    if(data.horario_abertura)document.getElementById('cfg-abertura').value=data.horario_abertura.substring(0,5);
+    if(data.horario_fechamento)document.getElementById('cfg-fechamento').value=data.horario_fechamento.substring(0,5);
   }
   document.getElementById('cfg-loja-msg').innerHTML='';
+  document.getElementById('cfg-senha-loja').value='';
 }
 
 async function salvarConfigLoja(){
+  const rua=document.getElementById('cfg-rua').value;
+  const num=document.getElementById('cfg-numero').value;
+  const bairro=document.getElementById('cfg-bairro').value;
+  const cidade=document.getElementById('cfg-cidade').value||'Ribeirao Preto';
+  const comp=document.getElementById('cfg-complemento').value;
   const dados={
     nome_loja:document.getElementById('cfg-nome-loja').value,
     telefone:document.getElementById('cfg-tel-loja').value,
-    endereco:document.getElementById('cfg-end-loja').value,
     cnpj:document.getElementById('cfg-cnpj-loja').value,
-    horario_abertura:document.getElementById('cfg-abertura').value,
-    horario_fechamento:document.getElementById('cfg-fechamento').value,
+    endereco:montarEndereco(rua,num,bairro,cidade,comp),
+    endereco_rua:rua,endereco_numero:num,endereco_bairro:bairro,
+    endereco_cidade:cidade,cidade,endereco_complemento:comp,
+    horario_abertura:document.getElementById('cfg-abertura').value||null,
+    horario_fechamento:document.getElementById('cfg-fechamento').value||null,
   };
   const novaSenha=document.getElementById('cfg-senha-loja').value;
   if(novaSenha.length>=6)dados.senha_hash=novaSenha;
   const{error}=await db.from('usuarios').update(dados).eq('id',usuarioLogado.id);
-  if(error){showMsg('cfg-loja-msg','Erro ao salvar: '+error.message);return;}
+  if(error){showMsg('cfg-loja-msg','Erro: '+error.message);return;}
   usuarioLogado={...usuarioLogado,...dados};
   localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
   document.getElementById('nome-loja-display').textContent=dados.nome_loja||usuarioLogado.nome;
-  showMsg('cfg-loja-msg','Configuracoes salvas!',false);
+  showMsg('cfg-loja-msg','Salvo!',false);
   setTimeout(()=>closeModal('config-loja'),1500);
 }
 
-// ==================== ENTREGADOR ====================
+// ===== ENTREGADOR =====
 async function carregarDadosEntregador(){
   const{data}=await db.from('usuarios').select('*').eq('id',usuarioLogado.id).single();
   if(data){
@@ -984,7 +947,6 @@ async function carregarDadosEntregador(){
       document.getElementById('foto-placeholder').classList.add('hidden');
     }
   }
-  // Entregas hoje
   const{data:e}=await db.from('entregas').select('id,valor_entregador').eq('entregador_id',usuarioLogado.id).gte('created_at',inicioDia()).lte('created_at',fimDia());
   document.getElementById('minhas-entregas').textContent=e?e.length:0;
   const ganho=e?e.reduce((s,x)=>s+parseFloat(x.valor_entregador||0),0):0;
@@ -1009,40 +971,33 @@ function atualizarBotaoOnline(online){
 async function toggleOnline(){
   const novo=!usuarioLogado.online;
   await db.from('usuarios').update({online:novo}).eq('id',usuarioLogado.id);
-  usuarioLogado.online=novo;
-  localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
+  usuarioLogado.online=novo;localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
   atualizarBotaoOnline(novo);
-  if(novo){
-    // Inicia rastreamento GPS
-    iniciarRastreamento();
-  }else{
-    if(intervaloRastreamento)clearInterval(intervaloRastreamento);
-  }
+  if(novo)iniciarRastreamento();
+  else if(intervaloRastreamento)clearInterval(intervaloRastreamento);
 }
 
 function iniciarRastreamento(){
   if(intervaloRastreamento)clearInterval(intervaloRastreamento);
-  const enviarPos=()=>{
-    if(!usuarioLogado.online)return;
+  const enviar=()=>{
+    if(!usuarioLogado||!usuarioLogado.online)return;
     navigator.geolocation&&navigator.geolocation.getCurrentPosition(pos=>{
       db.from('usuarios').update({latitude:pos.coords.latitude,longitude:pos.coords.longitude}).eq('id',usuarioLogado.id);
-    });
+    },{},{ enableHighAccuracy:true,timeout:10000 });
   };
-  enviarPos();
-  intervaloRastreamento=setInterval(enviarPos,20000);
+  enviar();
+  intervaloRastreamento=setInterval(enviar,20000);
 }
 
 function abrirFotoPerfil(){document.getElementById('input-foto').click();}
 
 async function uploadFoto(event){
-  const file=event.target.files[0];
-  if(!file)return;
+  const file=event.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=async function(e){
     const base64=e.target.result;
     await db.from('usuarios').update({foto_url:base64}).eq('id',usuarioLogado.id);
-    usuarioLogado.foto_url=base64;
-    localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
+    usuarioLogado.foto_url=base64;localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
     document.getElementById('foto-entregador').src=base64;
     document.getElementById('foto-entregador').classList.remove('hidden');
     document.getElementById('foto-placeholder').classList.add('hidden');
@@ -1056,43 +1011,34 @@ async function abrirRotaEntregador(){
   lista.innerHTML='<p>Carregando...</p>';
   const{data}=await db.from('entregas').select('*').eq('entregador_id',usuarioLogado.id).eq('status','em_rota').order('ordem_rota');
   if(!data||!data.length){lista.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Nenhuma entrega atribuida no momento.</p>';return;}
-  
-  // Monta URL do Google Maps com waypoints
   const enderecos=data.map(e=>encodeURIComponent(e.endereco_entrega));
   const destino=enderecos[enderecos.length-1];
-  const waypoints=enderecos.slice(0,-1).join('|');
-  const mapsUrl=`https://www.google.com/maps/dir/?api=1&destination=${destino}${waypoints?'&waypoints='+waypoints:''}&travelmode=driving`;
-  
+  const wp=enderecos.slice(0,-1).join('|');
+  const mapsUrl=`https://www.google.com/maps/dir/?api=1&destination=${destino}${wp?'&waypoints='+wp:''}&travelmode=driving`;
   lista.innerHTML=`
-    <button onclick="window.open('${mapsUrl}','_blank')" style="margin-bottom:15px;background:#00C9A7;">
+    <button onclick="window.open('${mapsUrl}','_blank')" style="margin-bottom:14px;background:#00C9A7;">
       &#127758; Abrir Rota Completa no Maps
     </button>
     ${data.map((e,i)=>`
       <div class="entrega-card em-rota">
         <strong>${i+1}. ${e.numero_pedido?'Pedido #'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><br>
-        <p style="font-size:13px;color:#555;margin:4px 0;">&#128205; ${e.endereco_entrega}</p>
-        ${e.cliente_nome?`<p style="font-size:12px;color:#888;">&#128100; ${e.cliente_nome} ${e.cliente_telefone?'<a href="tel:'+e.cliente_telefone+'" style="color:#004E89;">&#128222; '+e.cliente_telefone+'</a>':''}</p>`:''}
-        <div style="display:flex;gap:6px;margin-top:8px;">
+        <p style="font-size:13px;color:#555;margin:3px 0;">&#128205; ${e.endereco_entrega}</p>
+        ${e.cliente_nome?`<p style="font-size:12px;color:#888;">&#128100; ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89;">&#128222; ${e.cliente_telefone}</a>`:''}</p>`:''}
+        <div style="display:flex;gap:6px;margin-top:7px;">
           <button class="btn-sm verde" onclick="entregadorMarcaEntregue('${e.id}')">&#10003; Entregue</button>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.endereco_entrega)}" target="_blank">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.endereco_entrega)}&travelmode=driving" target="_blank">
             <button class="btn-sm azul" style="margin:0;">&#127758; Ir</button>
           </a>
         </div>
-      </div>
-    `).join('')}
-  `;
+      </div>`).join('')}`;
 }
 
 async function entregadorMarcaEntregue(id){
   await db.from('entregas').update({status:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
-  abrirRotaEntregador();
-  carregarDadosEntregador();
+  abrirRotaEntregador();carregarDadosEntregador();
 }
 
-async function abrirGanhos(){
-  openModal('ganhos');
-  carregarGanhos();
-}
+async function abrirGanhos(){openModal('ganhos');carregarGanhos();}
 
 async function carregarGanhos(){
   const periodo=document.getElementById('filtro-ganhos').value;
@@ -1103,23 +1049,21 @@ async function carregarGanhos(){
   if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Nenhuma entrega no periodo.</p>';return;}
   const total=data.reduce((s,e)=>s+parseFloat(e.valor_entregador||0),0);
   el.innerHTML=`
-    <div style="background:#e8f5e9;padding:15px;border-radius:10px;text-align:center;margin-bottom:15px;">
-      <p style="font-size:13px;color:#666;">Total do periodo</p>
-      <p style="font-size:32px;font-weight:bold;color:#2e7d32;">${formatReal(total)}</p>
+    <div style="background:#e8f5e9;padding:14px;border-radius:10px;text-align:center;margin-bottom:14px;">
+      <p style="font-size:12px;color:#666;">Total do periodo</p>
+      <p style="font-size:30px;font-weight:bold;color:#2e7d32;">${formatReal(total)}</p>
       <p style="font-size:13px;color:#666;">${data.length} entrega(s)</p>
     </div>
     ${data.map((e,i)=>`
-      <div style="padding:10px 0;border-bottom:1px solid #eee;font-size:13px;">
+      <div style="padding:9px 0;border-bottom:1px solid #eee;font-size:13px;">
         <div style="display:flex;justify-content:space-between;">
-          <strong>${e.numero_pedido?'Pedido #'+e.numero_pedido:e.cliente_nome||'Entrega '+(i+1)}</strong>
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega '+(i+1)}</strong>
           <strong style="color:#2e7d32;">${formatReal(e.valor_entregador)}</strong>
         </div>
         <p style="color:#888;">&#127978; ${e.loja?(e.loja.nome_loja||e.loja.nome):'Loja'}</p>
         <p style="color:#555;">&#128205; ${e.endereco_entrega}</p>
-        <span class="${e.status==='entregue'?'badge-entregue':'badge-pendente'}">${e.status}</span>
-      </div>
-    `).join('')}
-  `;
+        <span class="badge-${e.status}">${e.status}</span>
+      </div>`).join('')}`;
 }
 
 async function abrirConfiguracoes(){
@@ -1142,9 +1086,8 @@ async function salvarConfiguracoes(){
   const novaSenha=document.getElementById('conf-senha').value;
   if(novaSenha.length>=6)dados.senha_hash=novaSenha;
   const{error}=await db.from('usuarios').update(dados).eq('id',usuarioLogado.id);
-  if(error){showMsg('conf-msg','Erro ao salvar!');return;}
-  usuarioLogado={...usuarioLogado,...dados};
-  localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
+  if(error){showMsg('conf-msg','Erro: '+error.message);return;}
+  usuarioLogado={...usuarioLogado,...dados};localStorage.setItem('usuario',JSON.stringify(usuarioLogado));
   document.getElementById('nome-entregador-display').textContent=dados.nome;
   showMsg('conf-msg','Dados salvos!',false);
   setTimeout(()=>closeModal('configuracoes'),1500);
