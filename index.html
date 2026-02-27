@@ -108,10 +108,11 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 </head>
 <body>
 
-<!-- GPS PERMISSION BANNER (global) -->
-<div id="gps-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#e74c3c;color:white;padding:10px 16px;font-size:13px;text-align:center;">
-  &#128205; GPS nao autorizado — funcionalidades de rastreamento e validacao de entrega desativadas.
-  <button onclick="pedirGPS()" style="background:white;color:#e74c3c;border:none;padding:4px 10px;border-radius:5px;font-weight:700;cursor:pointer;margin-left:8px;">Ativar GPS</button>
+<!-- GPS PERMISSION BANNER - only shows when user explicitly blocked GPS -->
+<div id="gps-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#e65100;color:white;padding:8px 16px;font-size:12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
+  &#128205; Localizacao bloqueada — permita o acesso nas configuracoes do navegador.
+  <button onclick="pedirGPS()" style="background:white;color:#e65100;border:none;padding:4px 10px;border-radius:5px;font-weight:700;cursor:pointer;font-size:11px;">Permitir GPS</button>
+  <button onclick="this.parentElement.classList.add('hidden')" style="background:transparent;color:white;border:none;font-size:16px;cursor:pointer;padding:0 4px;">&times;</button>
 </div>
 
 <!-- LOGIN -->
@@ -183,8 +184,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <div class="mapa-box">
           <div id="mapa-admin" style="height:280px;"></div>
           <div class="mapa-ctrl">
-            <button class="mapa-btn" id="btn-fol-adm" onclick="toggleFollow('admin')" title="Seguir">&#128247;</button>
-            <button class="mapa-btn" onclick="centerMap('admin')" title="Centralizar">&#127962;</button>
+            <button class="mapa-btn" id="btn-fol-adm" onclick="toggleFollowEnt('admin')" title="Seguir entregador">&#128757;</button>
           </div>
         </div>
         <div id="lista-on-adm" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;"></div>
@@ -278,15 +278,11 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     </div>
     <!-- Mapa -->
     <div class="secao">
-      <div class="s-title">&#128205; Entregadores Online
-        <button class="btn-sm orange" onclick="avisarPedidoPronto()" style="float:right;padding:7px 12px;font-size:12px;">&#128226; PEDIDO PRONTO</button>
-      </div>
-      <div style="clear:both;"></div>
+      <div class="s-title">&#128205; Entregadores Online</div>
       <div class="mapa-box">
         <div id="mapa-loja" style="height:230px;"></div>
         <div class="mapa-ctrl">
-          <button class="mapa-btn" id="btn-fol-lj" onclick="toggleFollow('loja')" title="Seguir">&#128247;</button>
-          <button class="mapa-btn" onclick="centerMap('loja')" title="Centralizar">&#127962;</button>
+          <button class="mapa-btn" id="btn-fol-lj" onclick="toggleFollowEnt('loja')" title="Seguir entregador automaticamente">&#128757;</button>
         </div>
       </div>
       <div id="lista-on-lj" style="margin-top:7px;display:flex;flex-wrap:wrap;gap:5px;"></div>
@@ -329,15 +325,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <button class="btn btn-green" onclick="confirmarLojaAtiva()" style="margin-top:7px;">Confirmar e Ficar Online</button>
       </div>
       <div id="ent-conectar-box">
-        <div style="background:#fff3e0;border-radius:9px;padding:11px;">
-          <p style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:5px;">&#128273; Conectar a uma loja</p>
-          <p style="font-size:12px;color:#666;margin-bottom:7px;">Peca o codigo de 6 letras ao responsavel da loja</p>
-          <div class="row">
-            <input type="text" id="cod-loja-inp" placeholder="EX: AB12CD" maxlength="6" style="flex:1;padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:20px;text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:700;">
-            <button class="btn-sm orange" onclick="conectarCodigo()" style="padding:10px 13px;font-size:13px;">Conectar</button>
-          </div>
-          <div id="msg-cod" style="font-size:12px;margin-top:5px;"></div>
+        <p style="font-size:11px;color:#888;margin-bottom:8px;">Adicionar outra loja:</p>
+        <div style="display:flex;gap:7px;align-items:stretch;">
+          <input type="text" id="cod-loja-inp" placeholder="Codigo da loja" maxlength="6"
+            style="flex:1;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:18px;text-transform:uppercase;letter-spacing:5px;text-align:center;font-weight:700;">
+          <button onclick="conectarCodigo()" style="background:linear-gradient(135deg,#FF6B35,#e65100);color:white;border:none;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">&#128273; Conectar</button>
         </div>
+        <div id="msg-cod" style="font-size:12px;margin-top:5px;"></div>
       </div>
     </div>
     <div class="menu">
@@ -358,15 +352,26 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="modal-close" onclick="closeM('pedido')">&times;</button>
   <h2 style="margin-bottom:4px;">&#128247; Novo Pedido</h2>
   <p style="font-size:12px;color:#888;margin-bottom:12px;">Fotografe a comanda para leitura automatica ou preencha manualmente</p>
-  <div onclick="document.getElementById('ocr-input').click()" style="background:linear-gradient(135deg,#FF6B35,#004E89);border-radius:11px;padding:18px;text-align:center;cursor:pointer;color:white;margin-bottom:11px;">
-    <div style="font-size:34px;margin-bottom:5px;">&#128247;</div>
-    <div style="font-weight:700;font-size:14px;">Fotografar Comanda</div>
-    <div style="font-size:11px;opacity:.8;margin-top:2px;">Toque para abrir camera ou galeria</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:11px;">
+    <div onclick="abrirCamera()" style="background:linear-gradient(135deg,#FF6B35,#004E89);border-radius:11px;padding:16px;text-align:center;cursor:pointer;color:white;">
+      <div style="font-size:28px;margin-bottom:4px;">&#128247;</div>
+      <div style="font-weight:700;font-size:13px;">Tirar Foto</div>
+      <div style="font-size:10px;opacity:.8;">Abrir camera</div>
+    </div>
+    <div onclick="abrirGaleria()" style="background:linear-gradient(135deg,#004E89,#1a237e);border-radius:11px;padding:16px;text-align:center;cursor:pointer;color:white;">
+      <div style="font-size:28px;margin-bottom:4px;">&#128444;</div>
+      <div style="font-weight:700;font-size:13px;">Da Galeria</div>
+      <div style="font-size:10px;opacity:.8;">Escolher foto</div>
+    </div>
   </div>
-  <input type="file" id="ocr-input" accept="image/*" capture="environment" class="hidden" onchange="lerComanda(event)">
+  <input type="file" id="ocr-camera" accept="image/*" capture="environment" class="hidden" onchange="lerComanda(event)">
+  <input type="file" id="ocr-galeria" accept="image/*" class="hidden" onchange="lerComanda(event)">
   <div id="ocr-prev" class="hidden" style="margin-bottom:11px;text-align:center;">
     <img id="ocr-img" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid #eee;">
-    <div style="margin-top:5px;"><button onclick="document.getElementById('ocr-input').click()" class="btn-sm gray">Trocar foto</button></div>
+    <div style="margin-top:5px;display:flex;gap:6px;justify-content:center;">
+      <button onclick="abrirCamera()" class="btn-sm orange">&#128247; Camera</button>
+      <button onclick="abrirGaleria()" class="btn-sm blue">&#128444; Galeria</button>
+    </div>
   </div>
   <div id="ocr-load" class="ocr-progress hidden">
     <div>&#129300; Lendo comanda com OCR...</div>
@@ -380,7 +385,6 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="p-bairro" oninput="atualizarValorCorrida()"></div><div class="fg"><label>Cidade</label><input type="text" id="p-cidade" value="Ribeirao Preto"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="p-comp" placeholder="Ex: Apto 12 Torre 2"></div>
   <div class="fg"><label>Observacoes</label><input type="text" id="p-obs"></div>
-  <div class="fg"><label>Codigo de confirmacao Ifood (se houver)</label><input type="text" id="p-cod-conf" placeholder="Ex: 1234"></div>
   <div id="p-valor-corrida" class="hidden" style="margin:10px 0;padding:10px;background:#e8f5e9;border-radius:8px;text-align:center;">
     <p style="font-size:11px;color:#666;">Valor estimado da corrida</p>
     <p id="p-valor-txt" style="font-size:22px;font-weight:700;color:#2e7d32;"></p>
@@ -488,18 +492,50 @@ let geocodeCache={};
 
 // ============ INIT ============
 window.onload=()=>{
-  pedirGPS();
+  iniciarGPS();
   const s=localStorage.getItem('u');
   if(s){U=JSON.parse(s);showPg(U.tipo);}
 };
 
-function pedirGPS(){
-  if(!navigator.geolocation){$('gps-banner').classList.remove('hidden');return;}
-  navigator.geolocation.getCurrentPosition(
+function iniciarGPS(){
+  if(!navigator.geolocation)return;
+  // watchPosition - continuously tracks position silently
+  navigator.geolocation.watchPosition(
     p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;$('gps-banner').classList.add('hidden');},
-    ()=>{$('gps-banner').classList.remove('hidden');},
-    {enableHighAccuracy:true,timeout:10000}
+    err=>{
+      // Apenas mostra banner se o usuario BLOQUEOU explicitamente (code 1)
+      // code 2 = indisponivel, code 3 = timeout — nao mostrar banner
+      if(err.code===1)$('gps-banner').classList.remove('hidden');
+    },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:10000}
   );
+  // Tenta imediatamente
+  navigator.geolocation.getCurrentPosition(
+    p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;},
+    err=>{if(err.code===1)$('gps-banner').classList.remove('hidden');},
+    {enableHighAccuracy:true,timeout:8000,maximumAge:30000}
+  );
+}
+
+function pedirGPS(){
+  $('gps-banner').classList.add('hidden');
+  iniciarGPS();
+}
+
+// Obter posicao atual em tempo real (promise)
+function obterPosicaoAgora(){
+  return new Promise((resolve,reject)=>{
+    if(myLat&&myLng){resolve({lat:myLat,lng:myLng});return;} // usa cache recente
+    if(!navigator.geolocation){reject('sem_gps');return;}
+    navigator.geolocation.getCurrentPosition(
+      p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;resolve({lat:p.coords.latitude,lng:p.coords.longitude});},
+      ()=>{
+        if(myLat&&myLng)resolve({lat:myLat,lng:myLng});
+        else reject('sem_posicao');
+      },
+      {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+    );
+  });
 }
 
 // ============ UTILS ============
@@ -646,28 +682,39 @@ async function atuMapa(tipo,ents){
   const mk=mrks[tipo];
   Object.keys(mk).forEach(id=>{if(!ents.find(e=>e.id===id)){mk[id].remove();delete mk[id];}});
   const bounds=[];
+  let primLl=null;
   ents.forEach(e=>{
     if(!e.latitude||!e.longitude)return;
     const ll=[e.latitude,e.longitude];
     const ico=icoEnt(e.nome,e.telefone);
     if(mk[e.id]){mk[e.id].setLatLng(ll);mk[e.id].setIcon(ico);}
-    else{mk[e.id]=L.marker(ll,{icon:ico}).addTo(m).bindPopup(`<strong>${e.nome}</strong><br>Tel: ${e.telefone||'-'}<br>&#128205; ${e.latitude.toFixed(4)}, ${e.longitude.toFixed(4)}`);}
+    else mk[e.id]=L.marker(ll,{icon:ico}).addTo(m).bindPopup(`<strong>${e.nome}</strong><br>Tel: ${e.telefone||'-'}`);
     bounds.push(ll);
-    if(seg[tipo]&&ents.length===1)m.setView(ll,16,{animate:true});
+    if(!primLl)primLl=ll;
   });
-  if(!seg[tipo]){if(bounds.length)m.fitBounds(bounds,{padding:[40,40]});else m.setView([RP_LAT,RP_LNG],13);}
-  setTimeout(()=>m.invalidateSize(),200);
+  if(seg[tipo]&&primLl){
+    m.setView(primLl,16,{animate:true});
+  }else if(!seg[tipo]){
+    if(bounds.length===1)m.setView(bounds[0],15);
+    else if(bounds.length>1)m.fitBounds(bounds,{padding:[40,40]});
+    else m.setView([RP_LAT,RP_LNG],13);
+  }
+  setTimeout(()=>m.invalidateSize(),300);
 }
 
-function toggleFollow(tipo){
+function toggleFollowEnt(tipo){
   seg[tipo]=!seg[tipo];
   const bid='btn-fol-'+(tipo==='admin'?'adm':'lj');
-  const b=$(bid);if(b){b.classList.toggle('seguindo',seg[tipo]);b.innerHTML=seg[tipo]?'&#128994;':'&#128247;';}
+  const b=$(bid);
+  if(b){
+    b.classList.toggle('seguindo',seg[tipo]);
+    b.innerHTML=seg[tipo]?'&#128308;&#128757;':'&#128757;';
+    b.title=seg[tipo]?'Seguindo (clique para parar)':'Seguir entregador automaticamente';
+  }
 }
+function toggleFollow(tipo){toggleFollowEnt(tipo);}
 function centerMap(tipo){
   seg[tipo]=false;
-  const b=$('btn-fol-'+(tipo==='admin'?'adm':'lj'));
-  if(b){b.classList.remove('seguindo');b.innerHTML='&#128247;';}
   mapas[tipo]&&mapas[tipo].setView([RP_LAT,RP_LNG],13);
 }
 
@@ -916,7 +963,7 @@ async function initLoja(){
 }
 
 async function pullLj(){
-  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id).eq('status','ativo');
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id);
   const el=$('lista-on-lj');
   if(!assoc||!assoc.length){el.innerHTML='<span style="font-size:12px;color:#999">Nenhum entregador vinculado.</span>';$('lj-online-cnt').textContent='0';return;}
   const ids=assoc.map(a=>a.entregador_id);
@@ -968,10 +1015,14 @@ async function atualizarValorCorrida(){
   window._pedidoGeo={lat:geo.lat,lng:geo.lng,dist,valor};
 }
 
+function abrirCamera(){$('ocr-camera').click();}
+function abrirGaleria(){$('ocr-galeria').click();}
+
 function abrirNovoPedido(){
   openM('pedido');
-  $('ocr-input').value='';$('ocr-prev').classList.add('hidden');$('ocr-load').classList.add('hidden');
-  ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp','p-cod-conf'].forEach(id=>{const e=$(id);if(e)e.value='';});
+  ['ocr-camera','ocr-galeria'].forEach(id=>{const e=$(id);if(e)e.value='';});
+  $('ocr-prev').classList.add('hidden');$('ocr-load').classList.add('hidden');
+  ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp'].forEach(id=>{const e=$(id);if(e)e.value='';});
   $('p-cidade').value='Ribeirao Preto';clearM('ped-msg');$('p-valor-corrida').classList.add('hidden');
   window._pedidoGeo=null;
 }
@@ -1036,7 +1087,7 @@ async function salvarPedido(){
     lat_entrega:geo?geo.lat:null,lng_entrega:geo?geo.lng:null,
     status:'pendente',status_detalhado:'pendente',ordem_rota:99,
     pedido_pronto:false,
-    codigo_confirmacao:v('p-cod-conf')
+    codigo_confirmacao:''
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){showM('ped-msg','Erro: '+error.message);return;}
@@ -1239,7 +1290,7 @@ async function initEnt(){
 }
 
 async function carregarLojaAtiva(){
-  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome)').eq('entregador_id',U.id).eq('status','ativo');
+  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome)').eq('entregador_id',U.id);
   const entBox=$('ent-conectar-box'),selBox=$('ent-selecionar-loja-box'),infoBox=$('ent-loja-ativa-info');
   if(!assoc||!assoc.length){
     infoBox.innerHTML='<p style="font-size:12px;color:#999">Sem loja vinculada. Conecte abaixo.</p>';
@@ -1304,7 +1355,7 @@ function atuBtnOn(on){
 
 async function toggleOnline(){
   // Se tem multiplas lojas e nao tem loja ativa, mostrar seletor
-  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).eq('status','ativo');
+  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id);
   if(!assoc||!assoc.length){alert('Voce precisa estar vinculado a uma loja primeiro.');return;}
   if(!U.online&&assoc.length>1&&!U.loja_ativa_id){
     $('ent-selecionar-loja-box').classList.remove('hidden');return;
@@ -1314,24 +1365,22 @@ async function toggleOnline(){
   U.online=novo;if(!novo)U.loja_ativa_id=null;
   localStorage.setItem('u',JSON.stringify(U));
   atuBtnOn(novo);
-  if(novo)inicRast();else{if(ivs.rast){clearInterval(ivs.rast);ivs.rast=null;}}
+  if(novo)inicRast();else{if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}}
   if(!novo)carregarLojaAtiva();
 }
 
 function inicRast(){
-  if(ivs.rast)clearInterval(ivs.rast);
-  const fn=()=>{
-    if(!U||!U.online)return;
-    navigator.geolocation&&navigator.geolocation.getCurrentPosition(
-      p=>{
-        myLat=p.coords.latitude;myLng=p.coords.longitude;gpsOk=true;
-        db.from('usuarios').update({latitude:p.coords.latitude,longitude:p.coords.longitude}).eq('id',U.id);
-        $('gps-banner').classList.add('hidden');
-      },
-      ()=>{$('gps-banner').classList.remove('hidden');},{enableHighAccuracy:true,timeout:12000}
-    );
-  };
-  fn();ivs.rast=setInterval(fn,15000);
+  if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
+  if(!navigator.geolocation)return;
+  ivs.rast=navigator.geolocation.watchPosition(
+    p=>{
+      myLat=p.coords.latitude;myLng=p.coords.longitude;gpsOk=true;
+      $('gps-banner').classList.add('hidden');
+      if(U&&U.online)db.from('usuarios').update({latitude:p.coords.latitude,longitude:p.coords.longitude}).eq('id',U.id);
+    },
+    err=>{if(err.code===1)$('gps-banner').classList.remove('hidden');},
+    {enableHighAccuracy:true,timeout:20000,maximumAge:5000}
+  );
 }
 
 function abrirFoto(){$('input-foto').click();}
@@ -1402,21 +1451,26 @@ async function carregarRotaEnt(){
       <p style="font-size:12px;color:#555;margin:3px 0">&#128205; ${e.endereco_entrega}</p>
       ${e.cliente_nome?`<p style="font-size:11px;color:#888">&#128100; ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89;font-weight:700">&#128222; ${e.cliente_telefone}</a>`:''}</p>`:''}
       ${e.distancia_km>0?`<p style="font-size:11px;color:#888">&#128205; ${parseFloat(e.distancia_km).toFixed(1)}km | <strong style="color:#2e7d32">${fR(e.valor_corrida||e.valor_entregador)}</strong></p>`:''}
-      ${e.codigo_confirmacao?`<div style="background:#f3e5f5;padding:7px;border-radius:6px;margin:5px 0;"><p style="font-size:12px;font-weight:700;color:#6a1b9a;">&#128273; Codigo Ifood: ${e.codigo_confirmacao}</p><a href="https://ifood.com.br" target="_blank" style="font-size:11px;color:#004E89;">Confirmar no Ifood &#8599;</a></div>`:''}
+      ${e.codigo_confirmacao?`<div style="background:#f3e5f5;padding:9px;border-radius:8px;margin:5px 0;border:1.5px solid #ce93d8;"><p style="font-size:12px;font-weight:700;color:#6a1b9a;margin-bottom:5px;">&#128273; Codigo de Confirmacao Ifood: <strong style="font-size:16px;letter-spacing:3px;">${e.codigo_confirmacao}</strong></p><a href="https://confirmacao-entrega-propria.ifood.com.br/${e.numero_pedido||''}" target="_blank" style="display:block;background:#ea1d2c;color:white;text-align:center;padding:9px;border-radius:7px;font-weight:700;font-size:13px;text-decoration:none;">&#128247; Abrir Confirmacao no Ifood</a></div>`:''}
       <div class="row" style="margin-top:7px;flex-wrap:wrap;">${botoesHtml}<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.endereco_entrega)}&travelmode=driving" target="_blank"><button class="btn-sm blue" style="margin:2px">&#127758; Ir</button></a></div>
     </div>`;
   });
 }
 
 async function entStatus(id,novoStatus,refLat,refLng){
-  const RAIO_M=300; // 300 metros de tolerancia
+  const RAIO_M=400; // 400 metros de tolerancia
   if(novoStatus==='chegou_loja'||novoStatus==='entregue'){
-    if(!gpsOk||!myLat||!myLng){
-      alert('GPS nao disponivel. Ative o GPS para confirmar esta acao.');return;
-    }
-    const dist=distKm(myLat,myLng,refLat,refLng)*1000; // metros
-    if(dist>RAIO_M){
-      alert('Voce precisa estar a menos de '+RAIO_M+'m do local para confirmar.\nDistancia atual: '+Math.round(dist)+'m');return;
+    try{
+      const pos=await obterPosicaoAgora();
+      const dist=distKm(pos.lat,pos.lng,refLat,refLng)*1000;
+      if(dist>RAIO_M){
+        const confirmar=confirm('Voce parece estar a '+Math.round(dist)+'m do local (limite: '+RAIO_M+'m).\nConfirmar mesmo assim?');
+        if(!confirmar)return;
+      }
+    }catch(e){
+      // GPS nao disponivel - perguntar se quer confirmar sem validacao
+      const confirmar=confirm('GPS nao disponivel no momento. Confirmar sem validacao de localizacao?');
+      if(!confirmar)return;
     }
   }
   const upd={status_detalhado:novoStatus};
