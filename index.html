@@ -12,88 +12,115 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#333;}
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);}
-.login-box{background:white;padding:28px;border-radius:16px;width:100%;max-width:390px;box-shadow:0 8px 30px rgba(0,0,0,0.2);}
-.login-logo{text-align:center;margin-bottom:20px;}
-.login-logo h1{color:#004E89;font-size:22px;margin-top:8px;}
+.login-box{background:white;padding:28px;border-radius:16px;width:100%;max-width:390px;box-shadow:0 8px 30px rgba(0,0,0,.2);}
 .tabs{display:flex;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid #eee;}
 .tab{flex:1;padding:10px;text-align:center;cursor:pointer;background:#f5f5f5;color:#666;font-size:14px;border:none;}
 .tab.active{background:linear-gradient(135deg,#FF6B35,#004E89);color:white;font-weight:600;}
-.fg{margin-bottom:12px;}
-.fg label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;}
-.fg input,.fg select,.fg textarea{width:100%;padding:11px 13px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;background:white;transition:border .2s;}
+.fg{margin-bottom:11px;}
+.fg label{display:block;font-size:11px;font-weight:700;color:#666;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;}
 .fg input:focus,.fg select:focus{outline:none;border-color:#FF6B35;}
-.fg textarea{resize:vertical;min-height:65px;}
-.g2{display:grid;grid-template-columns:2fr 1fr;gap:10px;}
-.g2b{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;}
+.g2{display:grid;grid-template-columns:2fr 1fr;gap:8px;}
+.g2b{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;}
 .btn:hover{opacity:.88;}.btn:disabled{opacity:.5;cursor:not-allowed;}
 .btn-primary{background:linear-gradient(135deg,#FF6B35,#004E89);color:white;}
 .btn-green{background:#00C9A7;color:white;}
 .btn-blue{background:#004E89;color:white;}
+.btn-orange{background:#FF6B35;color:white;}
+.btn-red{background:#e74c3c;color:white;}
+.btn-gray{background:#888;color:white;}
+.btn-purple{background:#8e44ad;color:white;}
 .user-type{display:flex;gap:10px;margin-bottom:12px;}
-.user-type label{flex:1;padding:11px;text-align:center;border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;font-size:14px;transition:all .2s;}
+.user-type label{flex:1;padding:10px;text-align:center;border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;font-size:13px;}
 .user-type input:checked+label{border-color:#FF6B35;background:#fff5f2;color:#FF6B35;font-weight:600;}
 .user-type input{display:none;}
-.msg-error{background:#ffebee;color:#c62828;padding:10px 13px;border-radius:8px;font-size:13px;margin-bottom:10px;}
-.msg-ok{background:#e8f5e9;color:#2e7d32;padding:10px 13px;border-radius:8px;font-size:13px;margin-bottom:10px;}
-.header{background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);color:white;padding:20px 16px 16px;text-align:center;position:relative;}
-.header h1{font-size:20px;font-weight:700;}
-.header p{font-size:13px;opacity:.85;margin-top:3px;}
-.btn-logout{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.18);color:white;border:none;padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;}
-.container{padding:14px;max-width:900px;margin:0 auto;}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px;}
-.card{background:white;padding:14px;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);}
-.card h3{font-size:11px;color:#999;font-weight:500;margin-bottom:5px;text-transform:uppercase;}
-.card .val{font-size:24px;font-weight:700;color:#FF6B35;}
+.msg-error{background:#ffebee;color:#c62828;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:9px;}
+.msg-ok{background:#e8f5e9;color:#2e7d32;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:9px;}
+.msg-warn{background:#fff8e1;color:#e65100;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:9px;}
+.header{background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);color:white;padding:18px 16px 14px;text-align:center;position:relative;}
+.header h1{font-size:19px;font-weight:700;}
+.header p{font-size:12px;opacity:.85;margin-top:2px;}
+.btn-logout{position:absolute;top:13px;right:13px;background:rgba(255,255,255,.18);color:white;border:none;padding:6px 12px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;}
+.container{padding:12px;max-width:900px;margin:0 auto;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:9px;margin-bottom:12px;}
+.card{background:white;padding:12px;border-radius:11px;box-shadow:0 1px 6px rgba(0,0,0,.07);cursor:pointer;}
+.card h3{font-size:10px;color:#999;font-weight:500;margin-bottom:4px;text-transform:uppercase;}
+.card .val{font-size:22px;font-weight:700;color:#FF6B35;}
 .menu{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
-.mitem{background:white;padding:20px 12px;border-radius:12px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,.07);cursor:pointer;transition:transform .15s,box-shadow .15s;}
-.mitem:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12);}
-.mitem .ico{font-size:30px;margin-bottom:7px;}
-.mitem h3{font-size:13px;color:#444;font-weight:600;}
-.btn-logout2{position:absolute;top:14px;right:14px;background:rgba(255,255,255,.18);color:white;border:none;padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;}
-.secao{background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.07);padding:14px;margin-bottom:12px;}
-.s-title{font-size:14px;font-weight:700;color:#004E89;margin-bottom:10px;}
-.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
-.b-ativo{background:#e8f5e9;color:#2e7d32;}
-.b-bloqueado,.b-vermelho{background:#ffebee;color:#c62828;}
+.mitem{background:white;padding:18px 10px;border-radius:11px;text-align:center;box-shadow:0 1px 6px rgba(0,0,0,.07);cursor:pointer;transition:transform .15s;}
+.mitem:hover{transform:translateY(-2px);}
+.mitem .ico{font-size:28px;margin-bottom:6px;}
+.mitem h3{font-size:12px;color:#444;font-weight:600;}
+.secao{background:white;border-radius:11px;box-shadow:0 1px 6px rgba(0,0,0,.07);padding:13px;margin-bottom:11px;}
+.s-title{font-size:13px;font-weight:700;color:#004E89;margin-bottom:9px;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;}
+.b-ativo,.b-entregue{background:#e8f5e9;color:#2e7d32;}
+.b-bloqueado,.b-cancelado{background:#ffebee;color:#c62828;}
 .b-pendente{background:#fff8e1;color:#e65100;}
-.b-entregue{background:#e8f5e9;color:#2e7d32;}
-.b-em_rota{background:#e3f2fd;color:#1565c0;}
+.b-em_rota,.b-aceito{background:#e3f2fd;color:#1565c0;}
+.b-chegou_loja{background:#f3e5f5;color:#6a1b9a;}
+.b-saiu_entrega{background:#e0f7fa;color:#00695c;}
 .b-online{background:#e8f5e9;color:#2e7d32;}
 .b-offline{background:#f5f5f5;color:#777;}
 .mapa-box{border-radius:10px;overflow:hidden;position:relative;}
-.mapa-ctrl{position:absolute;top:8px;right:8px;z-index:999;display:flex;flex-direction:column;gap:6px;}
-.mapa-btn{background:white;border:none;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;}
+.mapa-ctrl{position:absolute;top:8px;right:8px;z-index:999;display:flex;flex-direction:column;gap:5px;}
+.mapa-btn{background:white;border:none;width:34px;height:34px;border-radius:7px;font-size:16px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;}
 .mapa-btn.seguindo{background:#FF6B35;color:white;}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-.modal.open{display:flex;align-items:flex-start;justify-content:center;padding:10px;}
-.modal-box{background:white;border-radius:14px;width:100%;max-width:600px;padding:18px;position:relative;margin:auto;}
-.modal-close{position:absolute;top:12px;right:14px;font-size:24px;cursor:pointer;color:#999;background:none;border:none;line-height:1;}
-.litem{padding:12px 0;border-bottom:1px solid #f0f0f0;display:flex;gap:10px;align-items:flex-start;}
+.modal.open{display:flex;align-items:flex-start;justify-content:center;padding:8px;}
+.modal-box{background:white;border-radius:13px;width:100%;max-width:640px;padding:16px;position:relative;margin:auto;}
+.modal-close{position:absolute;top:11px;right:13px;font-size:22px;cursor:pointer;color:#999;background:none;border:none;line-height:1;}
+.litem{padding:11px 0;border-bottom:1px solid #f0f0f0;display:flex;gap:9px;align-items:flex-start;}
 .litem:last-child{border-bottom:none;}
-.btn-sm{background:#FF6B35;color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;margin:0;width:auto;font-weight:600;}
-.btn-sm.green{background:#00C9A7;}.btn-sm.blue{background:#004E89;}.btn-sm.red{background:#e74c3c;}.btn-sm.gray{background:#888;}.btn-sm.orange{background:#FF6B35;}
-.foto-wrap{cursor:pointer;margin:0 auto 10px;}
-.foto-circle{width:82px;height:82px;border-radius:50%;background:rgba(255,255,255,.25);border:3px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;}
-.foto-img{width:82px;height:82px;border-radius:50%;object-fit:cover;border:3px solid white;}
-.codigo-box{background:rgba(255,255,255,.15);border-radius:10px;padding:8px 16px;margin-top:8px;display:inline-block;}
-.codigo-num{font-size:28px;font-weight:700;letter-spacing:6px;color:white;}
-.codigo-label{font-size:11px;opacity:.8;text-align:center;}
-.ecard{background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid #FF6B35;}
+.btn-sm{color:white;border:none;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:11px;white-space:nowrap;margin:0;width:auto;font-weight:700;}
+.btn-sm.green{background:#00C9A7;}.btn-sm.blue{background:#004E89;}.btn-sm.red{background:#e74c3c;}.btn-sm.gray{background:#888;}.btn-sm.orange{background:#FF6B35;}.btn-sm.purple{background:#8e44ad;}
+.foto-circle{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.25);border:3px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 6px;cursor:pointer;}
+.foto-img{width:78px;height:78px;border-radius:50%;object-fit:cover;border:3px solid white;margin:0 auto 6px;display:block;cursor:pointer;}
+.codigo-box{background:rgba(255,255,255,.15);border-radius:9px;padding:7px 14px;margin-top:7px;display:inline-block;}
+.codigo-num{font-size:26px;font-weight:700;letter-spacing:6px;color:white;}
+.codigo-label{font-size:10px;opacity:.8;text-align:center;}
+.ecard{background:#f8f9fa;border-radius:9px;padding:11px;margin-bottom:7px;border-left:4px solid #FF6B35;}
 .ecard.rota{border-left-color:#004E89;background:#f0f4ff;}
-.ocr-progress{background:#e3f2fd;border-radius:8px;padding:14px;text-align:center;margin:12px 0;}
-.ocr-bar{height:6px;background:#e0e0e0;border-radius:3px;margin-top:8px;overflow:hidden;}
+.ecard.entregue-card{border-left-color:#00C9A7;opacity:.7;}
+.ocr-progress{background:#e3f2fd;border-radius:8px;padding:13px;text-align:center;margin:10px 0;}
+.ocr-bar{height:5px;background:#e0e0e0;border-radius:3px;margin-top:7px;overflow:hidden;}
 .ocr-fill{height:100%;background:linear-gradient(90deg,#FF6B35,#004E89);border-radius:3px;transition:width .3s;width:0%;}
 .hidden{display:none!important;}
-.row{display:flex;gap:8px;align-items:center;}
+.row{display:flex;gap:7px;align-items:center;}
+.status-flow{display:flex;gap:4px;margin:8px 0;flex-wrap:wrap;}
+.sf-step{flex:1;padding:6px 4px;border-radius:6px;text-align:center;font-size:10px;font-weight:700;border:2px solid #e0e0e0;color:#999;min-width:60px;}
+.sf-step.done{background:#e8f5e9;border-color:#00C9A7;color:#2e7d32;}
+.sf-step.active{background:#004E89;border-color:#004E89;color:white;}
+.sf-step.current{background:#FF6B35;border-color:#FF6B35;color:white;animation:pulse2 1s infinite;}
+@keyframes pulse2{0%,100%{opacity:1;}50%{opacity:.7;}}
+.gps-banner{background:#ffebee;padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:13px;color:#c62828;display:flex;align-items:center;gap:8px;}
+.entrega-valor{background:#e8f5e9;border-radius:6px;padding:5px 10px;font-size:13px;font-weight:700;color:#2e7d32;display:inline-block;}
+.chip{background:#e3f2fd;color:#1565c0;border-radius:20px;padding:3px 10px;font-size:11px;display:inline-flex;align-items:center;gap:4px;margin:2px;}
+.chip.green{background:#e8f5e9;color:#2e7d32;}
+.notif-dot{width:10px;height:10px;background:#e74c3c;border-radius:50%;display:inline-block;margin-left:5px;animation:pulse2 .8s infinite;}
+select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:7px;font-size:13px;margin-top:5px;}
+.adm-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.adm-tab{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#e0e0e0;color:#555;}
+.adm-tab.active{background:#004E89;color:white;}
 </style>
 </head>
 <body>
 
+<!-- GPS PERMISSION BANNER (global) -->
+<div id="gps-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#e74c3c;color:white;padding:10px 16px;font-size:13px;text-align:center;">
+  &#128205; GPS nao autorizado — funcionalidades de rastreamento e validacao de entrega desativadas.
+  <button onclick="pedirGPS()" style="background:white;color:#e74c3c;border:none;padding:4px 10px;border-radius:5px;font-weight:700;cursor:pointer;margin-left:8px;">Ativar GPS</button>
+</div>
+
 <!-- LOGIN -->
 <div id="pg-login" class="login-wrap">
   <div class="login-box">
-    <div class="login-logo"><div style="font-size:40px;">&#128230;</div><h1>Monta a Rota Ai</h1></div>
+    <div style="text-align:center;margin-bottom:18px;">
+      <div style="font-size:38px;">&#128230;</div>
+      <h2 style="color:#004E89;font-size:20px;margin-top:6px;">Monta a Rota Ai</h2>
+    </div>
     <div class="tabs">
       <button class="tab active" onclick="switchTab('login',this)">Entrar</button>
       <button class="tab" onclick="switchTab('register',this)">Cadastrar</button>
@@ -136,27 +163,73 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <h1>&#128230; Monta a Rota Ai</h1><p>Painel Administrativo</p>
   </div>
   <div class="container">
-    <div class="cards">
-      <div class="card"><h3>Entregadores</h3><div class="val" id="adm-ent">0</div></div>
-      <div class="card"><h3>Lojas</h3><div class="val" id="adm-loj">0</div></div>
-      <div class="card"><h3>Online</h3><div class="val" id="adm-on">0</div></div>
+    <div class="adm-tabs">
+      <button class="adm-tab active" onclick="admTab('painel',this)">&#127968; Painel</button>
+      <button class="adm-tab" onclick="admTab('lojas',this)">&#127978; Lojas</button>
+      <button class="adm-tab" onclick="admTab('entregadores',this)">&#128757; Entregadores</button>
+      <button class="adm-tab" onclick="admTab('financeiro',this)">&#128176; Financeiro</button>
+      <button class="adm-tab" onclick="admTab('impersonar',this)">&#128065; Ver Painel</button>
     </div>
-    <div class="secao">
-      <div class="s-title">&#128205; Entregadores Online Agora</div>
-      <div class="mapa-box">
-        <div id="mapa-admin" style="height:260px;"></div>
-        <div class="mapa-ctrl">
-          <button class="mapa-btn" id="btn-fol-adm" onclick="toggleFollow('admin')" title="Seguir">&#128247;</button>
-          <button class="mapa-btn" onclick="centerMap('admin')" title="Centralizar">&#127962;</button>
-        </div>
+    <!-- Painel -->
+    <div id="adm-painel">
+      <div class="cards">
+        <div class="card"><h3>Entregadores</h3><div class="val" id="adm-cnt-ent">0</div></div>
+        <div class="card"><h3>Lojas</h3><div class="val" id="adm-cnt-loj">0</div></div>
+        <div class="card"><h3>Online</h3><div class="val" id="adm-cnt-on">0</div></div>
+        <div class="card"><h3>Em Rota</h3><div class="val" id="adm-cnt-rota">0</div></div>
       </div>
-      <div id="lista-on-adm" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div class="secao">
+        <div class="s-title">&#128205; Mapa Geral — Entregadores Online</div>
+        <div class="mapa-box">
+          <div id="mapa-admin" style="height:280px;"></div>
+          <div class="mapa-ctrl">
+            <button class="mapa-btn" id="btn-fol-adm" onclick="toggleFollow('admin')" title="Seguir">&#128247;</button>
+            <button class="mapa-btn" onclick="centerMap('admin')" title="Centralizar">&#127962;</button>
+          </div>
+        </div>
+        <div id="lista-on-adm" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;"></div>
+      </div>
+      <div class="secao">
+        <div class="s-title">&#128230; Entregas em Tempo Real</div>
+        <div id="adm-entregas-realtime"></div>
+      </div>
     </div>
-    <div class="menu">
-      <div class="mitem" onclick="abrirEntAdm()"><div class="ico">&#128757;</div><h3>Entregadores</h3></div>
-      <div class="mitem" onclick="abrirLojAdm()"><div class="ico">&#127978;</div><h3>Lojas</h3></div>
-      <div class="mitem" onclick="abrirFinAdm()"><div class="ico">&#128176;</div><h3>Financeiro</h3></div>
-      <div class="mitem" onclick="abrirCobAdm()"><div class="ico">&#128197;</div><h3>Cobrancas</h3></div>
+    <!-- Lojas -->
+    <div id="adm-lojas" class="hidden">
+      <div id="adm-loj-lst"></div>
+    </div>
+    <!-- Entregadores -->
+    <div id="adm-entregadores" class="hidden">
+      <div id="adm-ent-lst"></div>
+    </div>
+    <!-- Financeiro -->
+    <div id="adm-financeiro" class="hidden">
+      <div class="secao">
+        <div class="s-title">Filtrar por periodo</div>
+        <select id="adm-fin-per" onchange="carregarFinAdm()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;">
+          <option value="hoje">Hoje</option>
+          <option value="semana">Esta semana</option>
+          <option value="mes">Este mes</option>
+        </select>
+      </div>
+      <div id="adm-fin-dados"></div>
+    </div>
+    <!-- Impersonar -->
+    <div id="adm-impersonar" class="hidden">
+      <div class="secao">
+        <div class="s-title">Ver como Loja</div>
+        <select id="adm-sel-loja" onchange="admVerLoja()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:8px;">
+          <option value="">Selecione uma loja...</option>
+        </select>
+        <div id="adm-loja-view"></div>
+      </div>
+      <div class="secao">
+        <div class="s-title">Ver como Entregador</div>
+        <select id="adm-sel-ent" onchange="admVerEnt()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:8px;">
+          <option value="">Selecione um entregador...</option>
+        </select>
+        <div id="adm-ent-view"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -174,66 +247,97 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="container">
     <div class="cards">
       <div class="card"><h3>Taxa Sistema</h3><div class="val" id="lj-ts">-</div></div>
-      <div class="card"><h3>Taxa Ent.</h3><div class="val" id="lj-te">-</div></div>
       <div class="card"><h3>Hoje</h3><div class="val" id="lj-hj">0</div></div>
+      <div class="card"><h3>Online</h3><div class="val" id="lj-online-cnt">0</div></div>
     </div>
+    <!-- Taxa config -->
     <div class="secao">
-      <div class="s-title">&#128176; Taxa por entrega ao entregador</div>
-      <div class="row">
-        <input type="number" id="lj-taxa-new" step="0.10" min="0" placeholder="0.00" style="flex:1;padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;">
-        <button class="btn-sm blue" onclick="salvarTaxaLj()">Salvar</button>
+      <div class="s-title">&#128176; Configuracao de Taxa ao Entregador</div>
+      <div class="fg">
+        <label>Tipo de taxa</label>
+        <select id="lj-taxa-tipo" onchange="toggleTaxaTipo()">
+          <option value="fixo">Valor fixo (mesmo valor para qualquer distancia)</option>
+          <option value="por_km">Por distancia (ate X km fixo, acima diferente)</option>
+        </select>
+      </div>
+      <div id="taxa-fixo-area">
+        <div class="fg"><label>Valor fixo por entrega (R$)</label>
+          <div class="row"><input type="number" id="lj-taxa-new" step="0.50" min="0" placeholder="0.00" style="flex:1;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;">
+          <button class="btn-sm blue" onclick="salvarTaxaLj()">Salvar</button></div>
+        </div>
+      </div>
+      <div id="taxa-km-area" class="hidden">
+        <div class="g3">
+          <div class="fg"><label>Valor ate X km</label><input type="number" id="lj-taxa-base" step="0.50" min="0" placeholder="8.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
+          <div class="fg"><label>Limite (km)</label><input type="number" id="lj-km-limite" step="0.5" min="1" placeholder="5" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
+          <div class="fg"><label>Acima do limite</label><input type="number" id="lj-taxa-km-exc" step="0.50" min="0" placeholder="12.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
+        </div>
+        <button class="btn btn-blue" onclick="salvarTaxaLj()" style="margin-top:4px;">Salvar Configuracao de Taxa</button>
       </div>
       <div id="taxa-msg" style="font-size:12px;margin-top:5px;"></div>
     </div>
+    <!-- Mapa -->
     <div class="secao">
-      <div class="s-title">&#128205; Entregadores Online</div>
+      <div class="s-title">&#128205; Entregadores Online
+        <button class="btn-sm orange" onclick="avisarPedidoPronto()" style="float:right;padding:7px 12px;font-size:12px;">&#128226; PEDIDO PRONTO</button>
+      </div>
+      <div style="clear:both;"></div>
       <div class="mapa-box">
-        <div id="mapa-loja" style="height:240px;"></div>
+        <div id="mapa-loja" style="height:230px;"></div>
         <div class="mapa-ctrl">
           <button class="mapa-btn" id="btn-fol-lj" onclick="toggleFollow('loja')" title="Seguir">&#128247;</button>
           <button class="mapa-btn" onclick="centerMap('loja')" title="Centralizar">&#127962;</button>
         </div>
       </div>
-      <div id="lista-on-lj" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+      <div id="lista-on-lj" style="margin-top:7px;display:flex;flex-wrap:wrap;gap:5px;"></div>
     </div>
     <div class="menu">
       <div class="mitem" onclick="abrirNovoPedido()"><div class="ico">&#128247;</div><h3>Novo Pedido</h3></div>
       <div class="mitem" onclick="abrirPedidosLj()"><div class="ico">&#128230;</div><h3>Pedidos / Rota</h3></div>
       <div class="mitem" onclick="abrirRelLj()"><div class="ico">&#128202;</div><h3>Relatorio</h3></div>
       <div class="mitem" onclick="abrirGerEnt()"><div class="ico">&#128101;</div><h3>Entregadores</h3></div>
-      <div class="mitem" onclick="abrirCfgLj()" style="grid-column:1/-1;max-width:180px;margin:0 auto;"><div class="ico">&#9881;</div><h3>Configuracoes</h3></div>
+      <div class="mitem" onclick="abrirCfgLj()" style="grid-column:1/-1;max-width:170px;margin:0 auto;"><div class="ico">&#9881;</div><h3>Configuracoes</h3></div>
     </div>
   </div>
 </div>
 
 <!-- ENTREGADOR -->
 <div id="pg-entregador" class="hidden">
-  <div class="header">
-    <button class="btn-logout" onclick="sair()">Sair</button>
-    <div class="foto-wrap" onclick="abrirFoto()">
-      <div id="foto-ph" class="foto-circle">&#128100;</div>
-      <img id="foto-img" class="foto-img hidden" src="" alt="">
-    </div>
+  <div class="header" style="cursor:pointer;" onclick="abrirFoto()">
+    <button class="btn-logout" onclick="event.stopPropagation();sair()">Sair</button>
+    <div id="foto-ph" class="foto-circle">&#128100;</div>
+    <img id="foto-img" class="foto-img hidden" src="" alt="">
     <h1 id="ent-nome">Entregador</h1>
     <p id="ent-st">&#9899; Offline</p>
     <input type="file" id="input-foto" accept="image/*" class="hidden" onchange="uploadFoto(event)">
   </div>
   <div class="container">
+    <div id="ent-pedido-alerta" class="hidden" style="background:#FF6B35;color:white;padding:12px;border-radius:10px;margin-bottom:10px;text-align:center;font-weight:700;font-size:14px;cursor:pointer;" onclick="abrirRotaEnt()">
+      &#128226; PEDIDO PRONTO NA LOJA! Toque para ver
+    </div>
     <div class="cards">
       <div class="card"><h3>Entregas Hoje</h3><div class="val" id="ent-cnt">0</div></div>
-      <div class="card"><h3>Ganhos Hoje</h3><div class="val" id="ent-gnh">R$0</div></div>
+      <div class="card"><h3>Ganhos Hoje</h3><div class="val" id="ent-gnh" style="font-size:16px;">R$0</div></div>
     </div>
+    <!-- Loja ativa -->
     <div class="secao">
-      <div class="s-title">&#127978; Minhas Lojas</div>
-      <div id="minhas-lojas" style="margin-bottom:10px;"></div>
-      <div style="background:#fff3e0;border-radius:10px;padding:12px;">
-        <p style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:6px;">&#128273; Conectar a uma nova loja</p>
-        <p style="font-size:12px;color:#666;margin-bottom:8px;">Peca o <strong>codigo de 6 letras</strong> que aparece no painel da loja</p>
-        <div class="row">
-          <input type="text" id="cod-loja-inp" placeholder="EX: AB12CD" maxlength="6" style="flex:1;padding:11px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:20px;text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:700;">
-          <button class="btn-sm orange" onclick="conectarCodigo()" style="padding:11px 14px;font-size:14px;">Conectar</button>
+      <div class="s-title">&#127978; Loja Ativa</div>
+      <div id="ent-loja-ativa-info" style="margin-bottom:8px;"></div>
+      <div id="ent-selecionar-loja-box" class="hidden">
+        <p style="font-size:12px;color:#666;margin-bottom:6px;">Selecione com qual loja vai trabalhar hoje:</p>
+        <select id="ent-sel-loja-ativa" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;"></select>
+        <button class="btn btn-green" onclick="confirmarLojaAtiva()" style="margin-top:7px;">Confirmar e Ficar Online</button>
+      </div>
+      <div id="ent-conectar-box">
+        <div style="background:#fff3e0;border-radius:9px;padding:11px;">
+          <p style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:5px;">&#128273; Conectar a uma loja</p>
+          <p style="font-size:12px;color:#666;margin-bottom:7px;">Peca o codigo de 6 letras ao responsavel da loja</p>
+          <div class="row">
+            <input type="text" id="cod-loja-inp" placeholder="EX: AB12CD" maxlength="6" style="flex:1;padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:20px;text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:700;">
+            <button class="btn-sm orange" onclick="conectarCodigo()" style="padding:10px 13px;font-size:13px;">Conectar</button>
+          </div>
+          <div id="msg-cod" style="font-size:12px;margin-top:5px;"></div>
         </div>
-        <div id="msg-cod" style="font-size:13px;margin-top:6px;"></div>
       </div>
     </div>
     <div class="menu">
@@ -241,7 +345,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <div class="ico" id="ico-on">&#128994;</div>
         <h3 id="txt-on">Ficar Online</h3>
       </div>
-      <div class="mitem" onclick="abrirRotaEnt()"><div class="ico">&#127758;</div><h3>Minha Rota</h3></div>
+      <div class="mitem" onclick="abrirRotaEnt()"><div class="ico">&#127758;</div><h3>Minha Rota <span id="rota-notif" class="hidden notif-dot"></span></h3></div>
       <div class="mitem" onclick="abrirGanhosEnt()"><div class="ico">&#128181;</div><h3>Meus Ganhos</h3></div>
       <div class="mitem" onclick="abrirCfgEnt()"><div class="ico">&#9881;</div><h3>Configuracoes</h3></div>
     </div>
@@ -249,77 +353,80 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 </div>
 
 <!-- MODAIS -->
-<div id="m-adm-ent" class="modal"><div class="modal-box"><button class="modal-close" onclick="closeM('adm-ent')">&times;</button><h2 style="margin-bottom:14px;">Entregadores</h2><div id="adm-ent-lst"></div></div></div>
-<div id="m-adm-loj" class="modal"><div class="modal-box"><button class="modal-close" onclick="closeM('adm-loj')">&times;</button><h2 style="margin-bottom:14px;">Lojas</h2><div id="adm-loj-lst"></div></div></div>
-<div id="m-adm-fin" class="modal"><div class="modal-box"><button class="modal-close" onclick="closeM('adm-fin')">&times;</button><h2 style="margin-bottom:14px;">Financeiro</h2><div id="adm-fin-lst"></div></div></div>
-<div id="m-adm-cob" class="modal"><div class="modal-box"><button class="modal-close" onclick="closeM('adm-cob')">&times;</button><h2 style="margin-bottom:14px;">Cobrancas</h2><div id="adm-cob-lst"></div></div></div>
-
 <!-- Novo Pedido -->
 <div id="m-pedido" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('pedido')">&times;</button>
   <h2 style="margin-bottom:4px;">&#128247; Novo Pedido</h2>
-  <p style="font-size:13px;color:#888;margin-bottom:14px;">Fotografe a comanda para leitura automatica</p>
-  <div onclick="document.getElementById('ocr-input').click()" style="background:linear-gradient(135deg,#FF6B35,#004E89);border-radius:12px;padding:20px;text-align:center;cursor:pointer;color:white;margin-bottom:12px;">
-    <div style="font-size:36px;margin-bottom:6px;">&#128247;</div>
-    <div style="font-weight:700;font-size:15px;">Fotografar Comanda</div>
-    <div style="font-size:12px;opacity:.8;margin-top:3px;">Toque aqui para abrir a camera ou galeria</div>
+  <p style="font-size:12px;color:#888;margin-bottom:12px;">Fotografe a comanda para leitura automatica ou preencha manualmente</p>
+  <div onclick="document.getElementById('ocr-input').click()" style="background:linear-gradient(135deg,#FF6B35,#004E89);border-radius:11px;padding:18px;text-align:center;cursor:pointer;color:white;margin-bottom:11px;">
+    <div style="font-size:34px;margin-bottom:5px;">&#128247;</div>
+    <div style="font-weight:700;font-size:14px;">Fotografar Comanda</div>
+    <div style="font-size:11px;opacity:.8;margin-top:2px;">Toque para abrir camera ou galeria</div>
   </div>
   <input type="file" id="ocr-input" accept="image/*" capture="environment" class="hidden" onchange="lerComanda(event)">
-  <div id="ocr-prev" class="hidden" style="margin-bottom:12px;text-align:center;">
-    <img id="ocr-img" style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid #eee;">
-    <div style="margin-top:6px;"><button onclick="document.getElementById('ocr-input').click()" class="btn-sm gray">Trocar foto</button></div>
+  <div id="ocr-prev" class="hidden" style="margin-bottom:11px;text-align:center;">
+    <img id="ocr-img" style="max-width:100%;max-height:160px;border-radius:8px;border:1px solid #eee;">
+    <div style="margin-top:5px;"><button onclick="document.getElementById('ocr-input').click()" class="btn-sm gray">Trocar foto</button></div>
   </div>
   <div id="ocr-load" class="ocr-progress hidden">
     <div>&#129300; Lendo comanda com OCR...</div>
     <div class="ocr-bar"><div class="ocr-fill" id="ocr-fill"></div></div>
-    <div id="ocr-pct" style="font-size:12px;color:#888;margin-top:4px;">0%</div>
+    <div id="ocr-pct" style="font-size:11px;color:#888;margin-top:3px;">0%</div>
   </div>
-  <div class="fg"><label>Numero do Pedido</label><input type="text" id="p-num" placeholder="Ex: 4321 ou #IFD-123"></div>
+  <div class="fg"><label>Numero do Pedido / Codigo Ifood</label><input type="text" id="p-num" placeholder="Ex: 4321 ou #IFD-ABC123"></div>
   <div class="fg"><label>Nome do Cliente</label><input type="text" id="p-cli"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="p-tel"></div>
-  <div class="g2"><div class="fg"><label>Rua / Avenida</label><input type="text" id="p-rua"></div><div class="fg"><label>Numero</label><input type="text" id="p-nend"></div></div>
-  <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="p-bairro"></div><div class="fg"><label>Cidade</label><input type="text" id="p-cidade" value="Ribeirao Preto"></div></div>
-  <div class="fg"><label>Complemento (apto, bloco, torre...)</label><input type="text" id="p-comp" placeholder="Ex: Apto 12 Torre 2"></div>
-  <div class="fg"><label>Observacoes do Pedido</label><input type="text" id="p-obs"></div>
-  <div id="ped-msg" style="margin-top:6px;"></div>
-  <button class="btn btn-green" onclick="salvarPedido()" style="margin-top:10px;">&#10004; Salvar e Adicionar a Rota</button>
+  <div class="g2"><div class="fg"><label>Rua / Avenida</label><input type="text" id="p-rua" oninput="atualizarValorCorrida()"></div><div class="fg"><label>Numero</label><input type="text" id="p-nend" oninput="atualizarValorCorrida()"></div></div>
+  <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="p-bairro" oninput="atualizarValorCorrida()"></div><div class="fg"><label>Cidade</label><input type="text" id="p-cidade" value="Ribeirao Preto"></div></div>
+  <div class="fg"><label>Complemento</label><input type="text" id="p-comp" placeholder="Ex: Apto 12 Torre 2"></div>
+  <div class="fg"><label>Observacoes</label><input type="text" id="p-obs"></div>
+  <div class="fg"><label>Codigo de confirmacao Ifood (se houver)</label><input type="text" id="p-cod-conf" placeholder="Ex: 1234"></div>
+  <div id="p-valor-corrida" class="hidden" style="margin:10px 0;padding:10px;background:#e8f5e9;border-radius:8px;text-align:center;">
+    <p style="font-size:11px;color:#666;">Valor estimado da corrida</p>
+    <p id="p-valor-txt" style="font-size:22px;font-weight:700;color:#2e7d32;"></p>
+    <p id="p-dist-txt" style="font-size:11px;color:#888;"></p>
+  </div>
+  <div id="ped-msg" style="margin-top:5px;"></div>
+  <button class="btn btn-green" onclick="salvarPedido()" style="margin-top:9px;">&#10004; Salvar e Adicionar a Rota</button>
 </div></div>
 
 <!-- Pedidos/Rota Loja -->
 <div id="m-rota" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('rota')">&times;</button>
-  <h2 style="margin-bottom:10px;">&#128230; Pedidos e Rota</h2>
-  <div class="row" style="margin-bottom:12px;flex-wrap:wrap;">
-    <button class="btn-sm blue" onclick="otimizarRota()" style="padding:9px 14px;">&#129302; Otimizar</button>
-    <button class="btn-sm green" onclick="enviarRota()" style="padding:9px 14px;">&#128757; Enviar ao Entregador</button>
+  <h2 style="margin-bottom:9px;">&#128230; Pedidos e Rota</h2>
+  <div class="row" style="margin-bottom:11px;flex-wrap:wrap;gap:6px;">
+    <button class="btn-sm blue" onclick="otimizarRotaInteligente()" style="padding:8px 13px;">&#129302; Otimizar Inteligente</button>
+    <button class="btn-sm orange" onclick="avisarPedidoPronto()" style="padding:8px 13px;">&#128226; Pedido Pronto</button>
   </div>
   <div id="rota-lst"></div>
 </div></div>
 
-<!-- Relatorio -->
+<!-- Relatorio Loja -->
 <div id="m-rel" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('rel')">&times;</button>
-  <h2 style="margin-bottom:10px;">&#128202; Relatorio</h2>
-  <select id="rel-f" onchange="carregarRel()" style="width:100%;padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:12px;"><option value="hoje">Hoje</option><option value="semana">Esta semana</option><option value="mes">Este mes</option></select>
+  <h2 style="margin-bottom:9px;">&#128202; Relatorio Financeiro</h2>
+  <select id="rel-f" onchange="carregarRel()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:11px;">
+    <option value="hoje">Hoje</option><option value="semana">Esta semana</option><option value="mes">Este mes</option>
+  </select>
   <div id="rel-dados"></div>
 </div></div>
 
-<!-- Gerenciar Entregadores -->
+<!-- Gerenciar Entregadores Loja -->
 <div id="m-ger" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('ger')">&times;</button>
-  <h2 style="margin-bottom:10px;">&#128101; Meus Entregadores</h2>
-  <div class="secao" style="background:#fff3e0;margin-bottom:12px;">
-    <div class="s-title" style="color:#e65100;">Como o entregador se conecta</div>
-    <p style="font-size:13px;color:#666;">O entregador abre o app, vai em <strong>Minhas Lojas</strong> e digita o codigo abaixo:</p>
-    <div style="font-size:32px;text-align:center;letter-spacing:8px;font-weight:700;color:#004E89;margin-top:8px;" id="ger-cod">------</div>
+  <h2 style="margin-bottom:9px;">&#128101; Meus Entregadores</h2>
+  <div class="secao" style="background:#fff3e0;">
+    <div class="s-title" style="color:#e65100;">Codigo da Loja</div>
+    <p style="font-size:12px;color:#666;margin-bottom:7px;">O entregador digita este codigo para se vincular a esta loja:</p>
+    <div style="font-size:30px;text-align:center;letter-spacing:7px;font-weight:700;color:#004E89;" id="ger-cod">------</div>
   </div>
-  <div id="ger-lst"></div>
+  <div id="ger-lst" style="margin-top:9px;"></div>
 </div></div>
 
 <!-- Config Loja -->
 <div id="m-cfg-lj" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('cfg-lj')">&times;</button>
-  <h2 style="margin-bottom:14px;">&#9881; Configuracoes</h2>
+  <h2 style="margin-bottom:13px;">&#9881; Configuracoes da Loja</h2>
   <div class="fg"><label>Nome da Loja</label><input type="text" id="cfg-nlj"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="cfg-tel"></div>
   <div class="fg"><label>CNPJ</label><input type="text" id="cfg-cnpj"></div>
@@ -332,25 +439,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <button class="btn btn-primary" onclick="salvarCfgLj()">Salvar</button>
 </div></div>
 
-<!-- Ganhos -->
+<!-- Ganhos Entregador -->
 <div id="m-ganhos" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('ganhos')">&times;</button>
-  <h2 style="margin-bottom:10px;">&#128181; Meus Ganhos</h2>
-  <select id="gnh-f" onchange="carregarGanhos()" style="width:100%;padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:12px;"><option value="hoje">Hoje</option><option value="semana">Esta semana</option><option value="mes">Este mes</option></select>
+  <h2 style="margin-bottom:9px;">&#128181; Meus Ganhos</h2>
+  <select id="gnh-f" onchange="carregarGanhos()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:11px;">
+    <option value="hoje">Hoje</option><option value="semana">Esta semana</option><option value="mes">Este mes</option>
+  </select>
   <div id="gnh-dados"></div>
 </div></div>
 
 <!-- Rota Entregador -->
 <div id="m-rota-ent" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('rota-ent')">&times;</button>
-  <h2 style="margin-bottom:10px;">&#127758; Minhas Entregas</h2>
+  <h2 style="margin-bottom:9px;">&#127758; Minhas Entregas</h2>
   <div id="rota-ent-lst"></div>
 </div></div>
 
 <!-- Config Entregador -->
 <div id="m-cfg-ent" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('cfg-ent')">&times;</button>
-  <h2 style="margin-bottom:14px;">&#9881; Meus Dados</h2>
+  <h2 style="margin-bottom:13px;">&#9881; Meus Dados</h2>
   <div class="fg"><label>Nome</label><input type="text" id="ent-nome2"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="ent-tel2"></div>
   <div class="fg"><label>Placa</label><input type="text" id="ent-plc"></div>
@@ -364,19 +473,39 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 const SB_URL='https://dfvjaweyxfenhjgusekq.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdmphd2V5eGZlbmhqZ3VzZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMzk4NTMsImV4cCI6MjA4NzYxNTg1M30.MT9pzSQgc3ZNGiIV95DwjVtNvSZI0Lz-SKMkvMys1Kg';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-const RP=[-21.1767,-47.8208];
+const RP_LAT=-21.1767, RP_LNG=-47.8208;
 
 let U=null;
 let mapas={admin:null,loja:null};
 let mrks={admin:{},loja:{}};
+let tooltips={admin:{},loja:{}};
 let seg={admin:false,loja:false};
-let ivs={rast:null,mAdm:null,mLj:null};
+let ivs={rast:null,mAdm:null,mLj:null,alerta:null};
+let gpsOk=false;
+let myLat=null,myLng=null;
+let lojaGeoCache={lat:null,lng:null};
+let geocodeCache={};
 
-window.onload=()=>{const s=localStorage.getItem('u');if(s){U=JSON.parse(s);showPg(U.tipo);}};
+// ============ INIT ============
+window.onload=()=>{
+  pedirGPS();
+  const s=localStorage.getItem('u');
+  if(s){U=JSON.parse(s);showPg(U.tipo);}
+};
 
+function pedirGPS(){
+  if(!navigator.geolocation){$('gps-banner').classList.remove('hidden');return;}
+  navigator.geolocation.getCurrentPosition(
+    p=>{gpsOk=true;myLat=p.coords.latitude;myLng=p.coords.longitude;$('gps-banner').classList.add('hidden');},
+    ()=>{$('gps-banner').classList.remove('hidden');},
+    {enableHighAccuracy:true,timeout:10000}
+  );
+}
+
+// ============ UTILS ============
 const $=id=>document.getElementById(id);
 const v=id=>{const e=$(id);return e?e.value.trim():'';}
-const fR=val=>'R$'+parseFloat(val||0).toFixed(2).replace('.',',');
+const fR=val=>'R$ '+parseFloat(val||0).toFixed(2).replace('.',',');
 const fEnd=(r,n,b,c,cp)=>{let s=[r,n].filter(Boolean).join(', ');if(b)s+=', '+b;if(c)s+=' - '+c;if(cp)s+=' ('+cp+')';return s;};
 function showM(id,msg,ok){const e=$(id);if(!e)return;e.className=ok?'msg-ok':'msg-error';e.textContent=msg;}
 function clearM(id){const e=$(id);if(e){e.className='';e.textContent='';}}
@@ -384,6 +513,41 @@ function iDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
 function fDia(){const d=new Date();d.setHours(23,59,59,999);return d.toISOString();}
 function iPer(p){const n=new Date();if(p==='hoje')n.setHours(0,0,0,0);else if(p==='semana'){n.setDate(n.getDate()-n.getDay());n.setHours(0,0,0,0);}else{n.setDate(1);n.setHours(0,0,0,0);}return n.toISOString();}
 
+// Haversine
+function distKm(lat1,lng1,lat2,lng2){
+  const R=6371,dL=(lat2-lat1)*Math.PI/180,dG=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dG/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function angleDeg(lat1,lng1,lat2,lng2){return Math.atan2(lng2-lng1,lat2-lat1)*180/Math.PI;}
+
+// Geocode via Nominatim
+async function geocode(addr){
+  if(geocodeCache[addr])return geocodeCache[addr];
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(addr+', Ribeirao Preto, SP, Brasil')+'&format=json&limit=1',{headers:{'User-Agent':'MontaARotaAi/1.0'}});
+    const d=await r.json();
+    if(d&&d[0]){const res={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};geocodeCache[addr]=res;return res;}
+  }catch(e){}
+  return null;
+}
+
+// Sound beep
+function beep(freq=880,dur=0.4){
+  try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(0.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);o.start();o.stop(ctx.currentTime+dur);}catch(e){}
+}
+function beepAlerta(){beep(660,0.2);setTimeout(()=>beep(880,0.3),300);}
+
+// Calcular valor corrida
+function calcularValorCorrida(distancia,taxaTipo,taxaBase,kmLimite,taxaExcedente){
+  if(taxaTipo==='por_km'){
+    if(distancia<=kmLimite)return taxaBase;
+    else return taxaExcedente;
+  }
+  return taxaBase; // fixo
+}
+
+// MODAIS
 function openM(id){const m=$('m-'+id);if(m)m.classList.add('open');}
 function closeM(id){const m=$('m-'+id);if(m)m.classList.remove('open');}
 window.addEventListener('click',e=>{if(e.target.classList.contains('modal'))e.target.classList.remove('open');});
@@ -397,7 +561,13 @@ function toggleCad(){
   const t=document.querySelector('input[name="rtype"]:checked').value;
   $('c-loja').classList.toggle('hidden',t!=='loja');$('c-ent').classList.toggle('hidden',t!=='entregador');
 }
+function toggleTaxaTipo(){
+  const t=v('lj-taxa-tipo');
+  $('taxa-fixo-area').classList.toggle('hidden',t!=='fixo');
+  $('taxa-km-area').classList.toggle('hidden',t!=='por_km');
+}
 
+// ============ AUTH ============
 async function fazerLogin(){
   const email=v('l-email'),senha=v('l-senha'),btn=$('btn-login');
   if(!email||!senha){showM('login-msg','Preencha email e senha');return;}
@@ -422,7 +592,7 @@ async function fazerCadastro(){
     const{data:ex}=await db.from('usuarios').select('id').eq('email',email).single();
     if(ex){showM('reg-msg','Email ja cadastrado');return;}
     const rua=v('r-rua'),num=v('r-num'),bairro=v('r-bairro'),cidade=v('r-cidade')||'Ribeirao Preto';
-    const d={tipo,nome,email,telefone:v('r-tel'),senha_hash:senha,status:'ativo',taxa_sistema:0.50,taxa_entrega:0,online:false,cidade};
+    const d={tipo,nome,email,telefone:v('r-tel'),senha_hash:senha,status:'ativo',taxa_sistema:0.50,taxa_entrega:0,taxa_tipo:'fixo',taxa_km_limite:5,taxa_km_excedente:2,online:false,cidade};
     if(tipo==='loja'){
       d.nome_loja=v('r-nloja');d.cnpj=v('r-cnpj');
       d.endereco=fEnd(rua,num,bairro,cidade,'');
@@ -449,21 +619,28 @@ function showPg(tipo){
 function sair(){
   pararIvs();
   if(U&&U.online)db.from('usuarios').update({online:false}).eq('id',U.id);
-  U=null;localStorage.removeItem('u');showPg('login');
+  U=null;localStorage.removeItem('u');
+  ['pg-admin','pg-loja','pg-entregador'].forEach(id=>$(id).classList.add('hidden'));
+  $('pg-login').classList.remove('hidden');
   $('l-email').value='';$('l-senha').value='';
 }
 function pararIvs(){Object.keys(ivs).forEach(k=>{if(ivs[k]){clearInterval(ivs[k]);ivs[k]=null;}});}
 
-// MAPA
+// ============ MAPA ============
 function criarMapa(tipo){
   const id=tipo==='admin'?'mapa-admin':'mapa-loja';
   if(mapas[tipo])return;
-  mapas[tipo]=L.map(id).setView(RP,13);
+  mapas[tipo]=L.map(id).setView([RP_LAT,RP_LNG],13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(mapas[tipo]);
 }
-function icoEnt(nome){
-  return L.divIcon({html:`<div style="position:relative"><div style="background:#FF6B35;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:17px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4)">&#128757;</div><div style="position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:white;font-size:9px;padding:1px 5px;border-radius:4px;white-space:nowrap">${nome.split(' ')[0]}</div></div>`,iconSize:[36,36],iconAnchor:[18,18],className:''});
+
+function icoEnt(nome,tel){
+  return L.divIcon({
+    html:`<div style="position:relative;text-align:center;"><div style="background:#FF6B35;color:white;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);margin:0 auto;">&#128757;</div><div style="background:rgba(0,0,0,.75);color:white;font-size:9px;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-top:2px;max-width:90px;overflow:hidden;text-overflow:ellipsis;">${nome.split(' ')[0]}${tel?' | '+tel.slice(-4):''}</div></div>`,
+    iconSize:[90,52],iconAnchor:[45,34],className:''
+  });
 }
+
 async function atuMapa(tipo,ents){
   const m=mapas[tipo];if(!m)return;
   const mk=mrks[tipo];
@@ -472,14 +649,16 @@ async function atuMapa(tipo,ents){
   ents.forEach(e=>{
     if(!e.latitude||!e.longitude)return;
     const ll=[e.latitude,e.longitude];
-    if(mk[e.id])mk[e.id].setLatLng(ll);
-    else mk[e.id]=L.marker(ll,{icon:icoEnt(e.nome)}).addTo(m).bindPopup(`<strong>${e.nome}</strong><br>${e.telefone||''}`);
+    const ico=icoEnt(e.nome,e.telefone);
+    if(mk[e.id]){mk[e.id].setLatLng(ll);mk[e.id].setIcon(ico);}
+    else{mk[e.id]=L.marker(ll,{icon:ico}).addTo(m).bindPopup(`<strong>${e.nome}</strong><br>Tel: ${e.telefone||'-'}<br>&#128205; ${e.latitude.toFixed(4)}, ${e.longitude.toFixed(4)}`);}
     bounds.push(ll);
     if(seg[tipo]&&ents.length===1)m.setView(ll,16,{animate:true});
   });
-  if(!seg[tipo]){if(bounds.length)m.fitBounds(bounds,{padding:[40,40]});else m.setView(RP,13);}
+  if(!seg[tipo]){if(bounds.length)m.fitBounds(bounds,{padding:[40,40]});else m.setView([RP_LAT,RP_LNG],13);}
   setTimeout(()=>m.invalidateSize(),200);
 }
+
 function toggleFollow(tipo){
   seg[tipo]=!seg[tipo];
   const bid='btn-fol-'+(tipo==='admin'?'adm':'lj');
@@ -487,221 +666,485 @@ function toggleFollow(tipo){
 }
 function centerMap(tipo){
   seg[tipo]=false;
-  const bid='btn-fol-'+(tipo==='admin'?'adm':'lj');
-  const b=$(bid);if(b){b.classList.remove('seguindo');b.innerHTML='&#128247;';}
-  mapas[tipo]&&mapas[tipo].setView(RP,13);
+  const b=$('btn-fol-'+(tipo==='admin'?'adm':'lj'));
+  if(b){b.classList.remove('seguindo');b.innerHTML='&#128247;';}
+  mapas[tipo]&&mapas[tipo].setView([RP_LAT,RP_LNG],13);
 }
 
-// ADMIN
+// ============ ADMIN ============
 async function initAdmin(){
+  admTab('painel',document.querySelector('.adm-tab'));
+  await carregarDadosAdmin();
+  criarMapa('admin');await pullAdm();
+  ivs.mAdm=setInterval(pullAdm,12000);
+  await carregarAdmImpersonar();
+}
+
+async function carregarDadosAdmin(){
   const{data:e}=await db.from('usuarios').select('id').eq('tipo','entregador').eq('status','ativo');
   const{data:l}=await db.from('usuarios').select('id').eq('tipo','loja').eq('status','ativo');
-  $('adm-ent').textContent=e?e.length:0;$('adm-loj').textContent=l?l.length:0;
-  criarMapa('admin');await pullAdm();ivs.mAdm=setInterval(pullAdm,15000);
+  const{data:on}=await db.from('usuarios').select('id').eq('tipo','entregador').eq('online',true);
+  const{data:rota}=await db.from('entregas').select('id').eq('status','em_rota');
+  $('adm-cnt-ent').textContent=e?e.length:0;
+  $('adm-cnt-loj').textContent=l?l.length:0;
+  $('adm-cnt-on').textContent=on?on.length:0;
+  $('adm-cnt-rota').textContent=rota?rota.length:0;
+  // Entregas realtime
+  const{data:ativ}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome),entregador:entregador_id(nome,telefone)').in('status',['aceito','chegou_loja','saiu_entrega','em_rota']).order('created_at',{ascending:false}).limit(20);
+  const el=$('adm-entregas-realtime');
+  if(!ativ||!ativ.length){el.innerHTML='<p style="color:#999;font-size:13px;">Nenhuma entrega ativa agora.</p>';return;}
+  el.innerHTML=ativ.map(e=>`
+    <div style="padding:9px;border-radius:8px;background:#f8f9fa;margin-bottom:7px;border-left:3px solid #FF6B35;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+          <span class="badge b-${e.status_detalhado||e.status}" style="margin-left:5px;">${e.status_detalhado||e.status}</span><br>
+          <small style="color:#888;">&#127978; ${e.loja?e.loja.nome_loja||e.loja.nome:'?'} | &#128757; ${e.entregador?e.entregador.nome:'Nao atribuido'}</small><br>
+          <small style="color:#555;">&#128205; ${e.endereco_entrega}</small>
+        </div>
+        <div style="text-align:right;font-size:11px;color:#888;">${e.valor_corrida>0?fR(e.valor_corrida):''}</div>
+      </div>
+    </div>`).join('');
 }
+
 async function pullAdm(){
   const{data:ents}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude').eq('tipo','entregador').eq('online',true);
-  $('adm-on').textContent=ents?ents.length:0;
+  $('adm-cnt-on').textContent=ents?ents.length:0;
   const el=$('lista-on-adm');
-  el.innerHTML=ents&&ents.length?ents.map(e=>`<span class="badge b-online">&#128994; ${e.nome}</span>`).join(''):'<span style="font-size:13px;color:#999">Nenhum online</span>';
+  el.innerHTML=ents&&ents.length?ents.map(e=>`<span class="badge b-online">&#128994; ${e.nome} ${e.telefone?'('+e.telefone+')':''}</span>`).join(''):'<span style="font-size:12px;color:#999">Nenhum online</span>';
   await atuMapa('admin',ents||[]);
+  carregarDadosAdmin();
 }
-async function abrirEntAdm(){
-  openM('adm-ent');$('adm-ent-lst').innerHTML='<p>Carregando...</p>';
-  const{data}=await db.from('usuarios').select('*').eq('tipo','entregador');
-  if(!data||!data.length){$('adm-ent-lst').innerHTML='<p>Nenhum</p>';return;}
-  $('adm-ent-lst').innerHTML=data.map(e=>`
-    <div class="litem">
-      <div style="flex:1"><strong>${e.nome}</strong> <span class="badge ${e.online?'b-online':'b-offline'}">${e.online?'Online':'Offline'}</span><br>
-      <small style="color:#888">Tel:${e.telefone||'-'} | Placa:${e.placa_moto||'-'} | Pix:${e.chave_pix||'-'}</small></div>
-      <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
-        <span class="badge b-${e.status}">${e.status}</span>
-        <button class="btn-sm ${e.status==='ativo'?'red':'green'}" onclick="toggleSt('${e.id}','${e.status}','adm-ent')">${e.status==='ativo'?'Bloquear':'Ativar'}</button>
-      </div>
-    </div>`).join('');
+
+function admTab(aba,btn){
+  ['painel','lojas','entregadores','financeiro','impersonar'].forEach(a=>$('adm-'+a).classList.add('hidden'));
+  document.querySelectorAll('.adm-tab').forEach(b=>b.classList.remove('active'));
+  $('adm-'+aba).classList.remove('hidden');
+  if(btn)btn.classList.add('active');
+  if(aba==='lojas')carregarAdmLojas();
+  else if(aba==='entregadores')carregarAdmEnt();
+  else if(aba==='financeiro')carregarFinAdm();
 }
-async function abrirLojAdm(){
-  openM('adm-loj');$('adm-loj-lst').innerHTML='<p>Carregando...</p>';
+
+async function carregarAdmLojas(){
+  const el=$('adm-loj-lst');el.innerHTML='<p>Carregando...</p>';
   const{data}=await db.from('usuarios').select('*').eq('tipo','loja');
-  if(!data||!data.length){$('adm-loj-lst').innerHTML='<p>Nenhuma</p>';return;}
-  $('adm-loj-lst').innerHTML=data.map(l=>`
-    <div class="litem" style="flex-direction:column;align-items:flex-start">
-      <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:8px">
-        <div><strong>${l.nome_loja||l.nome}</strong> <span style="font-size:12px;font-weight:700;color:#888">[${l.codigo_loja||'---'}]</span><br>
-        <small style="color:#888">${l.endereco||''}</small></div>
+  if(!data||!data.length){el.innerHTML='<p>Nenhuma loja</p>';return;}
+  el.innerHTML=data.map(l=>`
+    <div class="secao">
+      <div style="display:flex;justify-content:space-between;margin-bottom:7px;">
+        <div><strong>${l.nome_loja||l.nome}</strong> <span style="font-size:11px;color:#888;">[${l.codigo_loja||'---'}]</span><br>
+        <small style="color:#888;">${l.endereco||''} | Tel: ${l.telefone||'-'}</small></div>
         <span class="badge b-${l.status}">${l.status}</span>
       </div>
-      <div class="row" style="flex-wrap:wrap">
-        <label style="font-size:12px;color:#666">Taxa R$</label>
-        <input type="number" id="tx-${l.id}" value="${parseFloat(l.taxa_sistema||0.50).toFixed(2)}" step="0.01" min="0" style="width:72px;padding:6px;border:1.5px solid #e0e0e0;border-radius:6px;font-size:13px">
-        <button class="btn-sm blue" onclick="saveTaxAdm('${l.id}')">Salvar</button>
-        <button class="btn-sm ${l.status==='ativo'?'red':'green'}" onclick="toggleSt('${l.id}','${l.status}','adm-loj')">${l.status==='ativo'?'Bloquear':'Ativar'}</button>
+      <div class="row" style="flex-wrap:wrap;">
+        <label style="font-size:11px;">Taxa R$</label>
+        <input type="number" id="tx-${l.id}" value="${parseFloat(l.taxa_sistema||0.50).toFixed(2)}" step="0.01" min="0" style="width:70px;padding:6px;border:1.5px solid #e0e0e0;border-radius:6px;font-size:12px;">
+        <button class="btn-sm blue" onclick="saveTaxAdm('${l.id}')">Salvar Taxa</button>
+        <button class="btn-sm ${l.status==='ativo'?'red':'green'}" onclick="toggleStAdm('${l.id}','${l.status}','loja')">${l.status==='ativo'?'Bloquear':'Ativar'}</button>
       </div>
-      <small id="tx-msg-${l.id}" style="color:#27ae60;margin-top:3px"></small>
+      <small id="tx-msg-${l.id}" style="color:#27ae60;margin-top:3px;display:block;"></small>
     </div>`).join('');
 }
-async function toggleSt(id,st,modal){
+
+async function carregarAdmEnt(){
+  const el=$('adm-ent-lst');el.innerHTML='<p>Carregando...</p>';
+  const{data}=await db.from('usuarios').select('*').eq('tipo','entregador');
+  if(!data||!data.length){el.innerHTML='<p>Nenhum entregador</p>';return;}
+  el.innerHTML=data.map(e=>`
+    <div class="secao">
+      <div style="display:flex;justify-content:space-between;">
+        <div><strong>${e.nome}</strong> <span class="badge ${e.online?'b-online':'b-offline'}">${e.online?'Online':'Offline'}</span><br>
+        <small style="color:#888;">Tel: ${e.telefone||'-'} | Placa: ${e.placa_moto||'-'} | Pix: ${e.chave_pix||'-'}</small></div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">
+          <span class="badge b-${e.status}">${e.status}</span>
+          <button class="btn-sm ${e.status==='ativo'?'red':'green'}" onclick="toggleStAdm('${e.id}','${e.status}','ent')">${e.status==='ativo'?'Bloquear':'Ativar'}</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function carregarFinAdm(){
+  const p=$('adm-fin-per').value,el=$('adm-fin-dados');el.innerHTML='<p>Carregando...</p>';
+  const{data:lojas}=await db.from('usuarios').select('*').eq('tipo','loja');
+  const{data:entregas}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome),entregador:entregador_id(nome)').gte('created_at',iPer(p));
+  if(!entregas||!entregas.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Sem dados no periodo.</p>';return;}
+  const totSis=entregas.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
+  const totEnt=entregas.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  el.innerHTML=`
+    <div class="secao">
+      <div class="s-title">Resumo do Periodo</div>
+      <div class="g3">
+        <div style="text-align:center;padding:10px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888;">Total Entregas</p><p style="font-size:20px;font-weight:700;color:#FF6B35;">${entregas.length}</p></div>
+        <div style="text-align:center;padding:10px;background:#e3f2fd;border-radius:8px;"><p style="font-size:10px;color:#888;">Taxa Sistema</p><p style="font-size:14px;font-weight:700;color:#004E89;">${fR(totSis)}</p></div>
+        <div style="text-align:center;padding:10px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888;">Pago Entregad.</p><p style="font-size:14px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p></div>
+      </div>
+    </div>
+    ${(lojas||[]).map(lj=>{
+      const ljEnt=entregas.filter(e=>e.loja_id===lj.id);
+      if(!ljEnt.length)return '';
+      const ljSis=ljEnt.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
+      const ljEntVal=ljEnt.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+      return `<div class="secao">
+        <div class="s-title">&#127978; ${lj.nome_loja||lj.nome} (${ljEnt.length} entregas)</div>
+        <div class="row" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <span class="badge b-pendente">Sistema: ${fR(ljSis)}</span>
+          <span class="badge b-ativo">Entregadores: ${fR(ljEntVal)}</span>
+        </div>
+        ${ljEnt.map(e=>`<div style="padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;">
+            <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+            <span style="font-weight:700;color:#2e7d32;">${fR(e.valor_corrida||e.valor_entregador)}</span>
+          </div>
+          <p style="color:#555;">&#128205; ${e.endereco_entrega}</p>
+          <p style="color:#888;">&#128757; ${e.entregador?e.entregador.nome:'Sem entregador'} | <span class="badge b-${e.status}">${e.status}</span></p>
+        </div>`).join('')}
+      </div>`;
+    }).join('')}`;
+}
+
+async function toggleStAdm(id,st,tipo){
   const novo=st==='ativo'?'bloqueado':'ativo';
   await db.from('usuarios').update({status:novo}).eq('id',id);
-  if(modal==='adm-loj')abrirLojAdm();else abrirEntAdm();
+  if(tipo==='loja')carregarAdmLojas();else carregarAdmEnt();
 }
 async function saveTaxAdm(id){
   const val=parseFloat($('tx-'+id).value);
   await db.from('usuarios').update({taxa_sistema:val}).eq('id',id);
   const m=$('tx-msg-'+id);m.textContent='Salvo!';setTimeout(()=>{m.textContent='';},2000);
 }
-async function abrirFinAdm(){
-  openM('adm-fin');const{data:l}=await db.from('usuarios').select('*').eq('tipo','loja');
-  $('adm-fin-lst').innerHTML=(!l||!l.length)?'<p>Nenhuma</p>':l.map(x=>`<div class="litem"><div><strong>${x.nome_loja||x.nome}</strong><br><small>Taxa:${fR(x.taxa_sistema)}/entrega</small></div><span class="badge b-${x.status}">${x.status}</span></div>`).join('');
-}
-async function abrirCobAdm(){
-  openM('adm-cob');const{data:l}=await db.from('usuarios').select('*').eq('tipo','loja');
-  const hoje=new Date(),d=(3-hoje.getDay()+7)%7||7,prox=new Date(hoje);prox.setDate(hoje.getDate()+d);
-  $('adm-cob-lst').innerHTML=`<p style="margin-bottom:12px">Proxima: <strong>${prox.toLocaleDateString('pt-BR')}</strong></p>`+
-    (!l||!l.length?'<p>Sem lojas</p>':l.map(x=>`<div class="litem"><div><strong>${x.nome_loja||x.nome}</strong><br><small>Taxa:${fR(x.taxa_sistema)}/ent</small></div><span class="badge b-${x.status}">${x.status}</span></div>`).join(''));
+
+async function carregarAdmImpersonar(){
+  const{data:lojas}=await db.from('usuarios').select('id,nome_loja,nome').eq('tipo','loja');
+  const{data:ents}=await db.from('usuarios').select('id,nome').eq('tipo','entregador');
+  const selL=$('adm-sel-loja'),selE=$('adm-sel-ent');
+  if(lojas)lojas.forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.nome_loja||l.nome;selL.appendChild(o);});
+  if(ents)ents.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nome;selE.appendChild(o);});
 }
 
-// LOJA
+async function admVerLoja(){
+  const id=$('adm-sel-loja').value;if(!id)return;
+  const el=$('adm-loja-view');el.innerHTML='<p>Carregando...</p>';
+  const{data:lj}=await db.from('usuarios').select('*').eq('id',id).single();
+  if(!lj){el.innerHTML='<p>Erro ao carregar</p>';return;}
+  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).neq('status','entregue').order('ordem_rota');
+  const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(nome,online,status)').eq('loja_id',id);
+  const{data:rel}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).gte('created_at',iDia()).lte('created_at',fDia());
+  const totH=rel?rel.length:0;
+  const totSis=rel?rel.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0):0;
+  const totEnt=rel?rel.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
+  el.innerHTML=`
+    <div style="background:#e3f2fd;border-radius:10px;padding:12px;margin-bottom:10px;">
+      <strong>${lj.nome_loja||lj.nome}</strong> | Codigo: <strong>${lj.codigo_loja||'---'}</strong><br>
+      <small>${lj.endereco||''}</small><br>
+      <small>Taxa sistema: ${fR(lj.taxa_sistema)} | Taxa entregador: ${fR(lj.taxa_entrega)}</small>
+    </div>
+    <div class="g3" style="margin-bottom:10px;">
+      <div style="text-align:center;padding:8px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888;">Hoje</p><p style="font-size:18px;font-weight:700;color:#FF6B35;">${totH}</p></div>
+      <div style="text-align:center;padding:8px;background:#e3f2fd;border-radius:8px;"><p style="font-size:10px;color:#888;">Sistema</p><p style="font-size:13px;font-weight:700;color:#004E89;">${fR(totSis)}</p></div>
+      <div style="text-align:center;padding:8px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888;">Entregad.</p><p style="font-size:13px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p></div>
+    </div>
+    <div style="margin-bottom:8px;"><strong>Entregadores vinculados:</strong><br>${(assoc||[]).map(a=>`<span class="badge ${a.e&&a.e.online?'b-online':'b-offline'}" style="margin:2px;">${a.e?a.e.nome:'?'}</span>`).join('')||'Nenhum'}</div>
+    <div><strong>Pedidos ativos:</strong><br>${(!ents||!ents.length)?'<p style="color:#999;font-size:12px;">Nenhum pedido ativo</p>':ents.map(e=>`
+      <div class="ecard ${e.status==='em_rota'?'rota':''}">
+        <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${e.status_detalhado||e.status}">${e.status_detalhado||e.status}</span></div>
+        <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
+        ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
+        ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
+      </div>`).join('')}
+    </div>`;
+}
+
+async function admVerEnt(){
+  const id=$('adm-sel-ent').value;if(!id)return;
+  const el=$('adm-ent-view');el.innerHTML='<p>Carregando...</p>';
+  const{data:ent}=await db.from('usuarios').select('*').eq('id',id).single();
+  if(!ent){el.innerHTML='<p>Erro</p>';return;}
+  const{data:rota}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome)').eq('entregador_id',id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).order('ordem_rota');
+  const{data:ganhos}=await db.from('entregas').select('id,valor_corrida,valor_entregador').eq('entregador_id',id).gte('created_at',iDia()).lte('created_at',fDia());
+  const totalGanhos=ganhos?ganhos.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
+  const{data:assoc}=await db.from('loja_entregadores').select('l:loja_id(nome_loja,nome)').eq('entregador_id',id);
+  el.innerHTML=`
+    <div style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:10px;">
+      <strong>${ent.nome}</strong> <span class="badge ${ent.online?'b-online':'b-offline'}">${ent.online?'Online':'Offline'}</span><br>
+      <small>Tel: ${ent.telefone||'-'} | Placa: ${ent.placa_moto||'-'} | Pix: ${ent.chave_pix||'-'}</small><br>
+      <small>Lojas: ${(assoc||[]).map(a=>a.l?a.l.nome_loja||a.l.nome:'?').join(', ')||'Nenhuma'}</small><br>
+      <small>Ganhos hoje: <strong>${fR(totalGanhos)}</strong> (${ganhos?ganhos.length:0} entregas)</small>
+    </div>
+    <strong>Rota atual:</strong><br>
+    ${(!rota||!rota.length)?'<p style="color:#999;font-size:12px;">Sem entregas na rota.</p>':rota.map((e,i)=>`
+      <div class="ecard rota">
+        <div style="display:flex;justify-content:space-between;"><strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${e.status_detalhado||e.status}">${e.status_detalhado||e.status}</span></div>
+        <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
+        <p style="font-size:11px;color:#888;">&#127978; ${e.loja?e.loja.nome_loja||e.loja.nome:'?'}</p>
+        ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">&#128273; Cod. Conf: ${e.codigo_confirmacao}</p>`:''}
+        ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
+        <div class="row" style="margin-top:6px;flex-wrap:wrap;">
+          <button class="btn-sm blue" onclick="admForcarStatus('${e.id}','entregue')">&#10003; Marcar Entregue (ADM)</button>
+          <button class="btn-sm red" onclick="admForcarStatus('${e.id}','cancelado')">Cancelar</button>
+        </div>
+      </div>`).join('')}`;
+}
+
+async function admForcarStatus(id,status){
+  await db.from('entregas').update({status,status_detalhado:status,entregue_at:status==='entregue'?new Date().toISOString():null}).eq('id',id);
+  const sel=$('adm-sel-ent').value;if(sel)admVerEnt();
+}
+
+// ============ LOJA ============
 async function initLoja(){
   const{data}=await db.from('usuarios').select('*').eq('id',U.id).single();
   if(data){U={...U,...data};localStorage.setItem('u',JSON.stringify(U));}
   $('loja-nome').textContent=U.nome_loja||U.nome;
   $('loja-cod').textContent=U.codigo_loja||'------';
-  $('lj-ts').textContent=fR(U.taxa_sistema);$('lj-te').textContent=fR(U.taxa_entrega);
-  $('lj-taxa-new').value=parseFloat(U.taxa_entrega||0).toFixed(2);
+  $('lj-ts').textContent=fR(U.taxa_sistema);
+  // Taxa tipo
+  const tipoEl=$('lj-taxa-tipo');
+  if(tipoEl&&U.taxa_tipo){tipoEl.value=U.taxa_tipo;toggleTaxaTipo();}
+  if(U.taxa_tipo==='por_km'){
+    if($('lj-taxa-base'))$('lj-taxa-base').value=parseFloat(U.taxa_entrega||0).toFixed(2);
+    if($('lj-km-limite'))$('lj-km-limite').value=parseFloat(U.taxa_km_limite||5).toFixed(1);
+    if($('lj-taxa-km-exc'))$('lj-taxa-km-exc').value=parseFloat(U.taxa_km_excedente||2).toFixed(2);
+  }else{if($('lj-taxa-new'))$('lj-taxa-new').value=parseFloat(U.taxa_entrega||0).toFixed(2);}
   const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
-  criarMapa('loja');await pullLj();ivs.mLj=setInterval(pullLj,15000);
+  // Geocode loja
+  if(U.loja_lat&&U.loja_lng){lojaGeoCache={lat:U.loja_lat,lng:U.loja_lng};}
+  else if(U.endereco){geocode(U.endereco).then(g=>{if(g){lojaGeoCache=g;db.from('usuarios').update({loja_lat:g.lat,loja_lng:g.lng}).eq('id',U.id);}});}
+  criarMapa('loja');await pullLj();
+  ivs.mLj=setInterval(pullLj,12000);
 }
+
 async function pullLj(){
   const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id).eq('status','ativo');
   const el=$('lista-on-lj');
-  if(!assoc||!assoc.length){el.innerHTML='<span style="font-size:13px;color:#999">Nenhum entregador vinculado.</span>';return;}
+  if(!assoc||!assoc.length){el.innerHTML='<span style="font-size:12px;color:#999">Nenhum entregador vinculado.</span>';$('lj-online-cnt').textContent='0';return;}
   const ids=assoc.map(a=>a.entregador_id);
   const{data:ents}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude').in('id',ids).eq('online',true);
-  el.innerHTML=ents&&ents.length?ents.map(e=>`<span class="badge b-online">&#128994; ${e.nome}</span>`).join(''):'<span style="font-size:13px;color:#999">Nenhum online agora.</span>';
+  $('lj-online-cnt').textContent=ents?ents.length:0;
+  el.innerHTML=ents&&ents.length?ents.map(e=>`<span class="badge b-online">&#128994; ${e.nome}</span>`).join(''):'<span style="font-size:12px;color:#999">Nenhum online agora.</span>';
   await atuMapa('loja',ents||[]);
 }
+
 async function salvarTaxaLj(){
-  const val=parseFloat(v('lj-taxa-new'));if(isNaN(val)||val<0){$('taxa-msg').textContent='Invalido';return;}
-  await db.from('usuarios').update({taxa_entrega:val}).eq('id',U.id);
-  U.taxa_entrega=val;localStorage.setItem('u',JSON.stringify(U));
-  $('lj-te').textContent=fR(val);$('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='Salvo!';
+  const tipo=v('lj-taxa-tipo');
+  let base,kmLim,kmExc;
+  if(tipo==='por_km'){
+    base=parseFloat(v('lj-taxa-base')||0);
+    kmLim=parseFloat(v('lj-km-limite')||5);
+    kmExc=parseFloat(v('lj-taxa-km-exc')||0);
+  }else{
+    base=parseFloat(v('lj-taxa-new')||0);kmLim=5;kmExc=0;
+  }
+  await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc}).eq('id',U.id);
+  U.taxa_entrega=base;U.taxa_tipo=tipo;U.taxa_km_limite=kmLim;U.taxa_km_excedente=kmExc;
+  localStorage.setItem('u',JSON.stringify(U));
+  $('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='Configuracao salva!';
   setTimeout(()=>{$('taxa-msg').textContent='';},2000);
 }
 
-// OCR
+// Avisar pedido pronto (toca alerta em todos entregadores vinculados e online)
+async function avisarPedidoPronto(){
+  // Marca pedidos pendentes sem entregador como pedido_pronto=true
+  const{data:ents}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','pendente');
+  if(!ents||!ents.length){alert('Nenhum pedido pendente para avisar.');return;}
+  for(const e of ents)await db.from('entregas').update({pedido_pronto:true}).eq('id',e.id);
+  alert('Aviso enviado! Os entregadores online serao notificados.');
+}
+
+// Calcular valor corrida baseado no endereco
+async function atualizarValorCorrida(){
+  const rua=v('p-rua'),num=v('p-nend'),bairro=v('p-bairro');
+  if(!rua){$('p-valor-corrida').classList.add('hidden');return;}
+  const endFull=fEnd(rua,num,bairro,v('p-cidade')||'Ribeirao Preto','');
+  const geo=await geocode(endFull);
+  if(!geo){$('p-valor-corrida').classList.add('hidden');return;}
+  const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
+  const dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);
+  const valor=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0);
+  $('p-valor-txt').textContent=fR(valor);
+  $('p-dist-txt').textContent='Distancia estimada: '+dist.toFixed(1)+' km';
+  $('p-valor-corrida').classList.remove('hidden');
+  window._pedidoGeo={lat:geo.lat,lng:geo.lng,dist,valor};
+}
+
 function abrirNovoPedido(){
   openM('pedido');
   $('ocr-input').value='';$('ocr-prev').classList.add('hidden');$('ocr-load').classList.add('hidden');
-  ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp'].forEach(id=>{const e=$(id);if(e)e.value='';});
-  $('p-cidade').value='Ribeirao Preto';clearM('ped-msg');
+  ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp','p-cod-conf'].forEach(id=>{const e=$(id);if(e)e.value='';});
+  $('p-cidade').value='Ribeirao Preto';clearM('ped-msg');$('p-valor-corrida').classList.add('hidden');
+  window._pedidoGeo=null;
 }
+
 async function lerComanda(event){
   const file=event.target.files[0];if(!file)return;
   const url=URL.createObjectURL(file);
   $('ocr-img').src=url;$('ocr-prev').classList.remove('hidden');
-  $('ocr-load').classList.remove('hidden');
-  $('ocr-fill').style.width='0%';$('ocr-pct').textContent='0%';
+  $('ocr-load').classList.remove('hidden');$('ocr-fill').style.width='0%';$('ocr-pct').textContent='0%';
   try{
     const{data:{text}}=await Tesseract.recognize(file,'por',{
-      logger:m=>{
-        if(m.status==='recognizing text'){
-          const p=Math.round(m.progress*100);
-          $('ocr-fill').style.width=p+'%';$('ocr-pct').textContent=p+'%';
-        }
-      }
+      logger:m=>{if(m.status==='recognizing text'){const p=Math.round(m.progress*100);$('ocr-fill').style.width=p+'%';$('ocr-pct').textContent=p+'%';}}
     });
     $('ocr-load').classList.add('hidden');
     parseOcr(text);
-  }catch(err){$('ocr-load').classList.add('hidden');console.warn('OCR:',err);}
+  }catch(err){$('ocr-load').classList.add('hidden');}
 }
+
 function parseOcr(text){
-  const full=text.replace(/\n/g,' ');
-  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  // Numero pedido
-  const pm=full.match(/(?:pedido|ordem|n[?o]\.?|#)\s*:?\s*([A-Z0-9\-]{3,12})/i)||full.match(/\b(\d{3,6})\b/);
-  if(pm)$('p-num').value=pm[1];
+  const linhas=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const full=text;
+  // Pedido numero
+  const pm=full.match(/(?:pedido|order|nro?|numero|#|cod)\.?\s*:?\s*([A-Z0-9\-]{3,15})/i)||full.match(/\b(\d{3,6})\b/);
+  if(pm&&pm[1])$('p-num').value=pm[1];
   // Telefone
-  const tm=full.match(/\(?\d{2}\)?\s*9?\d{4}[\s\-]?\d{4}/);
-  if(tm)$('p-tel').value=tm[0].replace(/[\s\-]/g,'');
-  // Nome cliente
-  for(let i=0;i<lines.length;i++){
-    if(/cliente|nome|entregar/i.test(lines[i])&&lines[i+1]&&lines[i+1].length>2&&lines[i+1].length<50){
-      $('p-cli').value=lines[i+1];break;
+  const tel=full.match(/(?:\(?\d{2}\)?[\s\-]?)?(?:9[\s\-]?\d{4}|[2-9]\d{3})[\s\-]?\d{4}/);
+  if(tel)$('p-tel').value=tel[0].replace(/[^\d]/g,'');
+  // Rua
+  const ruaM=full.match(/(?:rua|r\.\s|av(?:enida)?\.?\s|avenida\s|alameda\s|al\.\s|travessa\s|tv\.\s)([^,\n\r]{3,40})[,\s]+n?[°o]?[\s]*?(\d{1,6})/i);
+  if(ruaM){$('p-rua').value=ruaM[0].match(/^[\w\s\.]+/)[0].trim();$('p-nend').value=ruaM[2];}
+  // Bairro
+  const bairroM=full.match(/(?:bairro|bro\.?)\s*:?\s*([\w\s]{3,30})/i);
+  if(bairroM)$('p-bairro').value=bairroM[1].trim().split('\n')[0];
+  // Nome cliente - linha apos "cliente", "entregar", "destinatario"
+  for(let i=0;i<linhas.length;i++){
+    if(/(?:cliente|para|entregar|destinat)/i.test(linhas[i])&&linhas[i+1]&&linhas[i+1].length>2&&linhas[i+1].length<60&&!/rua|av\.?|\d{4}/i.test(linhas[i+1])){
+      $('p-cli').value=linhas[i+1];break;
     }
   }
-  // Endereco
-  const em=full.match(/(rua|r\.|av\.?|avenida|alameda|al\.|travessa)\s+([^,\n]+?),?\s*(\d+)/i);
-  if(em){$('p-rua').value=em[1]+' '+em[2].trim();$('p-nend').value=em[3];}
-  // Bairro
-  const bm=full.match(/(?:bairro|bro)\s*:?\s*([A-Za-z\s]{3,30})/i);
-  if(bm)$('p-bairro').value=bm[1].trim();
   // Complemento
-  const cm=full.match(/(?:apto?|apartamento|bloco|torre|sala|loja)\.?\s+[\w\d]+/i);
-  if(cm)$('p-comp').value=cm[0];
+  const compM=full.match(/(?:apto?\.?|apartamento|bloco|torre|sala|loja|casa)\s+[\w\d]+/i);
+  if(compM)$('p-comp').value=compM[0];
+  // Tentar calcular corrida apos OCR
+  setTimeout(atualizarValorCorrida,500);
 }
+
 async function salvarPedido(){
-  const rua=v('p-rua');if(!rua){showM('ped-msg','Informe a rua');return;}
+  const rua=v('p-rua');if(!rua){showM('ped-msg','Informe a rua de entrega');return;}
   const num=v('p-nend'),bairro=v('p-bairro'),cidade=v('p-cidade')||'Ribeirao Preto',comp=v('p-comp');
+  const geo=window._pedidoGeo;
+  const valor=geo?geo.valor:(U.taxa_entrega||0);
+  const dist=geo?geo.dist:0;
   const dados={
-    loja_id:U.id,numero_pedido:v('p-num'),cliente_nome:v('p-cli'),cliente_telefone:v('p-tel'),
+    loja_id:U.id,
+    numero_pedido:v('p-num'),cliente_nome:v('p-cli'),cliente_telefone:v('p-tel'),
     endereco_entrega:fEnd(rua,num,bairro,cidade,comp),
     endereco_rua:rua,endereco_numero:num,endereco_bairro:bairro,endereco_cidade:cidade,endereco_complemento:comp,
-    valor_sistema:parseFloat(U.taxa_sistema||0),valor_entregador:parseFloat(U.taxa_entrega||0),
-    status:'pendente',ordem_rota:99
+    valor_sistema:parseFloat(U.taxa_sistema||0),
+    valor_entregador:parseFloat(valor),
+    valor_corrida:parseFloat(valor),
+    distancia_km:parseFloat(dist),
+    lat_entrega:geo?geo.lat:null,lng_entrega:geo?geo.lng:null,
+    status:'pendente',status_detalhado:'pendente',ordem_rota:99,
+    pedido_pronto:false,
+    codigo_confirmacao:v('p-cod-conf')
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){showM('ped-msg','Erro: '+error.message);return;}
-  showM('ped-msg','Pedido salvo!',true);
+  showM('ped-msg','Pedido salvo! '+fR(valor),true);
   const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
-  setTimeout(()=>closeM('pedido'),1200);
+  setTimeout(()=>closeM('pedido'),1300);
+}
+
+// ===== ROTA INTELIGENTE POR DIRECAO =====
+async function otimizarRotaInteligente(){
+  const{data:peds}=await db.from('entregas').select('*').eq('loja_id',U.id).eq('status','pendente').order('created_at');
+  if(!peds||!peds.length){alert('Sem pedidos pendentes.');return;}
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id).eq('status','ativo');
+  const onlineEnts=(assoc||[]).filter(a=>a.e&&a.e.online);
+  if(!onlineEnts.length){alert('Nenhum entregador online vinculado.');return;}
+  // Verificar quais entregadores estao livres (sem pedidos em_rota)
+  const livres=[];
+  for(const a of onlineEnts){
+    const{data:rotaAtiva}=await db.from('entregas').select('id').eq('entregador_id',a.entregador_id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).limit(1);
+    if(!rotaAtiva||!rotaAtiva.length)livres.push(a);
+  }
+  if(!livres.length){alert('Todos os entregadores ja estao com rota ativa. Aguarde eles finalizarem.');return;}
+  // Geocode pedidos sem lat
+  const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
+  const pedsGeo=[];
+  for(const p of peds){
+    let lat=p.lat_entrega,lng=p.lng_entrega;
+    if(!lat||!lng){
+      const g=await geocode(p.endereco_entrega);
+      if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}
+    }
+    if(lat&&lng)pedsGeo.push({...p,lat,lng,dist:distKm(lojaLat,lojaLng,lat,lng),ang:angleDeg(lojaLat,lojaLng,lat,lng)});
+    else pedsGeo.push({...p,lat:lojaLat,lng:lojaLng,dist:0,ang:0}); // fallback
+  }
+  // Agrupar por setor de 60 graus
+  const setores={};
+  pedsGeo.forEach(p=>{
+    const s=Math.floor((p.ang+180)/60);
+    if(!setores[s])setores[s]=[];
+    setores[s].push(p);
+  });
+  // Ordenar cada setor por distancia crescente
+  Object.values(setores).forEach(s=>s.sort((a,b)=>a.dist-b.dist));
+  const grupos=Object.values(setores);
+  // Distribuir grupos entre entregadores livres
+  let ordem=1,entIdx=0;
+  for(const grupo of grupos){
+    const eid=livres[entIdx%livres.length].entregador_id;
+    const ent=livres[entIdx%livres.length].e;
+    entIdx++;
+    for(const p of grupo){
+      await db.from('entregas').update({entregador_id:eid,status:'aceito',status_detalhado:'aceito',ordem_rota:ordem,pedido_pronto:true,aceito_at:new Date().toISOString()}).eq('id',p.id);
+      ordem++;
+    }
+  }
+  alert('Rota otimizada por direcao e distribuida entre '+(entIdx)+ ' entregador(es)!');
+  carregarPedidos();
 }
 
 async function abrirPedidosLj(){openM('rota');carregarPedidos();}
 async function carregarPedidos(){
   $('rota-lst').innerHTML='<p>Carregando...</p>';
-  const{data}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',U.id).neq('status','entregue').order('ordem_rota');
+  const{data}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',U.id).neq('status','entregue').neq('status','cancelado').order('ordem_rota');
   if(!data||!data.length){$('rota-lst').innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem pedidos. Use "Novo Pedido".</p>';return;}
-  $('rota-lst').innerHTML=data.map((e,i)=>`
-    <div class="ecard ${e.status==='em_rota'?'rota':''}">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+  // Buscar entregadores disponiveis
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id).eq('status','ativo');
+  const onlineList=(assoc||[]).filter(a=>a.e&&a.e.online);
+  $('rota-lst').innerHTML=data.map((e,i)=>{
+    const stDet=e.status_detalhado||e.status;
+    const steps=['pendente','aceito','chegou_loja','saiu_entrega','entregue'];
+    const curIdx=steps.indexOf(stDet);
+    const stepsHtml=steps.slice(0,4).map((st,idx)=>`<div class="sf-step ${idx<curIdx?'done':idx===curIdx?'current':''}">${['Pendente','Aceito','Na Loja','A Caminho'][idx]}</div>`).join('');
+    const entOptions=onlineList.map(a=>`<option value="${a.entregador_id}" ${e.entregador_id===a.entregador_id?'selected':''}>${a.e.nome}</option>`).join('');
+    return `<div class="ecard ${e.status==='em_rota'||e.status==='aceito'?'rota':''}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
         <strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
-        <span class="badge b-${e.status}">${e.status}</span>
+        <span class="badge b-${stDet}">${stDet}</span>
       </div>
-      <p style="font-size:13px;color:#555">&#128205; ${e.endereco_entrega}</p>
-      ${e.cliente_nome?`<p style="font-size:12px;color:#888">&#128100; ${e.cliente_nome}${e.cliente_telefone?' | '+e.cliente_telefone:''}</p>`:''}
-      ${e.entregador?`<p style="font-size:12px;color:#004E89">&#128757; ${e.entregador.nome}</p>`:''}
-      <div class="row" style="margin-top:7px">
+      <div class="status-flow">${stepsHtml}</div>
+      <p style="font-size:12px;color:#555;margin:3px 0;">&#128205; ${e.endereco_entrega}</p>
+      ${e.cliente_nome?`<p style="font-size:11px;color:#888;">&#128100; ${e.cliente_nome}${e.cliente_telefone?' | '+e.cliente_telefone:''}</p>`:''}
+      ${e.distancia_km>0?`<p style="font-size:11px;color:#888;">&#128205; ${parseFloat(e.distancia_km).toFixed(1)}km | ${fR(e.valor_corrida||e.valor_entregador)}</p>`:''}
+      ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">&#128273; Cod. Conf: ${e.codigo_confirmacao}</p>`:''}
+      ${e.status==='pendente'?`<div style="margin-top:6px;"><label style="font-size:11px;font-weight:700;color:#555;">Atribuir a:</label><select class="ent-select" onchange="atribuirEnt('${e.id}',this.value)"><option value="">Selecione entregador...</option>${entOptions}</select></div>`:''}
+      ${e.entregador?`<p style="font-size:11px;color:#004E89;margin-top:4px;">&#128757; ${e.entregador.nome}</p>`:''}
+      <div class="row" style="margin-top:7px;flex-wrap:wrap;">
         <button class="btn-sm green" onclick="marcarEnt('${e.id}')">&#10003; Entregue</button>
         <button class="btn-sm red" onclick="cancelarEnt('${e.id}')">Cancelar</button>
+        ${e.status==='pendente'?`<button class="btn-sm orange" onclick="avisarPedidoPronto()">&#128226; Pronto</button>`:''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
-async function otimizarRota(){
-  const{data}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','pendente').order('created_at');
-  if(!data||!data.length){alert('Sem pedidos pendentes.');return;}
-  for(let i=0;i<data.length;i++)await db.from('entregas').update({ordem_rota:i+1}).eq('id',data[i].id);
-  alert('Rota organizada!');carregarPedidos();
+
+async function atribuirEnt(pedId,entId){
+  if(!entId)return;
+  await db.from('entregas').update({entregador_id:entId,status:'aceito',status_detalhado:'aceito',aceito_at:new Date().toISOString(),pedido_pronto:true}).eq('id',pedId);
+  carregarPedidos();
 }
-async function enviarRota(){
-  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id).eq('status','ativo');
-  const on=(assoc||[]).filter(a=>a.e&&a.e.online);
-  if(!on.length){alert('Nenhum entregador online vinculado.');return;}
-  const{data:ents}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','pendente');
-  if(!ents||!ents.length){alert('Sem pedidos pendentes.');return;}
-  const eid=on[0].entregador_id;
-  for(const e of ents)await db.from('entregas').update({entregador_id:eid,status:'em_rota'}).eq('id',e.id);
-  alert(`Rota enviada para ${on[0].e.nome}!`);carregarPedidos();
-}
+
 async function marcarEnt(id){
-  await db.from('entregas').update({status:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
+  await db.from('entregas').update({status:'entregue',status_detalhado:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
   carregarPedidos();
   const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
 }
-async function cancelarEnt(id){if(!confirm('Cancelar?'))return;await db.from('entregas').delete().eq('id',id);carregarPedidos();}
+async function cancelarEnt(id){if(!confirm('Cancelar esta entrega?'))return;await db.from('entregas').update({status:'cancelado',status_detalhado:'cancelado'}).eq('id',id);carregarPedidos();}
 
 async function abrirRelLj(){openM('rel');carregarRel();}
 async function carregarRel(){
@@ -709,29 +1152,34 @@ async function carregarRel(){
   const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',U.id).gte('created_at',iPer(p));
   if(!ents||!ents.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas.</p>';return;}
   const tS=ents.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
-  const tE=ents.reduce((s,e)=>s+parseFloat(e.valor_entregador||0),0);
+  const tE=ents.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
   const pE={};
-  ents.forEach(e=>{const k=e.entregador_id||'sem';if(!pE[k])pE[k]={nome:e.entregador?e.entregador.nome:'Sem entregador',lista:[],total:0};pE[k].lista.push(e);pE[k].total+=parseFloat(e.valor_entregador||0);});
+  ents.forEach(e=>{const k=e.entregador_id||'sem';if(!pE[k])pE[k]={nome:e.entregador?e.entregador.nome:'Sem entregador',lista:[],total:0};pE[k].lista.push(e);pE[k].total+=parseFloat(e.valor_corrida||e.valor_entregador||0);});
   el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:#fff3e0;padding:10px;border-radius:8px;text-align:center"><p style="font-size:10px;color:#888">Entregas</p><p style="font-size:22px;font-weight:700;color:#FF6B35">${ents.length}</p></div>
-      <div style="background:#e3f2fd;padding:10px;border-radius:8px;text-align:center"><p style="font-size:10px;color:#888">Sistema</p><p style="font-size:14px;font-weight:700;color:#004E89">${fR(tS)}</p></div>
-      <div style="background:#e8f5e9;padding:10px;border-radius:8px;text-align:center"><p style="font-size:10px;color:#888">Entregad.</p><p style="font-size:14px;font-weight:700;color:#00C9A7">${fR(tE)}</p></div>
+    <div class="g3" style="margin-bottom:13px;">
+      <div style="text-align:center;padding:10px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888">Entregas</p><p style="font-size:20px;font-weight:700;color:#FF6B35">${ents.length}</p></div>
+      <div style="text-align:center;padding:10px;background:#e3f2fd;border-radius:8px;"><p style="font-size:10px;color:#888">Sistema</p><p style="font-size:13px;font-weight:700;color:#004E89">${fR(tS)}</p></div>
+      <div style="text-align:center;padding:10px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888">Entregad.</p><p style="font-size:13px;font-weight:700;color:#00C9A7">${fR(tE)}</p></div>
     </div>
     ${Object.values(pE).map(g=>`
       <div class="secao"><div class="s-title">&#128757; ${g.nome} &mdash; ${fR(g.total)}</div>
-      ${g.lista.map((e,i)=>`<div style="padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
-        <div style="display:flex;justify-content:space-between"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Ent '+(i+1)}</strong><span class="badge b-${e.status}">${e.status}</span></div>
+      ${g.lista.map((e,i)=>`<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
+        <div style="display:flex;justify-content:space-between;">
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Ent '+(i+1)}</strong>
+          <span style="font-weight:700;color:#2e7d32;">${fR(e.valor_corrida||e.valor_entregador)}</span>
+        </div>
         <p style="color:#555;margin:2px 0">&#128205; ${e.endereco_entrega}</p>
-        <p style="color:#999;font-size:12px">Sist:${fR(e.valor_sistema)} | Ent:${fR(e.valor_entregador)}</p>
-      </div>`).join('')}</div>`).join('')}`;
+        ${e.distancia_km>0?`<p style="color:#888">${parseFloat(e.distancia_km).toFixed(1)}km</p>`:''}
+        <span class="badge b-${e.status}">${e.status}</span>
+      </div>`).join('')}
+      </div>`).join('')}`;
 }
 
 async function abrirGerEnt(){openM('ger');$('ger-cod').textContent=U.codigo_loja||'------';carregarGer();}
 async function carregarGer(){
   $('ger-lst').innerHTML='<p>Carregando...</p>';
   const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(id,nome,telefone,placa_moto,online)').eq('loja_id',U.id);
-  if(!assoc||!assoc.length){$('ger-lst').innerHTML='<p style="color:#999;margin-top:10px">Nenhum vinculado ainda.</p>';return;}
+  if(!assoc||!assoc.length){$('ger-lst').innerHTML='<p style="color:#999;margin-top:9px">Nenhum entregador vinculado ainda.</p>';return;}
   $('ger-lst').innerHTML=assoc.map(a=>`
     <div class="litem">
       <div style="flex:1"><strong>${a.e?a.e.nome:'Removido'}</strong> <span class="badge ${a.e&&a.e.online?'b-online':'b-offline'}">${a.e&&a.e.online?'Online':'Offline'}</span><br>
@@ -767,58 +1215,125 @@ async function salvarCfgLj(){
   $('loja-nome').textContent=d.nome_loja||U.nome;showM('cfg-lj-msg','Salvo!',true);setTimeout(()=>closeM('cfg-lj'),1500);
 }
 
-// ENTREGADOR
+// ============ ENTREGADOR ============
 async function initEnt(){
   const{data}=await db.from('usuarios').select('*').eq('id',U.id).single();
   if(data){U={...U,...data};localStorage.setItem('u',JSON.stringify(U));}
-  $('ent-nome').textContent=U.nome;atuBtnOn(U.online);
+  $('ent-nome').textContent=U.nome;
+  $('ent-st').textContent=U.online?'&#128994; Online':'&#9899; Offline';
+  atuBtnOn(U.online);
   if(U.foto_url){$('foto-img').src=U.foto_url;$('foto-img').classList.remove('hidden');$('foto-ph').classList.add('hidden');}
-  const{data:e}=await db.from('entregas').select('id,valor_entregador').eq('entregador_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
+  // Entregas hoje
+  const{data:e}=await db.from('entregas').select('id,valor_corrida,valor_entregador').eq('entregador_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
   $('ent-cnt').textContent=e?e.length:0;
-  const g=e?e.reduce((s,x)=>s+parseFloat(x.valor_entregador||0),0):0;
+  const g=e?e.reduce((s,x)=>s+parseFloat(x.valor_corrida||x.valor_entregador||0),0):0;
   $('ent-gnh').textContent=fR(g);
+  // Lojas vinculadas
+  await carregarLojaAtiva();
   if(U.online)inicRast();
-  carregarMinhasLojas();
+  // Polling alertas
+  ivs.alerta=setInterval(verificarAlertas,8000);
+  verificarAlertas();
+  // Notif rota
+  verificarRotaAtiva();
 }
-async function carregarMinhasLojas(){
-  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).eq('status','ativo');
-  const el=$('minhas-lojas');
-  if(!assoc||!assoc.length){el.innerHTML='<p style="font-size:13px;color:#999">Nenhuma loja vinculada ainda.</p>';return;}
-  el.innerHTML=assoc.map(a=>`<span class="badge b-em_rota" style="margin:3px">&#127978; ${a.l?(a.l.nome_loja||a.l.nome):'Loja'}</span>`).join('');
+
+async function carregarLojaAtiva(){
+  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome)').eq('entregador_id',U.id).eq('status','ativo');
+  const entBox=$('ent-conectar-box'),selBox=$('ent-selecionar-loja-box'),infoBox=$('ent-loja-ativa-info');
+  if(!assoc||!assoc.length){
+    infoBox.innerHTML='<p style="font-size:12px;color:#999">Sem loja vinculada. Conecte abaixo.</p>';
+    selBox.classList.add('hidden');return;
+  }
+  // Verificar loja ativa atual
+  if(U.loja_ativa_id){
+    const lojaAtiva=assoc.find(a=>a.loja_id===U.loja_ativa_id);
+    if(lojaAtiva&&lojaAtiva.l){
+      infoBox.innerHTML=`<span class="badge b-em_rota">&#127978; ${lojaAtiva.l.nome_loja||lojaAtiva.l.nome}</span>`;
+      selBox.classList.add('hidden');return;
+    }
+  }
+  if(assoc.length===1){
+    // Apenas uma loja, definir automaticamente
+    await db.from('usuarios').update({loja_ativa_id:assoc[0].loja_id}).eq('id',U.id);
+    U.loja_ativa_id=assoc[0].loja_id;localStorage.setItem('u',JSON.stringify(U));
+    infoBox.innerHTML=`<span class="badge b-em_rota">&#127978; ${assoc[0].l?assoc[0].l.nome_loja||assoc[0].l.nome:'Loja'}</span>`;
+    selBox.classList.add('hidden');
+  }else{
+    // Multiplas lojas: pedir para escolher ao ficar online
+    infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;">&#9888; Voce esta vinculado a mais de uma loja. Selecione com qual vai trabalhar ao ficar online.</p>`;
+    const sel=$('ent-sel-loja-ativa');sel.innerHTML='';
+    assoc.forEach(a=>sel.innerHTML+=`<option value="${a.loja_id}">${a.l?a.l.nome_loja||a.l.nome:'Loja'}</option>`);
+    selBox.classList.remove('hidden');
+  }
 }
-async function conectarCodigo(){
-  const cod=v('cod-loja-inp').toUpperCase();const msg=$('msg-cod');
-  if(cod.length<4){msg.className='msg-error';msg.textContent='Digite o codigo';return;}
-  const{data:loja}=await db.from('usuarios').select('id,nome_loja,nome').eq('codigo_loja',cod).eq('tipo','loja').single();
-  if(!loja){msg.className='msg-error';msg.textContent='Codigo nao encontrado. Confirme com a loja.';return;}
-  const{error}=await db.from('loja_entregadores').insert([{loja_id:loja.id,entregador_id:U.id}]);
-  if(error&&error.code==='23505'){msg.className='msg-error';msg.textContent='Voce ja esta vinculado a esta loja.';return;}
-  if(error){msg.className='msg-error';msg.textContent='Erro: '+error.message;return;}
-  msg.className='msg-ok';msg.textContent='Conectado a '+(loja.nome_loja||loja.nome)+'!';
-  $('cod-loja-inp').value='';setTimeout(()=>{msg.textContent='';},3000);carregarMinhasLojas();
+
+async function confirmarLojaAtiva(){
+  const lid=v('ent-sel-loja-ativa');if(!lid)return;
+  await db.from('usuarios').update({loja_ativa_id:lid,online:true}).eq('id',U.id);
+  U.loja_ativa_id=lid;U.online=true;localStorage.setItem('u',JSON.stringify(U));
+  atuBtnOn(true);inicRast();await carregarLojaAtiva();
 }
+
+async function verificarAlertas(){
+  if(!U)return;
+  // Verificar pedido pronto para este entregador
+  const{data:peds}=await db.from('entregas').select('id').eq('entregador_id',U.id).eq('pedido_pronto',true).in('status',['aceito','em_rota']).limit(1);
+  const alerta=$('ent-pedido-alerta');
+  if(peds&&peds.length){
+    if(alerta.classList.contains('hidden')){
+      alerta.classList.remove('hidden');beepAlerta();
+      $('rota-notif').classList.remove('hidden');
+    }
+  }else{
+    alerta.classList.add('hidden');$('rota-notif').classList.add('hidden');
+  }
+}
+
+async function verificarRotaAtiva(){
+  const{data:rota}=await db.from('entregas').select('id').eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).limit(1);
+  if(rota&&rota.length)$('rota-notif').classList.remove('hidden');
+  else $('rota-notif').classList.add('hidden');
+}
+
 function atuBtnOn(on){
   const c=$('btn-on-card');
-  if(on){c.style.background='linear-gradient(135deg,#00C9A7,#007a65)';$('ico-on').innerHTML='&#128308;';$('txt-on').textContent='Ficar Offline';$('txt-on').style.color='white';$('ent-st').textContent='&#128994; Online';}
-  else{c.style.background='';$('ico-on').innerHTML='&#128994;';$('txt-on').textContent='Ficar Online';$('txt-on').style.color='';$('ent-st').textContent='&#9899; Offline';}
+  if(on){c.style.background='linear-gradient(135deg,#00C9A7,#007a65)';$('ico-on').innerHTML='&#128308;';$('txt-on').textContent='Ficar Offline';$('txt-on').style.color='white';$('ent-st').innerHTML='&#128994; Online';}
+  else{c.style.background='';$('ico-on').innerHTML='&#128994;';$('txt-on').textContent='Ficar Online';$('txt-on').style.color='';$('ent-st').innerHTML='&#9899; Offline';}
 }
+
 async function toggleOnline(){
+  // Se tem multiplas lojas e nao tem loja ativa, mostrar seletor
+  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).eq('status','ativo');
+  if(!assoc||!assoc.length){alert('Voce precisa estar vinculado a uma loja primeiro.');return;}
+  if(!U.online&&assoc.length>1&&!U.loja_ativa_id){
+    $('ent-selecionar-loja-box').classList.remove('hidden');return;
+  }
   const novo=!U.online;
-  await db.from('usuarios').update({online:novo}).eq('id',U.id);
-  U.online=novo;localStorage.setItem('u',JSON.stringify(U));atuBtnOn(novo);
+  await db.from('usuarios').update({online:novo,loja_ativa_id:novo?U.loja_ativa_id:null}).eq('id',U.id);
+  U.online=novo;if(!novo)U.loja_ativa_id=null;
+  localStorage.setItem('u',JSON.stringify(U));
+  atuBtnOn(novo);
   if(novo)inicRast();else{if(ivs.rast){clearInterval(ivs.rast);ivs.rast=null;}}
+  if(!novo)carregarLojaAtiva();
 }
+
 function inicRast(){
   if(ivs.rast)clearInterval(ivs.rast);
   const fn=()=>{
     if(!U||!U.online)return;
     navigator.geolocation&&navigator.geolocation.getCurrentPosition(
-      p=>db.from('usuarios').update({latitude:p.coords.latitude,longitude:p.coords.longitude}).eq('id',U.id),
-      ()=>{},{enableHighAccuracy:true,timeout:12000}
+      p=>{
+        myLat=p.coords.latitude;myLng=p.coords.longitude;gpsOk=true;
+        db.from('usuarios').update({latitude:p.coords.latitude,longitude:p.coords.longitude}).eq('id',U.id);
+        $('gps-banner').classList.add('hidden');
+      },
+      ()=>{$('gps-banner').classList.remove('hidden');},{enableHighAccuracy:true,timeout:12000}
     );
   };
-  fn();ivs.rast=setInterval(fn,20000);
+  fn();ivs.rast=setInterval(fn,15000);
 }
+
 function abrirFoto(){$('input-foto').click();}
 async function uploadFoto(event){
   const file=event.target.files[0];if(!file)return;
@@ -831,53 +1346,110 @@ async function uploadFoto(event){
   };
   reader.readAsDataURL(file);
 }
+
+async function conectarCodigo(){
+  const cod=v('cod-loja-inp').toUpperCase();const msg=$('msg-cod');
+  if(cod.length<4){msg.className='msg-error';msg.textContent='Digite o codigo';return;}
+  // Verificar se ja tem loja ativa
+  if(U.loja_ativa_id&&U.online){msg.className='msg-error';msg.textContent='Fique offline antes de conectar a outra loja.';return;}
+  const{data:loja}=await db.from('usuarios').select('id,nome_loja,nome').eq('codigo_loja',cod).eq('tipo','loja').single();
+  if(!loja){msg.className='msg-error';msg.textContent='Codigo nao encontrado.';return;}
+  const{error}=await db.from('loja_entregadores').insert([{loja_id:loja.id,entregador_id:U.id}]);
+  if(error&&error.code==='23505'){msg.className='msg-error';msg.textContent='Voce ja esta vinculado a esta loja.';return;}
+  if(error){msg.className='msg-error';msg.textContent='Erro: '+error.message;return;}
+  msg.className='msg-ok';msg.textContent='Conectado a '+(loja.nome_loja||loja.nome)+'!';
+  $('cod-loja-inp').value='';setTimeout(()=>{msg.textContent='';},3000);
+  // Se for a primeira loja, definir como ativa
+  if(!U.loja_ativa_id){
+    await db.from('usuarios').update({loja_ativa_id:loja.id}).eq('id',U.id);
+    U.loja_ativa_id=loja.id;localStorage.setItem('u',JSON.stringify(U));
+  }
+  carregarLojaAtiva();
+}
+
+// ===== ROTA ENTREGADOR COM STATUS GPS =====
 async function abrirRotaEnt(){
   openM('rota-ent');
-  const{data}=await db.from('entregas').select('*').eq('entregador_id',U.id).eq('status','em_rota').order('ordem_rota');
-  if(!data||!data.length){$('rota-ent-lst').innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega atribuida.</p>';return;}
+  // Marcar como visto (remover alerta)
+  await db.from('entregas').update({pedido_pronto:false}).eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']);
+  $('ent-pedido-alerta').classList.add('hidden');$('rota-notif').classList.add('hidden');
+  carregarRotaEnt();
+}
+
+async function carregarRotaEnt(){
+  const{data}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)').eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente']).order('ordem_rota');
+  const el=$('rota-ent-lst');
+  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega atribuida.</p>';return;}
   const ends=data.map(e=>encodeURIComponent(e.endereco_entrega));
   const dest=ends[ends.length-1],wp=ends.slice(0,-1).join('|');
-  const url=`https://www.google.com/maps/dir/?api=1&destination=${dest}${wp?'&waypoints='+wp:''}&travelmode=driving`;
-  $('rota-ent-lst').innerHTML=`
-    <button class="btn btn-green" onclick="window.open('${url}','_blank')" style="margin-bottom:14px">&#127758; Abrir Rota no Maps</button>
-    ${data.map((e,i)=>`
-      <div class="ecard rota">
-        <strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><br>
-        <p style="font-size:13px;color:#555;margin:3px 0">&#128205; ${e.endereco_entrega}</p>
-        ${e.cliente_nome?`<p style="font-size:12px;color:#888">&#128100; ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89;font-weight:600">&#128222; ${e.cliente_telefone}</a>`:''}</p>`:''}
-        <div class="row" style="margin-top:7px">
-          <button class="btn-sm green" onclick="entMarcaEnt('${e.id}')">&#10003; Entregue</button>
-          <a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.endereco_entrega)}&travelmode=driving" target="_blank">
-            <button class="btn-sm blue" style="margin:0">&#127758; Ir</button>
-          </a>
-        </div>
-      </div>`).join('')}`;
+  const mapsUrl=`https://www.google.com/maps/dir/?api=1&destination=${dest}${wp?'&waypoints='+wp:''}&travelmode=driving`;
+  el.innerHTML=`<button class="btn btn-green" onclick="window.open('${mapsUrl}','_blank')" style="margin-bottom:12px">&#127758; Abrir Rota no Google Maps</button>`;
+  data.forEach((e,i)=>{
+    const st=e.status_detalhado||e.status;
+    const lojaLat=e.loja&&e.loja.loja_lat||RP_LAT,lojaLng=e.loja&&e.loja.loja_lng||RP_LNG;
+    const lojaEndereco=e.loja&&e.loja.endereco||'';
+    // Botoes de status
+    let botoesHtml='';
+    if(st==='aceito'||st==='pendente'){botoesHtml+=`<button class="btn-sm blue" onclick="entStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="margin:2px">&#127968; Cheguei na Loja</button>`;}
+    if(st==='chegou_loja'){botoesHtml+=`<button class="btn-sm orange" onclick="entStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="margin:2px">&#128757; Saindo para Entrega</button>`;}
+    if(st==='saiu_entrega'||st==='em_rota'){botoesHtml+=`<button class="btn-sm green" onclick="entStatus('${e.id}','entregue',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})" style="margin:2px">&#10003; Confirmar Entrega</button>`;}
+    const steps=['aceito','chegou_loja','saiu_entrega','entregue'];
+    const curI=steps.indexOf(st);
+    const flowHtml=steps.map((s,idx)=>`<div class="sf-step ${idx<curI?'done':idx===curI?'current':''}">${['Aceito','Na Loja','A Caminho','Entregue'][idx]}</div>`).join('');
+    el.innerHTML+=`<div class="ecard rota">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${st}">${st}</span></div>
+      <div class="status-flow">${flowHtml}</div>
+      <p style="font-size:12px;color:#555;margin:3px 0">&#128205; ${e.endereco_entrega}</p>
+      ${e.cliente_nome?`<p style="font-size:11px;color:#888">&#128100; ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89;font-weight:700">&#128222; ${e.cliente_telefone}</a>`:''}</p>`:''}
+      ${e.distancia_km>0?`<p style="font-size:11px;color:#888">&#128205; ${parseFloat(e.distancia_km).toFixed(1)}km | <strong style="color:#2e7d32">${fR(e.valor_corrida||e.valor_entregador)}</strong></p>`:''}
+      ${e.codigo_confirmacao?`<div style="background:#f3e5f5;padding:7px;border-radius:6px;margin:5px 0;"><p style="font-size:12px;font-weight:700;color:#6a1b9a;">&#128273; Codigo Ifood: ${e.codigo_confirmacao}</p><a href="https://ifood.com.br" target="_blank" style="font-size:11px;color:#004E89;">Confirmar no Ifood &#8599;</a></div>`:''}
+      <div class="row" style="margin-top:7px;flex-wrap:wrap;">${botoesHtml}<a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.endereco_entrega)}&travelmode=driving" target="_blank"><button class="btn-sm blue" style="margin:2px">&#127758; Ir</button></a></div>
+    </div>`;
+  });
 }
-async function entMarcaEnt(id){
-  await db.from('entregas').update({status:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
-  abrirRotaEnt();initEnt();
+
+async function entStatus(id,novoStatus,refLat,refLng){
+  const RAIO_M=300; // 300 metros de tolerancia
+  if(novoStatus==='chegou_loja'||novoStatus==='entregue'){
+    if(!gpsOk||!myLat||!myLng){
+      alert('GPS nao disponivel. Ative o GPS para confirmar esta acao.');return;
+    }
+    const dist=distKm(myLat,myLng,refLat,refLng)*1000; // metros
+    if(dist>RAIO_M){
+      alert('Voce precisa estar a menos de '+RAIO_M+'m do local para confirmar.\nDistancia atual: '+Math.round(dist)+'m');return;
+    }
+  }
+  const upd={status_detalhado:novoStatus};
+  if(novoStatus==='chegou_loja')upd.chegou_loja_at=new Date().toISOString();
+  if(novoStatus==='saiu_entrega'){upd.saiu_entrega_at=new Date().toISOString();upd.status='em_rota';}
+  if(novoStatus==='entregue'){upd.status='entregue';upd.entregue_at=new Date().toISOString();upd.pedido_pronto=false;}
+  await db.from('entregas').update(upd).eq('id',id);
+  carregarRotaEnt();initEnt();
 }
+
 async function abrirGanhosEnt(){openM('ganhos');carregarGanhos();}
 async function carregarGanhos(){
   const p=$('gnh-f').value,el=$('gnh-dados');el.innerHTML='<p>Carregando...</p>';
-  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',iPer(p));
-  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas.</p>';return;}
-  const tot=data.reduce((s,e)=>s+parseFloat(e.valor_entregador||0),0);
-  el.innerHTML=`
-    <div style="background:#e8f5e9;padding:16px;border-radius:12px;text-align:center;margin-bottom:14px">
-      <p style="font-size:12px;color:#666">Total do periodo</p>
-      <p style="font-size:32px;font-weight:700;color:#2e7d32">${fR(tot)}</p>
-      <p style="font-size:13px;color:#666">${data.length} entrega(s)</p>
-    </div>
-    ${data.map((e,i)=>`<div style="padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
-      <div style="display:flex;justify-content:space-between"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Ent '+(i+1)}</strong><strong style="color:#2e7d32">${fR(e.valor_entregador)}</strong></div>
-      <p style="color:#888">&#127978; ${e.l?(e.l.nome_loja||e.l.nome):'Loja'}</p>
-      <p style="color:#555">&#128205; ${e.endereco_entrega}</p>
-      <span class="badge b-${e.status}">${e.status}</span>
-    </div>`).join('')}`;
+  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',iPer(p)).in('status',['entregue','em_rota','saiu_entrega','chegou_loja','aceito']);
+  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no periodo.</p>';return;}
+  const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  el.innerHTML=`<div style="background:#e8f5e9;padding:14px;border-radius:11px;text-align:center;margin-bottom:13px;">
+    <p style="font-size:11px;color:#666">Total do periodo</p>
+    <p style="font-size:30px;font-weight:700;color:#2e7d32">${fR(tot)}</p>
+    <p style="font-size:12px;color:#666">${data.length} entrega(s)</p>
+  </div>
+  ${data.map((e,i)=>`<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
+    <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Ent '+(i+1)}</strong><strong style="color:#2e7d32">${fR(e.valor_corrida||e.valor_entregador)}</strong></div>
+    <p style="color:#888">&#127978; ${e.l?e.l.nome_loja||e.l.nome:'Loja'}</p>
+    <p style="color:#555">&#128205; ${e.endereco_entrega}</p>
+    ${e.distancia_km>0?`<p style="color:#888">${parseFloat(e.distancia_km).toFixed(1)} km</p>`:''}
+    <span class="badge b-${e.status}">${e.status}</span>
+  </div>`).join('')}`;
 }
+
 async function abrirCfgEnt(){
-  openM('cfg-ent');$('ent-nome2').value=U.nome||'';$('ent-tel2').value=U.telefone||'';$('ent-plc').value=U.placa_moto||'';$('ent-pix').value=U.chave_pix||'';$('ent-sen').value='';clearM('ent-cfg-msg');
+  openM('cfg-ent');
+  $('ent-nome2').value=U.nome||'';$('ent-tel2').value=U.telefone||'';$('ent-plc').value=U.placa_moto||'';$('ent-pix').value=U.chave_pix||'';$('ent-sen').value='';clearM('ent-cfg-msg');
 }
 async function salvarCfgEnt(){
   const d={nome:v('ent-nome2'),telefone:v('ent-tel2'),placa_moto:v('ent-plc'),chave_pix:v('ent-pix')};
