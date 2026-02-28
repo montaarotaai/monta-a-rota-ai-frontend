@@ -192,15 +192,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
           <div id="adm-gps-toggle-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:white;transition:left .3s;box-shadow:0 1px 3px rgba(0,0,0,.3);"></div>
         </div>
       </div>
-      <!-- SQL Fix Button -->
-      <div class="secao" style="background:#fce4ec;border:1.5px solid #f48fb1;padding:10px 14px;">
-        <div style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:6px;">🔧 Se GPS não aparece no mapa:</div>
-        <div style="font-size:11px;color:#555;margin-bottom:8px;">Execute este SQL no Supabase (SQL Editor):</div>
-        <div style="background:#1e1e2e;color:#a6e3a1;font-family:monospace;font-size:10px;padding:8px;border-radius:6px;white-space:pre-wrap;user-select:all;">ALTER TABLE usuarios DISABLE ROW LEVEL SECURITY;
-ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
-ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;</div>
-        <button onclick="navigator.clipboard.writeText('ALTER TABLE usuarios DISABLE ROW LEVEL SECURITY;\nALTER TABLE usuarios ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;\nALTER TABLE usuarios ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;').then(()=>alert('SQL copiado! Cole no Supabase SQL Editor.'))" style="margin-top:7px;background:#c62828;color:white;border:none;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;width:100%;">📋 Copiar SQL para corrigir GPS</button>
-      </div>
+
       <div class="secao">
         <div class="s-title">&#128230; Entregas em Tempo Real</div>
         <div id="adm-entregas-realtime"></div>
@@ -437,6 +429,17 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;</div>
 </div></div>
 
 <!-- Pedidos/Rota Loja -->
+<!-- Modal Plano de Rota -->
+<div id="m-rota-plano" class="modal"><div class="modal-box">
+  <button class="modal-close" onclick="closeM('rota-plano')">&times;</button>
+  <h2 style="margin-bottom:4px;">🗺️ Plano de Rota</h2>
+  <p style="font-size:12px;color:#888;margin-bottom:12px;">Escolha qual entregador faz cada grupo de entregas</p>
+  <div id="rota-plano-body"></div>
+  <div style="margin-top:12px;">
+    <button class="btn btn-primary" onclick="confirmarRotaPlano()" id="btn-confirmar-rota">✅ Confirmar e Despachar</button>
+  </div>
+</div></div>
+
 <div id="m-rota" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('rota')">&times;</button>
   <h2 style="margin-bottom:9px;">&#128230; Pedidos e Rota</h2>
@@ -762,10 +765,16 @@ function criarMapa(tipo){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(mapas[tipo]);
 }
 
-function icoEnt(nome,tel){
+function icoEnt(nome,tel,comPedido){
+  const bg=comPedido?'#1565C0':'#2e7d32'; // azul=com pedido, verde=livre
+  const emoji=comPedido?'&#128757;':'&#128757;';
+  const borda=comPedido?'#90CAF9':'#A5D6A7';
   return L.divIcon({
-    html:`<div style="position:relative;text-align:center;"><div style="background:#FF6B35;color:white;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);margin:0 auto;">&#128757;</div><div style="background:rgba(0,0,0,.75);color:white;font-size:9px;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-top:2px;max-width:90px;overflow:hidden;text-overflow:ellipsis;">${nome.split(' ')[0]}${tel?' | '+tel.slice(-4):''}</div></div>`,
-    iconSize:[90,52],iconAnchor:[45,34],className:''
+    html:`<div style="position:relative;text-align:center;">
+      <div style="background:${bg};color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:17px;border:3px solid ${borda};box-shadow:0 2px 8px rgba(0,0,0,.45);margin:0 auto;">${emoji}</div>
+      <div style="background:rgba(0,0,0,.80);color:white;font-size:9px;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-top:2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${nome.split(' ')[0]}${tel?' | '+tel.slice(-4):''}</div>
+    </div>`,
+    iconSize:[100,54],iconAnchor:[50,36],className:''
   });
 }
 
@@ -778,15 +787,15 @@ async function atuMapa(tipo,ents){
   ents.forEach(e=>{
     if(!e.latitude||!e.longitude)return;
     const ll=[e.latitude,e.longitude];
-    const ico=icoEnt(e.nome,e.telefone);
+    const ico=icoEnt(e.nome,e.telefone,!!e.com_pedido);
+    const popup=`<strong>${e.nome}</strong><br>Tel: ${e.telefone||'-'}<br><span style="color:${e.com_pedido?'#1565C0':'#2e7d32'};font-weight:700">${e.com_pedido?'🔵 Em rota':'🟢 Livre'}</span>`;
     if(mk[e.id]){mk[e.id].setLatLng(ll);mk[e.id].setIcon(ico);}
-    else mk[e.id]=L.marker(ll,{icon:ico}).addTo(m).bindPopup(`<strong>${e.nome}</strong><br>Tel: ${e.telefone||'-'}`);
+    else mk[e.id]=L.marker(ll,{icon:ico}).addTo(m).bindPopup(popup);
     bounds.push(ll);
     if(!primLl)primLl=ll;
   });
-  if(seg[tipo]&&primLl){
-    m.setView(primLl,16,{animate:true});
-  }else if(!seg[tipo]){
+  if(seg[tipo]&&primLl){m.setView(primLl,16,{animate:true});}
+  else if(!seg[tipo]){
     if(bounds.length===1)m.setView(bounds[0],15);
     else if(bounds.length>1)m.fitBounds(bounds,{padding:[40,40]});
     else m.setView([RP_LAT,RP_LNG],13);
@@ -852,8 +861,16 @@ async function pullAdm(){
   const{data:ents}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude').eq('tipo','entregador').eq('online',true);
   $('adm-cnt-on').textContent=ents?ents.length:0;
   const el=$('lista-on-adm');
-  el.innerHTML=ents&&ents.length?ents.map(e=>`<span class="badge b-online">&#128994; ${e.nome} ${e.telefone?'('+e.telefone+')':''}</span>`).join(''):'<span style="font-size:12px;color:#999">Nenhum online</span>';
-  await atuMapa('admin',ents||[]);
+  if(!ents||!ents.length){el.innerHTML='<span style="font-size:12px;color:#999">Nenhum online</span>';await atuMapa('admin',[]);carregarDadosAdmin();return;}
+  // Verifica quem tem pedido ativo
+  const{data:ativas}=await db.from('entregas').select('entregador_id').in('entregador_id',ents.map(e=>e.id)).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']);
+  const comPedidoIds=new Set((ativas||[]).map(a=>a.entregador_id));
+  const entsParaMapa=ents.map(e=>({...e,com_pedido:comPedidoIds.has(e.id)}));
+  el.innerHTML=ents.map(e=>{
+    const cp=comPedidoIds.has(e.id);
+    return `<span class="badge" style="background:${cp?'#1565C0':'#2e7d32'};color:white;">&#128757; ${e.nome} ${e.telefone?'('+e.telefone+')':''}${cp?' 🔵':' 🟢'}</span>`;
+  }).join('');
+  await atuMapa('admin',entsParaMapa);
   carregarDadosAdmin();
 }
 
@@ -1073,10 +1090,21 @@ async function pullLj(){
   const el=$('lista-on-lj');
   if(!assoc||!assoc.length){el.innerHTML='<span style="font-size:12px;color:#999">Nenhum entregador vinculado.</span>';$('lj-online-cnt').textContent='0';return;}
   const ids=assoc.map(a=>a.entregador_id);
-  const{data:ents}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude').in('id',ids).eq('online',true);
-  $('lj-online-cnt').textContent=ents?ents.length:0;
-  el.innerHTML=ents&&ents.length?ents.map(e=>`<span class="badge b-online">&#128994; ${e.nome}</span>`).join(''):'<span style="font-size:12px;color:#999">Nenhum online agora.</span>';
-  await atuMapa('loja',ents||[]);
+  // Busca todos os entregadores vinculados (online ou não)
+  const{data:todos}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude,online').in('id',ids);
+  const entsOnline=(todos||[]).filter(e=>e.online);
+  $('lj-online-cnt').textContent=entsOnline.length;
+  // Busca quais têm entrega ativa (em_rota, aceito, chegou_loja, saiu_entrega)
+  const{data:ativas}=entsOnline.length?await db.from('entregas').select('entregador_id').in('entregador_id',entsOnline.map(e=>e.id)).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']):{data:[]};
+  const comPedidoIds=new Set((ativas||[]).map(a=>a.entregador_id));
+  // Monta lista com flag com_pedido
+  const entsParaMapa=entsOnline.map(e=>({...e,com_pedido:comPedidoIds.has(e.id)}));
+  // Lista visual
+  el.innerHTML=entsOnline.length?entsOnline.map(e=>{
+    const cp=comPedidoIds.has(e.id);
+    return `<span class="badge" style="background:${cp?'#1565C0':'#2e7d32'};color:white;">&#128757; ${e.nome}${cp?' 🔵':' 🟢'}</span>`;
+  }).join(''):'<span style="font-size:12px;color:#999">Nenhum online agora.</span>';
+  await atuMapa('loja',entsParaMapa);
 }
 
 async function salvarTaxaLj(){
@@ -1189,19 +1217,23 @@ async function lerComanda(event){
   }
 }
 
-// Parser inteligente para comandas brasileiras iFood / Stone
+// Parser inteligente — suporta iFood, Takeat e sistemas similares
 function parsearComanda(txt){
   const t=txt.replace(/\r/g,'').replace(/[ \t]+/g,' ');
   const linhas=t.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
   const r={numero_pedido:'',nome_cliente:'',telefone:'',rua:'',numero_end:'',bairro:'',complemento:'',codigo_confirmacao:''};
 
-  // ── NUMERO DO PEDIDO ── (4-5 dígitos isolados na linha = número iFood)
-  for(const l of linhas){
-    if(/^\d{4,5}$/.test(l)){r.numero_pedido=l;break;}
-  }
-  if(!r.numero_pedido){
-    const m=t.match(/(?:Pedido[:\s#]+)(\d{3,6})/i);
-    if(m)r.numero_pedido=m[1];
+  // ── DETECTAR FORMATO ──
+  const isTakeat=/Takeat|takeat\.app|DELIVERY\s*\n.*Pedido #/i.test(t);
+  const isIfood=/iFood|EXPEDICAO|COLETA PARCEIRA|Entrega Propria/i.test(t);
+
+  // ── NUMERO DO PEDIDO ──
+  // Takeat: "Pedido #178"  |  iFood: linha isolada "8589"
+  const mPedTakeat=t.match(/Pedido\s*#?(\d+)/i);
+  if(mPedTakeat){r.numero_pedido=mPedTakeat[1];}
+  else{
+    for(const l of linhas){if(/^\d{4,5}$/.test(l)){r.numero_pedido=l;break;}}
+    if(!r.numero_pedido){const m=t.match(/Pedido[:\s]+(\d+)/i);if(m)r.numero_pedido=m[1];}
   }
 
   // ── CODIGO DE COLETA iFood ──
@@ -1209,47 +1241,55 @@ function parsearComanda(txt){
   if(mCod)r.codigo_confirmacao=mCod[1];
 
   // ── NOME DO CLIENTE ──
-  const idxLoc=linhas.findIndex(l=>/localizador/i.test(l));
-  const idxPrimeiroP=linhas.findIndex(l=>/primeiro pedido/i.test(l));
-  // Nome está logo após "Primeiro pedido!" ou após o localizador
-  const idxInicio=Math.max(idxLoc,idxPrimeiroP);
-  const naoNome=/^(Primeiro pedido|Data:|Entrega|Localizador|CODIGO|POR FAVOR|iFood|Steak|ITEM|Festival|Pagamento|Online|Valor|Taxa|Desconto|Cobrar|Rua |Av\.|Bairro|Comp|Cidade|EXPEDICAO|Entrega Propria|PEDIDO|0800|Tel|Fone|\*|\d{4})/i;
-  const pareceNome=(l)=>{
-    if(l.length<5||l.length>60)return false;
-    if(naoNome.test(l))return false;
-    if(/\d{5,}/.test(l))return false;
-    if(/R\$/.test(l))return false;
-    if(l.includes(':'))return false;
-    const palavras=l.split(' ').filter(p=>/[a-zA-ZÀ-ú]{2,}/.test(p));
-    return palavras.length>=2;
-  };
-  if(idxInicio>-1){
-    for(let i=idxInicio+1;i<Math.min(idxInicio+5,linhas.length);i++){
-      if(pareceNome(linhas[i])){r.nome_cliente=linhas[i];break;}
+  if(isTakeat){
+    // Takeat: "Cliente: Fulano" ou "Cliente:Fulano"
+    const mNome=t.match(/Cliente[:\s]+([^\n]+)/i);
+    if(mNome){
+      const nome=mNome[1].trim();
+      // Rejeita se for "whats" ou muito curto (bug de sistema)
+      if(nome.length>2&&!/^(whats|zap|app|test)/i.test(nome))r.nome_cliente=nome;
+    }
+  } else if(isIfood){
+    // iFood: nome aparece após "Localizador:" ou "Primeiro pedido!"
+    const idxLoc=linhas.findIndex(l=>/localizador/i.test(l));
+    const idxPrim=linhas.findIndex(l=>/primeiro pedido/i.test(l));
+    const idxInicio=Math.max(idxLoc,idxPrim);
+    if(idxInicio>-1){
+      for(let i=idxInicio+1;i<Math.min(idxInicio+5,linhas.length);i++){
+        const l=linhas[i];
+        if(pareceNomeCliente(l)){r.nome_cliente=l;break;}
+      }
+    }
+    if(!r.nome_cliente){
+      // Fallback: busca em todo texto
+      for(const l of linhas){if(pareceNomeCliente(l)){r.nome_cliente=l;break;}}
     }
   }
-  if(!r.nome_cliente){
-    for(const l of linhas){if(pareceNome(l)){r.nome_cliente=l;break;}}
-  }
 
-  // ── ENDERECO ── iFood quebra o número em linha separada: "Rua X, 17\n5" = nº175
-  for(let i=0;i<linhas.length;i++){
-    const l=linhas[i];
-    const mEnd=l.match(/(?:Endere[cç]o[:\s]+)?((?:Rua|Avenida|Av\.|Al\.|Alameda|Travessa|Trav\.)\s+[^,\n]+?)(?:[,\s]+(\d+))?$/i);
-    if(mEnd){
-      r.rua=mEnd[1].trim();
-      const numLinha=mEnd[2]||'';
-      // Verifica se próxima linha é continuação do número (ex: "17" + "5" = "175")
-      const proxLinha=(linhas[i+1]||'').trim();
-      if(numLinha&&/^\d+$/.test(proxLinha)&&proxLinha.length<=3){
-        // Junta: 17 + 5 = 175
-        r.numero_end=numLinha+proxLinha;
-      } else if(numLinha){
-        r.numero_end=numLinha;
-      } else if(/^\d+$/.test(proxLinha)){
-        r.numero_end=proxLinha;
+  // ── ENDERECO ──
+  // Takeat: "Endereço: Rua X, 200"  |  iFood: "Endereco: Rua X, 17\n5"
+  const mEndLabel=t.match(/Endere[cç]o[:\s]+([^\n]+)/i);
+  if(mEndLabel){
+    const endStr=mEndLabel[1].trim();
+    // Tenta separar rua e número: "Rua X, 200" ou "R. X, 200"
+    const mRuaNum=endStr.match(/^(.+?)[,\s]+(\d+)\s*$/);
+    if(mRuaNum){r.rua=mRuaNum[1].trim();r.numero_end=mRuaNum[2];}
+    else{r.rua=endStr;}
+  } else {
+    // Sem label, busca linha que começa com Rua/Av
+    for(let i=0;i<linhas.length;i++){
+      const l=linhas[i];
+      const mEnd=l.match(/^((?:Rua|Avenida|Av\.|R\.|Al\.|Alameda|Travessa)\s+[^,\n]+?)(?:[,\s]+(\d+))?$/i);
+      if(mEnd){
+        r.rua=mEnd[1].trim();
+        const numL=mEnd[2]||'';
+        const prox=(linhas[i+1]||'').trim();
+        // iFood: "17\n5" = 175
+        if(numL&&/^\d+$/.test(prox)&&prox.length<=3){r.numero_end=numL+prox;}
+        else if(numL){r.numero_end=numL;}
+        else if(/^\d{1,5}$/.test(prox)){r.numero_end=prox;}
+        break;
       }
-      break;
     }
   }
 
@@ -1258,25 +1298,51 @@ function parsearComanda(txt){
   if(mBairro){
     r.bairro=mBairro[1]
       .replace(/\s*[\(\[][^\)\]]*[\)\]]/g,'')
-      .replace(/\s*-\s*S[P-Z]\b.*/i,'')
-      .replace(/\s*-\s*CEP.*/i,'')
+      .replace(/\s*-\s*S[PQ-Z]\b.*/i,'')
+      .replace(/\s*-?\s*CEP.*/i,'')
       .replace(/\s*\(\s*S-?\d+\s*\)/g,'')
       .trim();
+    // Remove traço solitário (Takeat usa "Comp: -")
+    if(r.bairro==='-')r.bairro='';
   }
 
   // ── COMPLEMENTO ──
   const mComp=t.match(/(?:Comp(?:lemento)?)[:\s]+([^\n]+)/i);
-  if(mComp)r.complemento=mComp[1].replace(/Bairro.*/i,'').trim();
+  if(mComp){
+    r.complemento=mComp[1].replace(/Bairro.*/i,'').trim();
+    if(r.complemento==='-'||r.complemento==='- ')r.complemento='';
+  }
 
-  // ── TELEFONE ── ID numérico do iFood
-  const mTel=t.match(/ID[:\s]+(\d{8,11})/i);
-  if(mTel)r.telefone=mTel[1];
-  else{
+  // ── TELEFONE ──
+  // Takeat: "Tel: (16) 98157-3642"  |  iFood: "ID: 43421475"
+  const mTelLabel=t.match(/Tel(?:efone)?[:\s]+([^\n]+)/i);
+  if(mTelLabel){
+    const tel=mTelLabel[1].replace(/\D/g,'');
+    if(tel.length>=8)r.telefone=tel;
+  }
+  if(!r.telefone){
+    const mId=t.match(/ID[:\s]+(\d{8,11})/i);
+    if(mId)r.telefone=mId[1];
+  }
+  if(!r.telefone){
     const mTel2=t.match(/\(?\d{2}\)?\s?\d{4,5}[-\s]?\d{4}/);
     if(mTel2)r.telefone=mTel2[0].replace(/\D/g,'');
   }
 
   return r;
+}
+
+// Função auxiliar: verifica se linha parece nome de cliente (para iFood)
+function pareceNomeCliente(l){
+  const naoNome=/^(Primeiro pedido|Data:|Entrega|Localizador|CODIGO|POR FAVOR|iFood|Steak|ITEM|Festival|Pagamento|Online|Valor|Taxa|Desconto|Cobrar|Rua |Av\.|Bairro|Comp|Cidade|EXPEDICAO|Entrega Propria|PEDIDO|0800|Tel|Fone|\*|\d{4}|Cupim|Paulim|Delivery|Store|Barbecue)/i;
+  if(!l||l.length<4||l.length>60)return false;
+  if(naoNome.test(l))return false;
+  if(/\d{5,}/.test(l))return false;
+  if(/R\$/.test(l))return false;
+  if(l.includes(':'))return false;
+  // Deve ter 2+ palavras com pelo menos 2 letras cada
+  const palavras=l.split(' ').filter(p=>/[a-zA-ZÀ-ú]{2,}/.test(p));
+  return palavras.length>=2;
 }
 
 
@@ -1308,55 +1374,77 @@ async function salvarPedido(){
   setTimeout(()=>closeM('pedido'),1300);
 }
 
-// ===== ROTA INTELIGENTE POR DIRECAO =====
+// Guarda o plano de rota para confirmação
+let _rotaPlanoGrupos=[];
+let _rotaPlanoEnts=[];
+
 async function otimizarRotaInteligente(){
   const{data:peds}=await db.from('entregas').select('*').eq('loja_id',U.id).eq('status','pendente').order('created_at');
-  if(!peds||!peds.length){alert('Sem pedidos pendentes.');return;}
-  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id)
+  if(!peds||!peds.length){alert('Sem pedidos pendentes para otimizar.');return;}
+
+  // Busca todos entregadores online vinculados
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(id,nome,online)').eq('loja_id',U.id);
   const onlineEnts=(assoc||[]).filter(a=>a.e&&a.e.online);
-  if(!onlineEnts.length){alert('Nenhum entregador online vinculado.');return;}
-  // Verificar quais entregadores estao livres (sem pedidos em_rota)
-  const livres=[];
-  for(const a of onlineEnts){
-    const{data:rotaAtiva}=await db.from('entregas').select('id').eq('entregador_id',a.entregador_id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).limit(1);
-    if(!rotaAtiva||!rotaAtiva.length)livres.push(a);
-  }
-  if(!livres.length){alert('Todos os entregadores ja estao com rota ativa. Aguarde eles finalizarem.');return;}
-  // Geocode pedidos sem lat
+  if(!onlineEnts.length){alert('Nenhum entregador online vinculado à loja.');return;}
+
+  // Geocode pedidos sem coordenadas
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
   const pedsGeo=[];
   for(const p of peds){
     let lat=p.lat_entrega,lng=p.lng_entrega;
-    if(!lat||!lng){
-      const g=await geocode(p.endereco_entrega);
-      if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}
-    }
-    if(lat&&lng)pedsGeo.push({...p,lat,lng,dist:distKm(lojaLat,lojaLng,lat,lng),ang:angleDeg(lojaLat,lojaLng,lat,lng)});
-    else pedsGeo.push({...p,lat:lojaLat,lng:lojaLng,dist:0,ang:0}); // fallback
+    if(!lat||!lng){const g=await geocode(p.endereco_entrega);if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}}
+    pedsGeo.push({...p,lat:lat||lojaLat,lng:lng||lojaLng,dist:distKm(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng),ang:angleDeg(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng)});
   }
-  // Agrupar por setor de 60 graus
-  const setores={};
-  pedsGeo.forEach(p=>{
-    const s=Math.floor((p.ang+180)/60);
-    if(!setores[s])setores[s]=[];
-    setores[s].push(p);
-  });
-  // Ordenar cada setor por distancia crescente
-  Object.values(setores).forEach(s=>s.sort((a,b)=>a.dist-b.dist));
-  const grupos=Object.values(setores);
-  // Distribuir grupos entre entregadores livres
-  let ordem=1,entIdx=0;
-  for(const grupo of grupos){
-    const eid=livres[entIdx%livres.length].entregador_id;
-    const ent=livres[entIdx%livres.length].e;
-    entIdx++;
-    for(const p of grupo){
+
+  // Agrupa por setor de 60 graus (por direção)
+  const setoresMap={};
+  pedsGeo.forEach(p=>{const s=Math.floor((p.ang+180)/60);if(!setoresMap[s])setoresMap[s]=[];setoresMap[s].push(p);});
+  Object.values(setoresMap).forEach(s=>s.sort((a,b)=>a.dist-b.dist));
+  _rotaPlanoGrupos=Object.values(setoresMap);
+  _rotaPlanoEnts=onlineEnts;
+
+  // Monta o modal de plano
+  const entOptions=onlineEnts.map(a=>`<option value="${a.entregador_id}">${a.e.nome}</option>`).join('');
+  const body=$('rota-plano-body');
+  body.innerHTML=`<div style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#2e7d32;">
+    📦 ${peds.length} entrega${peds.length>1?'s':''} organizadas em ${_rotaPlanoGrupos.length} grupo${_rotaPlanoGrupos.length>1?'s':''} por direção
+  </div>`+_rotaPlanoGrupos.map((grupo,gi)=>`
+    <div class="secao" style="margin-bottom:10px;">
+      <div class="s-title">Grupo ${gi+1} — ${grupo.length} entrega${grupo.length>1?'s':''}</div>
+      ${grupo.map((p,pi)=>`<div style="padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
+        <strong>${pi+1}. ${p.numero_pedido?'#'+p.numero_pedido:p.cliente_nome||'Entrega'}</strong><br>
+        <span style="color:#555;">📍 ${p.endereco_entrega}</span>
+        ${p.distancia_km>0?`<span style="color:#888;font-size:11px;"> • ${parseFloat(p.distancia_km).toFixed(1)}km</span>`:''}
+      </div>`).join('')}
+      <div style="margin-top:8px;">
+        <label style="font-size:11px;font-weight:700;color:#333;">🛵 Atribuir ao entregador:</label>
+        <select id="rota-ent-${gi}" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:7px;margin-top:4px;font-size:13px;">
+          <option value="">— Selecione —</option>${entOptions}
+        </select>
+      </div>
+    </div>`).join('');
+
+  closeM('rota');
+  openM('rota-plano');
+}
+
+async function confirmarRotaPlano(){
+  let algumAtribuido=false;
+  let ordem=1;
+  for(let gi=0;gi<_rotaPlanoGrupos.length;gi++){
+    const eid=$(`rota-ent-${gi}`)?.value;
+    if(!eid)continue;
+    algumAtribuido=true;
+    for(const p of _rotaPlanoGrupos[gi]){
       await db.from('entregas').update({entregador_id:eid,status:'aceito',status_detalhado:'aceito',ordem_rota:ordem,pedido_pronto:true,aceito_at:new Date().toISOString()}).eq('id',p.id);
       ordem++;
     }
   }
-  alert('Rota otimizada por direcao e distribuida entre '+(entIdx)+ ' entregador(es)!');
+  if(!algumAtribuido){alert('Selecione pelo menos um entregador para confirmar.');return;}
+  closeM('rota-plano');
+  openM('rota');
   carregarPedidos();
+  alert('✅ Rota despachada com sucesso!');
 }
 
 async function abrirPedidosLj(){openM('rota');carregarPedidos();}
