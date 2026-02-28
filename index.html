@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monta a Rota Ai</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -184,12 +185,21 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <!-- GPS Validacao - controle global do admin -->
       <div class="secao" id="adm-gps-toggle-box" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fff3e0;border:1.5px solid #ffcc80;">
         <div>
-          <div style="font-size:13px;font-weight:700;color:#e65100;">&#128205; Validacao de GPS (Global)</div>
+          <div style="font-size:13px;font-weight:700;color:#e65100;">📍 Validacao de GPS (Global)</div>
           <div style="font-size:11px;color:#888;" id="adm-gps-toggle-desc">Entregadores confirmam sem validacao (modo livre)</div>
         </div>
         <div id="adm-gps-toggle-sw" onclick="admToggleGpsGlobal()" style="cursor:pointer;width:50px;height:26px;border-radius:13px;background:#ccc;position:relative;transition:background .3s;flex-shrink:0;">
           <div id="adm-gps-toggle-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:white;transition:left .3s;box-shadow:0 1px 3px rgba(0,0,0,.3);"></div>
         </div>
+      </div>
+      <!-- SQL Fix Button -->
+      <div class="secao" style="background:#fce4ec;border:1.5px solid #f48fb1;padding:10px 14px;">
+        <div style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:6px;">🔧 Se GPS não aparece no mapa:</div>
+        <div style="font-size:11px;color:#555;margin-bottom:8px;">Execute este SQL no Supabase (SQL Editor):</div>
+        <div style="background:#1e1e2e;color:#a6e3a1;font-family:monospace;font-size:10px;padding:8px;border-radius:6px;white-space:pre-wrap;user-select:all;">ALTER TABLE usuarios DISABLE ROW LEVEL SECURITY;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;</div>
+        <button onclick="navigator.clipboard.writeText('ALTER TABLE usuarios DISABLE ROW LEVEL SECURITY;\nALTER TABLE usuarios ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;\nALTER TABLE usuarios ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;').then(()=>alert('SQL copiado! Cole no Supabase SQL Editor.'))" style="margin-top:7px;background:#c62828;color:white;border:none;padding:7px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;width:100%;">📋 Copiar SQL para corrigir GPS</button>
       </div>
       <div class="secao">
         <div class="s-title">&#128230; Entregas em Tempo Real</div>
@@ -1134,43 +1144,26 @@ async function lerComanda(event){
   const file=event.target.files[0];if(!file)return;
   const url=URL.createObjectURL(file);
   $('ocr-img').src=url;$('ocr-prev').classList.remove('hidden');
-  $('ocr-load').classList.remove('hidden');
+  const loadEl=$('ocr-load');
+  loadEl.classList.remove('hidden');
+  loadEl.innerHTML='<span style="font-size:12px;color:#555">⏳ Iniciando leitura...</span>';
 
   try{
-    // Converter para base64
-    const base64=await new Promise((res,rej)=>{
-      const r=new FileReader();
-      r.onload=()=>res(r.result.split(',')[1]);
-      r.onerror=rej;
-      r.readAsDataURL(file);
+    const result=await Tesseract.recognize(file,'por+eng',{
+      logger:m=>{
+        if(m.status==='recognizing text'){
+          const pct=Math.round(m.progress*100);
+          loadEl.innerHTML=`<div style="background:#eee;border-radius:4px;height:8px;margin:4px 0;"><div style="background:#FF6B35;height:8px;border-radius:4px;width:${pct}%"></div></div><span style="font-size:11px;color:#666">Lendo comanda... ${pct}%</span>`;
+        }else if(m.status==='loading tesseract core'||m.status==='initializing tesseract'){
+          loadEl.innerHTML='<span style="font-size:11px;color:#666">⏳ Carregando motor OCR (primeira vez demora ~20s)...</span>';
+        }
+      }
     });
 
-    // Google Cloud Vision API - OCR do texto
-    const resp=await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_KEY}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        requests:[{
-          image:{content:base64},
-          features:[{type:'DOCUMENT_TEXT_DETECTION',maxResults:1}]
-        }]
-      })
-    });
+    loadEl.classList.add('hidden');
+    const texto=result.data.text||'';
+    if(!texto.trim()){showM('ped-msg','Não foi possível ler. Melhore a iluminação e tente novamente.',false);return;}
 
-    $('ocr-load').classList.add('hidden');
-
-    if(!resp.ok){
-      const err=await resp.text();
-      console.error('[Vision API]',resp.status,err);
-      showM('ped-msg','Erro Vision API ('+resp.status+'). Ative a API no Google Cloud Console.',false);
-      return;
-    }
-
-    const vdata=await resp.json();
-    const texto=vdata.responses?.[0]?.fullTextAnnotation?.text||'';
-    if(!texto){showM('ped-msg','Nao foi possivel ler o texto. Tente novamente com melhor iluminacao.',false);return;}
-
-    console.log('[OCR texto bruto]',texto);
     const parsed=parsearComanda(texto);
 
     if(parsed.numero_pedido)$('p-num').value=parsed.numero_pedido;
@@ -1183,89 +1176,105 @@ async function lerComanda(event){
     window._ocrCodConf=parsed.codigo_confirmacao||'';
     if(parsed.codigo_confirmacao){$('p-codconf-area').classList.remove('hidden');$('p-cod-conf').value=parsed.codigo_confirmacao;}
     setTimeout(atualizarValorCorrida,400);
-    showM('ped-msg','Comanda lida! Confira os campos.',true);
+
+    const preenchidos=[parsed.nome_cliente,parsed.rua,parsed.numero_end,parsed.bairro].filter(Boolean).length;
+    if(preenchidos>=3)showM('ped-msg','✅ Comanda lida com sucesso! Confira os campos.',true);
+    else if(preenchidos>=1)showM('ped-msg','⚠️ Leitura parcial — complete os campos vazios.',false);
+    else showM('ped-msg','❌ Não consegui ler. Preencha manualmente ou tire foto melhor.',false);
 
   }catch(err){
-    $('ocr-load').classList.add('hidden');
-    console.error('[OCR]',err);
-    showM('ped-msg','Erro de conexao. Preencha manualmente.',false);
+    loadEl.classList.add('hidden');
+    console.error('[OCR erro]',err);
+    showM('ped-msg','Erro ao processar imagem. Tente novamente.',false);
   }
 }
 
-// Parser inteligente para comandas brasileiras (iFood, Stone, etc.)
+// Parser inteligente para comandas brasileiras iFood / Stone
 function parsearComanda(txt){
-  const linhas=txt.split('\n').map(l=>l.trim()).filter(l=>l);
+  const t=txt.replace(/\r/g,'').replace(/[ \t]+/g,' ');
+  const linhas=t.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
   const r={numero_pedido:'',nome_cliente:'',telefone:'',rua:'',numero_end:'',bairro:'',complemento:'',codigo_confirmacao:''};
 
-  // Numero do pedido - grande destaque ou apos "Pedido:"
-  const mPed=txt.match(/\b(\d{4,6})\b/);
-  if(mPed)r.numero_pedido=mPed[1];
+  // ── NUMERO DO PEDIDO ── (4-5 dígitos isolados na linha = número iFood)
+  for(const l of linhas){
+    if(/^\d{4,5}$/.test(l)){r.numero_pedido=l;break;}
+  }
+  if(!r.numero_pedido){
+    const m=t.match(/(?:Pedido[:\s#]+)(\d{3,6})/i);
+    if(m)r.numero_pedido=m[1];
+  }
 
-  // Codigo de coleta iFood
-  const mCod=txt.match(/(?:CODIGO DE COLETA|COLETA PARCEIRA)[:\s]+(\d{3,6})/i);
+  // ── CODIGO DE COLETA iFood ──
+  const mCod=t.match(/(?:COLETA PARCEIRA|CODIGO DE COLETA)[:\s]+(\d{3,6})/i);
   if(mCod)r.codigo_confirmacao=mCod[1];
 
-  // Telefone - pegar numero apos "ID:" ou sequencia de digitos longa
-  // Ignora 0800 e numero do pedido
-  const mTel=txt.match(/ID:\s*(\d{8,11})/i)||txt.match(/\(?\d{2}\)?\s?\d{4,5}[-\s]?\d{4}/);
-  if(mTel)r.telefone=mTel[1]||(mTel[0].replace(/\D/g,''));
+  // ── NOME DO CLIENTE ──
+  const idxLoc=linhas.findIndex(l=>/localizador/i.test(l));
+  const idxPrimeiroP=linhas.findIndex(l=>/primeiro pedido/i.test(l));
+  // Nome está logo após "Primeiro pedido!" ou após o localizador
+  const idxInicio=Math.max(idxLoc,idxPrimeiroP);
+  const naoNome=/^(Primeiro pedido|Data:|Entrega|Localizador|CODIGO|POR FAVOR|iFood|Steak|ITEM|Festival|Pagamento|Online|Valor|Taxa|Desconto|Cobrar|Rua |Av\.|Bairro|Comp|Cidade|EXPEDICAO|Entrega Propria|PEDIDO|0800|Tel|Fone|\*|\d{4})/i;
+  const pareceNome=(l)=>{
+    if(l.length<5||l.length>60)return false;
+    if(naoNome.test(l))return false;
+    if(/\d{5,}/.test(l))return false;
+    if(/R\$/.test(l))return false;
+    if(l.includes(':'))return false;
+    const palavras=l.split(' ').filter(p=>/[a-zA-ZÀ-ú]{2,}/.test(p));
+    return palavras.length>=2;
+  };
+  if(idxInicio>-1){
+    for(let i=idxInicio+1;i<Math.min(idxInicio+5,linhas.length);i++){
+      if(pareceNome(linhas[i])){r.nome_cliente=linhas[i];break;}
+    }
+  }
+  if(!r.nome_cliente){
+    for(const l of linhas){if(pareceNome(l)){r.nome_cliente=l;break;}}
+  }
 
-  // Endereco - procura linha com "Endereco:" ou "Rua"/"Av."
-  const mEnd=txt.match(/(?:Endere[cç]o|Rua|Avenida|Av\.)[:\s]+([^\n,]+?)(?:[,\s]+(\d+))?[\n,]/i);
-  if(mEnd){
-    r.rua=mEnd[1].trim();
-    if(mEnd[2])r.numero_end=mEnd[2].trim();
-  } else {
-    // Tenta pegar linha com "Rua" ou "Av."
-    const lEnd=linhas.find(l=>/^(Rua|Avenida|Av\.|R\.) /i.test(l));
-    if(lEnd){
-      const partes=lEnd.match(/^(.+?)[,\s]+(\d+)/);
-      if(partes){r.rua=partes[1].trim();r.numero_end=partes[2];}
-      else r.rua=lEnd;
+  // ── ENDERECO ── iFood quebra o número em linha separada: "Rua X, 17\n5" = nº175
+  for(let i=0;i<linhas.length;i++){
+    const l=linhas[i];
+    const mEnd=l.match(/(?:Endere[cç]o[:\s]+)?((?:Rua|Avenida|Av\.|Al\.|Alameda|Travessa|Trav\.)\s+[^,\n]+?)(?:[,\s]+(\d+))?$/i);
+    if(mEnd){
+      r.rua=mEnd[1].trim();
+      const numLinha=mEnd[2]||'';
+      // Verifica se próxima linha é continuação do número (ex: "17" + "5" = "175")
+      const proxLinha=(linhas[i+1]||'').trim();
+      if(numLinha&&/^\d+$/.test(proxLinha)&&proxLinha.length<=3){
+        // Junta: 17 + 5 = 175
+        r.numero_end=numLinha+proxLinha;
+      } else if(numLinha){
+        r.numero_end=numLinha;
+      } else if(/^\d+$/.test(proxLinha)){
+        r.numero_end=proxLinha;
+      }
+      break;
     }
   }
 
-  // Numero separado - linha "175" apos endereco
-  if(!r.numero_end){
-    const idxEnd=linhas.findIndex(l=>l.includes(r.rua.split(' ')[1]||'XXXXX'));
-    if(idxEnd>-1){
-      const prox=linhas[idxEnd+1];
-      if(prox&&/^\d+$/.test(prox.trim()))r.numero_end=prox.trim();
-    }
-  }
-
-  // Bairro
-  const mBairro=txt.match(/(?:Bairro|Bairro:)\s*([^\n]+)/i);
+  // ── BAIRRO ──
+  const mBairro=t.match(/Bairro[:\s]+([^\n]+)/i);
   if(mBairro){
-    // Remove (S-7), SP, CEP etc
-    r.bairro=mBairro[1].replace(/[\(\[].+?[\)\]]/g,'').replace(/\s*-\s*SP.*/i,'').replace(/\s*-\s*CEP.*/i,'').trim();
-    // Se bairro começo com S-numero, remove
-    r.bairro=r.bairro.replace(/^\(S-?\d+\)\s*/i,'').trim();
-  } else {
-    const lBairro=linhas.find(l=>/^bairro:/i.test(l));
-    if(lBairro)r.bairro=lBairro.replace(/^bairro:\s*/i,'').replace(/[\(\[].+?[\)\]]/g,'').replace(/-\s*SP.*/i,'').trim();
+    r.bairro=mBairro[1]
+      .replace(/\s*[\(\[][^\)\]]*[\)\]]/g,'')
+      .replace(/\s*-\s*S[P-Z]\b.*/i,'')
+      .replace(/\s*-\s*CEP.*/i,'')
+      .replace(/\s*\(\s*S-?\d+\s*\)/g,'')
+      .trim();
   }
 
-  // Complemento
-  const mComp=txt.match(/(?:Comp|Complemento)[:\s]+([^\n]+)/i);
-  if(mComp)r.complemento=mComp[1].trim();
+  // ── COMPLEMENTO ──
+  const mComp=t.match(/(?:Comp(?:lemento)?)[:\s]+([^\n]+)/i);
+  if(mComp)r.complemento=mComp[1].replace(/Bairro.*/i,'').trim();
 
-  // Nome do cliente:
-  // iFood: nome aparece apos o bloco de data/localizador/observacoes
-  // Estrategia: pegar linha que NAO seja "Primeiro pedido!", data, localizador, telefone, endereco, bairro
-  const ignorar=/^(Primeiro pedido|Data:|Entrega|Localizador|CODIGO|POR FAVOR|PEDIDO|iFood|Steak|ITENS|Festival|Queijo|Chorizo|Pagamento|Online|Valor|Taxa|Desconto|Cobrar|Rua|Av\.|Bairro|Comp|Cidade|EXPEDICAO|Entrega Propria|\d{4}|\d{2}\/\d{2})/i;
-  // Nome geralmente tem 2+ palavras com letras e pelo menos uma letra maiuscula
-  const candidatos=linhas.filter(l=>
-    l.length>5 && l.length<60 &&
-    /^[A-ZÀ-Ú][a-zà-ú]/.test(l) &&
-    l.split(' ').length>=2 &&
-    !ignorar.test(l) &&
-    !/\d{5}/.test(l) &&   // sem CEP
-    !/[0-9]{4,}/.test(l)  // sem sequencias longas de numeros
-  );
-  // Pegar o candidato que mais parece um nome (sem R$, sem :)
-  const nomeCand=candidatos.find(c=>!c.includes(':')&&!c.includes('R$')&&!c.includes('Rua'));
-  if(nomeCand)r.nome_cliente=nomeCand.trim();
+  // ── TELEFONE ── ID numérico do iFood
+  const mTel=t.match(/ID[:\s]+(\d{8,11})/i);
+  if(mTel)r.telefone=mTel[1];
+  else{
+    const mTel2=t.match(/\(?\d{2}\)?\s?\d{4,5}[-\s]?\d{4}/);
+    if(mTel2)r.telefone=mTel2[0].replace(/\D/g,'');
+  }
 
   return r;
 }
@@ -1704,13 +1713,16 @@ function inicRast(){
   const salvarPos=async (lat,lng)=>{
     myLat=lat;myLng=lng;gpsOk=true;
     showGpsBanner(false);
-    // Mostra coordenadas no debug
-    const dbg=$('gps-debug');if(dbg)dbg.textContent=`GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    // Salva no Supabase com log de erro
+    const dbg=$('gps-debug');
+    if(dbg)dbg.innerHTML=`<span style="color:#888">📡 ${lat.toFixed(5)}, ${lng.toFixed(5)} — salvando...</span>`;
     if(U&&U.online){
-      const{error}=await db.from('usuarios').update({latitude:lat,longitude:lng}).eq('id',U.id);
-      if(error){console.error('[GPS Save Error]',error);const dbg=$('gps-debug');if(dbg)dbg.style.color='red';}
-      else{const dbg=$('gps-debug');if(dbg)dbg.style.color='#27ae60';}
+      const{error,data}=await db.from('usuarios').update({latitude:lat,longitude:lng}).eq('id',U.id).select();
+      if(error){
+        console.error('[GPS Save Error]',error);
+        if(dbg)dbg.innerHTML=`<span style="color:red;font-weight:700">❌ GPS ERRO: ${error.message||error.code||JSON.stringify(error)}</span>`;
+      } else {
+        if(dbg)dbg.innerHTML=`<span style="color:#27ae60">✅ GPS salvo: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>`;
+      }
     }
   };
 
