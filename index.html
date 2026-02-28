@@ -130,12 +130,20 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <label><input type="radio" name="rtype" value="loja" checked onchange="toggleCad()"><span>&#127978; Loja</span></label>
         <label><input type="radio" name="rtype" value="entregador" onchange="toggleCad()"><span>&#128757; Entregador</span></label>
       </div>
-      <div class="fg"><label>Nome</label><input type="text" id="r-nome"></div>
-      <div class="fg"><label>Email</label><input type="email" id="r-email"></div>
+      <div class="fg"><label>Nome (CAIXA ALTA automático)</label><input type="text" id="r-nome" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="fg">
+        <label>Login (usuário do sistema)</label>
+        <div style="display:flex;align-items:center;gap:0;">
+          <input type="text" id="r-email-user" placeholder="seunome" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._-]/g,'')"
+            style="flex:1;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px 0 0 8px;font-size:14px;border-right:none;">
+          <span style="background:#f5f5f5;border:1.5px solid #e0e0e0;border-left:none;padding:10px 10px;border-radius:0 8px 8px 0;font-size:13px;color:#666;white-space:nowrap;">@montarotaai.com</span>
+        </div>
+        <input type="hidden" id="r-email">
+      </div>
       <div class="fg"><label>Telefone</label><input type="tel" id="r-tel" placeholder="(16) 99999-9999"></div>
       <div class="fg"><label>Senha</label><input type="password" id="r-senha" placeholder="Minimo 6 caracteres"></div>
       <div id="c-loja">
-        <div class="fg"><label>Nome da Loja</label><input type="text" id="r-nloja"></div>
+        <div class="fg"><label>Nome da Loja (CAIXA ALTA automático)</label><input type="text" id="r-nloja" oninput="this.value=this.value.toUpperCase()"></div>
         <div class="fg"><label>CNPJ</label><input type="text" id="r-cnpj" placeholder="00.000.000/0000-00"></div>
         <div class="g2"><div class="fg"><label>Rua</label><input type="text" id="r-rua"></div><div class="fg"><label>Numero</label><input type="text" id="r-num"></div></div>
         <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="r-bairro"></div><div class="fg"><label>Cidade</label><input type="text" id="r-cidade" value="Ribeirao Preto"></div></div>
@@ -505,10 +513,14 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <!-- Ganhos Entregador -->
 <div id="m-ganhos" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('ganhos')">&times;</button>
-  <h2 style="margin-bottom:9px;">&#128181; Meus Ganhos</h2>
-  <select id="gnh-f" onchange="carregarGanhos()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:11px;">
-    <option value="hoje">Hoje</option><option value="semana">Esta semana</option><option value="mes">Este mes</option>
-  </select>
+  <h2 style="margin-bottom:9px;">💰 Meus Ganhos</h2>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+    <button onclick="filtroGanhos('hoje',this)" class="btn-sm green" id="gnhf-hoje">Hoje</button>
+    <button onclick="filtroGanhos('ontem',this)" class="btn-sm gray" id="gnhf-ontem">Ontem</button>
+    <button onclick="filtroGanhos('semana',this)" class="btn-sm gray" id="gnhf-semana">Esta Semana</button>
+    <button onclick="filtroGanhos('mes',this)" class="btn-sm gray" id="gnhf-mes">Este Mês</button>
+  </div>
+  <div id="gnh-resumo" style="margin-bottom:12px;"></div>
   <div id="gnh-dados"></div>
 </div></div>
 
@@ -578,8 +590,7 @@ const LOGO_URL='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGB
 const SB_URL='https://dfvjaweyxfenhjgusekq.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdmphd2V5eGZlbmhqZ3VzZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMzk4NTMsImV4cCI6MjA4NzYxNTg1M30.MT9pzSQgc3ZNGiIV95DwjVtNvSZI0Lz-SKMkvMys1Kg';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-// ⚠️ CHAVE API ANTHROPIC — gere em console.anthropic.com e cole aqui
-const ANTHROPIC_KEY='SUA_CHAVE_AQUI';
+// OCR usa Google Cloud Vision API — chave configurada em GOOGLE_KEY
 const RP_LAT=-21.1767, RP_LNG=-47.8208;
 
 let U=null;
@@ -780,25 +791,28 @@ async function fazerLogin(){
 
 async function fazerCadastro(){
   const tipo=document.querySelector('input[name="rtype"]:checked').value;
-  const nome=v('r-nome'),email=v('r-email'),senha=v('r-senha'),btn=$('btn-cad');
-  if(!nome||!email||!senha){showM('reg-msg','Preencha nome, email e senha');return;}
+  const nomeRaw=v('r-nome'),emailUser=v('r-email-user'),senha=v('r-senha'),btn=$('btn-cad');
+  const nome=nomeRaw.toUpperCase();
+  if(!nome||!emailUser||!senha){showM('reg-msg','Preencha nome, login e senha');return;}
+  if(!/^[a-z0-9._-]+$/.test(emailUser)){showM('reg-msg','Login inválido. Use apenas letras minúsculas e números.');return;}
   if(senha.length<6){showM('reg-msg','Senha minimo 6 caracteres');return;}
+  const email=emailUser+'@montarotaai.com';
   btn.disabled=true;btn.textContent='Cadastrando...';
   try{
     const{data:ex}=await db.from('usuarios').select('id').eq('email',email).single();
-    if(ex){showM('reg-msg','Email ja cadastrado');return;}
+    if(ex){showM('reg-msg','Login ja cadastrado. Escolha outro.');return;}
     const rua=v('r-rua'),num=v('r-num'),bairro=v('r-bairro'),cidade=v('r-cidade')||'Ribeirao Preto';
     const d={tipo,nome,email,telefone:v('r-tel'),senha_hash:senha,status:'ativo',taxa_sistema:0.50,taxa_entrega:0,taxa_tipo:'fixo',taxa_km_limite:5,taxa_km_excedente:2,online:false,cidade};
     if(tipo==='loja'){
-      d.nome_loja=v('r-nloja');d.cnpj=v('r-cnpj');
+      d.nome_loja=(v('r-nloja')||nome).toUpperCase();d.cnpj=v('r-cnpj');
       d.endereco=fEnd(rua,num,bairro,cidade,'');
       d.endereco_rua=rua;d.endereco_numero=num;d.endereco_bairro=bairro;d.endereco_cidade=cidade;
       d.codigo_loja=Math.random().toString(36).substring(2,8).toUpperCase();
     }else{d.placa_moto=v('r-placa');d.chave_pix=v('r-pix');}
     const{error}=await db.from('usuarios').insert([d]);
     if(error){showM('reg-msg','Erro: '+error.message);return;}
-    showM('reg-msg','Cadastro realizado! Faca login.',true);
-    setTimeout(()=>document.querySelectorAll('.tab')[0].click(),1500);
+    showM('reg-msg','✅ Cadastro realizado! Login: '+email,true);
+    setTimeout(()=>{$('l-email').value=email;document.querySelectorAll('.tab')[0].click();},1800);
   }catch(e){showM('reg-msg','Erro: '+e.message);}
   finally{btn.disabled=false;btn.textContent='Cadastrar';}
 }
@@ -957,7 +971,7 @@ async function pullAdm(){
   const entsParaMapa=ents.map(e=>({...e,com_pedido:comPedidoIds.has(e.id)}));
   el.innerHTML=ents.map(e=>{
     const cp=comPedidoIds.has(e.id);
-    return `<span class="badge" style="background:${cp?'#1565C0':'#2e7d32'};color:white;">&#128757; ${e.nome} ${e.telefone?'('+e.telefone+')':''}${cp?' 🔵':' 🟢'}</span>`;
+    return `<span class="badge" onclick="focarEntAdm('${e.id}')" style="background:${cp?'#1565C0':'#2e7d32'};color:white;cursor:pointer;padding:6px 11px;" title="Clique para ver no mapa">&#128757; ${e.nome} ${e.telefone?'('+e.telefone+')':''}${cp?' 🔵':' 🟢'}</span>`;
   }).join('');
   await atuMapa('admin',entsParaMapa);
   carregarDadosAdmin();
@@ -1258,23 +1272,80 @@ function abrirNovoPedido(){
   window._pedidoGeo=null;
 }
 
+// ── PARSER DE COMANDA BRASILEIRA (iFood, Takeat, Stone, etc.) ──
+function parsarComandaBR(txt){
+  const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean);
+  const r={numero_pedido:'',nome_cliente:'',telefone:'',rua:'',numero_end:'',bairro:'',complemento:'',codigo_confirmacao:''};
+
+  // Número do pedido: "Pedido #178" ou "Pedido #88" ou número isolado grande no topo
+  const mHash=txt.match(/[Pp]edido\s*#?\s*(\d+)/);
+  if(mHash){r.numero_pedido=mHash[1];}
+  else{
+    for(const l of lines){if(/^\d{4,6}$/.test(l)){r.numero_pedido=l;break;}}
+  }
+
+  // Telefone: (16) 99xxx-xxxx ou 16 99xxx xxxx ou Tel: ...
+  const mTel=txt.match(/[Tt]el(?:efone)?[:\s.]*\(?(\d{2})\)?[\s.-]?(\d{4,5})[\s.-]?(\d{4})/);
+  if(mTel){r.telefone=mTel[1]+mTel[2]+mTel[3];}
+  else{
+    const mTel2=txt.match(/\((\d{2})\)\s*(\d{4,5})-?(\d{4})/);
+    if(mTel2){r.telefone=mTel2[1]+mTel2[2]+mTel2[3];}
+    else{
+      const mTel3=txt.match(/(?<!\d)(\d{2})\s(\d{4,5})[\s-](\d{4})(?!\d)/);
+      if(mTel3){r.telefone=mTel3[1]+mTel3[2]+mTel3[3];}
+    }
+  }
+
+  // Nome do cliente: "Cliente: Nome" ou "cliente Nome"
+  const mCli=txt.match(/[Cc]liente[:\s]+([^\n\r0-9#@]+?)(?:\n|$)/);
+  if(mCli){r.nome_cliente=mCli[1].trim().replace(/\s+/g,' ');}
+  else{
+    // iFood: nome próprio em linha isolada (2+ palavras, primeira letra maiúscula)
+    const excluir=['Delivery','iFood','Cupim','Lanche','Pedido','Total','Pagamento','Itens','Taxa','Entrega','Prevista','Cobrar','Valor','Forma','Bairro','Cidade','Comp','Ref','CEP','Data','Desc','Observ','CODIGO','Localiz'];
+    for(const l of lines){
+      if(l.length<4||l.length>50)continue;
+      if(excluir.some(e=>l.includes(e)))continue;
+      if(l.match(/^\d/)|| l.includes(':')|| l.includes('R$')|| l.includes('www'))continue;
+      if(/^[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][a-záàãâéêíóôõúç]+(?:\s+[A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][a-záàãâéêíóôõúç]+)+$/.test(l)){
+        r.nome_cliente=l;break;
+      }
+    }
+  }
+
+  // Endereço: "Endereço: Rua X, 200" ou "R. Manoel Ache, 206"
+  const mEnd=txt.match(/[Ee]ndere[çc]o[:\s]+([^,\n\r]+),\s*(\d+)/);
+  if(mEnd){r.rua=mEnd[1].trim();r.numero_end=mEnd[2];}
+  else{
+    // Tenta achar linha com "Rua", "Av.", "R." seguido de nome e número
+    const mEnd2=txt.match(/(?:^|\n)\s*((?:Rua|Av(?:enida)?\.?|R\.|Travessa|Alameda|Estrada)\s+[^\n,]+),\s*(\d+)/im);
+    if(mEnd2){r.rua=mEnd2[1].trim();r.numero_end=mEnd2[2];}
+  }
+
+  // Bairro
+  const mBairro=txt.match(/[Bb]airro[:\s]+([^\n\r]+)/);
+  if(mBairro){r.bairro=mBairro[1].trim().replace(/\s+/g,' ');}
+
+  // Complemento: "Comp: Ap 22" — ignora traço sozinho
+  const mComp=txt.match(/[Cc]omp(?:lemento)?[:\s]+([^\n\r]+)/);
+  if(mComp){const c=mComp[1].trim();if(c!=='-'&&c!=='–'&&c!=='')r.complemento=c;}
+
+  // Código de coleta iFood: "CODIGO DE COLETA PARCEIRA: 3266"
+  const mCod=txt.match(/C[OÓ]DIGO\s+DE\s+COLETA\s+PARCEIRA[:\s]*(\d{4})/i);
+  if(mCod){r.codigo_confirmacao=mCod[1];}
+
+  return r;
+}
+
 async function lerComanda(event){
   const file=event.target.files[0];if(!file)return;
   const url=URL.createObjectURL(file);
   $('ocr-img').src=url;$('ocr-prev').classList.remove('hidden');
   const loadEl=$('ocr-load');
   loadEl.classList.remove('hidden');
-  loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 Preparando imagem...</span>';
+  loadEl.innerHTML='<span style="font-size:12px;color:#555">🔍 Preparando imagem...</span>';
 
   try{
-    // Verifica chave configurada
-    if(!ANTHROPIC_KEY||ANTHROPIC_KEY==='SUA_CHAVE_AQUI'){
-      loadEl.classList.add('hidden');
-      showM('ped-msg','⚠️ Chave API não configurada. Fale com o administrador do sistema.',false);
-      return;
-    }
-
-    // Redimensiona imagem para max 1200px (economiza tokens e acelera)
+    // Redimensiona imagem para max 1200px
     const base64=await new Promise((res,rej)=>{
       const img=new Image();
       img.onload=()=>{
@@ -1289,39 +1360,16 @@ async function lerComanda(event){
       img.src=URL.createObjectURL(file);
     });
 
-    loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 IA lendo a comanda... aguarde</span>';
+    loadEl.innerHTML='<span style="font-size:12px;color:#555">🔍 Lendo comanda via Google Vision... aguarde</span>';
 
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    // ── GOOGLE CLOUD VISION API ──
+    const resp=await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_KEY}`,{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':ANTHROPIC_KEY,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:600,
-        messages:[{
-          role:'user',
-          content:[
-            {type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},
-            {type:'text',text:`Esta é uma foto de comanda/cupom de delivery brasileiro. Pode ser iFood, Takeat, Stone, ou outro sistema.
-Extraia os dados de entrega e responda APENAS com JSON puro, sem markdown, sem explicação:
-
-{"numero_pedido":"","nome_cliente":"","telefone":"","rua":"","numero_end":"","bairro":"","complemento":"","codigo_confirmacao":""}
-
-Regras importantes:
-- numero_pedido: número grande no topo (ex: 8589, 5823, 178) OU "Pedido #X"
-- nome_cliente: SOMENTE o nome do cliente final. NUNCA nome de restaurante/loja/empresa
-- telefone: só os números com DDD, sem traços ou espaços
-- rua: nome da rua/avenida SEM o número (ex: "Rua Patrocínio", "Av. Luiz Eduardo Toledo Prado")
-- numero_end: só o número da casa/apto residencial (ex: "98", "200", "4100")  
-- bairro: nome do bairro (ex: "Campos Elíseos", "Golf", "Condomínio Mirante Sul")
-- complemento: apto, bloco, tower (ex: "Ap802", "bloco 01 Ap 508"). Se tiver traço "-" sozinho, deixe vazio ""
-- codigo_confirmacao: APENAS o "CODIGO DE COLETA PARCEIRA" do iFood (ex: "3027", "3266"). Se não houver, deixe ""
-- Campos não encontrados: string vazia ""`}
-          ]
+        requests:[{
+          image:{content:base64},
+          features:[{type:'TEXT_DETECTION',maxResults:1}]
         }]
       })
     });
@@ -1331,28 +1379,24 @@ Regras importantes:
     if(!resp.ok){
       const errData=await resp.json().catch(()=>({}));
       const errMsg=errData.error?.message||resp.statusText||resp.status;
-      console.error('[OCR API]',resp.status,errMsg);
-      if(resp.status===401)showM('ped-msg','❌ Chave API inválida. Verifique a configuração.',false);
-      else if(resp.status===429)showM('ped-msg','⚠️ Muitas requisições. Aguarde alguns segundos e tente novamente.',false);
-      else showM('ped-msg','❌ Erro na leitura ('+resp.status+'). Tente novamente.',false);
+      console.error('[OCR Google]',resp.status,errMsg);
+      if(resp.status===400&&errMsg.toLowerCase().includes('key'))showM('ped-msg','❌ Chave Google inválida. Verifique a configuração.',false);
+      else if(resp.status===403)showM('ped-msg','❌ Permissão negada. Ative a Cloud Vision API no Google Cloud Console.',false);
+      else if(resp.status===429)showM('ped-msg','⚠️ Muitas requisições. Aguarde alguns segundos.',false);
+      else showM('ped-msg','❌ Erro Google Vision ('+resp.status+'). Tente novamente.',false);
       return;
     }
 
     const data=await resp.json();
-    const rawText=(data.content||[]).map(c=>c.text||'').join('').trim();
-    let parsed;
-    try{
-      const clean=rawText.replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'').trim();
-      parsed=JSON.parse(clean);
-    }catch(e){
-      const m=rawText.match(/\{[\s\S]*?\}/);
-      if(m){try{parsed=JSON.parse(m[0]);}catch(e2){console.error('[OCR parse]',e2,rawText);}}
-    }
-    if(!parsed){
-      console.error('[OCR] Resposta inesperada:',rawText);
-      showM('ped-msg','❌ Não consegui interpretar a comanda. Tente foto mais nítida e centralizada.',false);
+    const rawText=data.responses?.[0]?.textAnnotations?.[0]?.description||'';
+
+    if(!rawText){
+      showM('ped-msg','❌ Não consegui ler texto na imagem. Tente foto mais nítida e centralizada.',false);
       return;
     }
+
+    // Parseia o texto extraído
+    const parsed=parsarComandaBR(rawText);
 
     // Preenche campos
     if(parsed.numero_pedido)$('p-num').value=parsed.numero_pedido;
@@ -1381,7 +1425,7 @@ Regras importantes:
     if(msg.includes('Failed to fetch')||msg.includes('NetworkError')){
       showM('ped-msg','❌ Sem conexão com a internet. Verifique a rede e tente novamente.',false);
     }else{
-      showM('ped-msg','❌ Erro ao processar: '+msg.slice(0,60),false);
+      showM('ped-msg','❌ Erro ao processar imagem. Tente novamente.',false);
     }
   }
 }
@@ -1825,9 +1869,7 @@ async function abrirCfgLj(){
     if(prev&&data.logo_url)prev.innerHTML=`<img src="${data.logo_url}" style="max-height:70px;max-width:200px;object-fit:contain;border-radius:6px;display:block;margin:0 auto;">`;
     else if(prev)prev.innerHTML='<p style="font-size:11px;color:#999;text-align:center;">Sem logo cadastrado</p>';
   }
-  // Carrega chave API do localStorage
-  const ak=localStorage.getItem('anthropic_key')||'';
-  if($('cfg-api-key'))$('cfg-api-key').value=ak?'••••••••••••'+ak.slice(-8):'';
+  // Google Vision já está configurado no código (GOOGLE_KEY)
   clearM('cfg-lj-msg');$('cfg-senha').value='';
 }
 async function salvarCfgLj(){
@@ -1837,9 +1879,6 @@ async function salvarCfgLj(){
     endereco_rua:rua,endereco_numero:num,endereco_bairro:bairro,endereco_cidade:cidade,endereco_complemento:comp,
     horario_abertura:v('cfg-ab')||null,horario_fechamento:v('cfg-fch')||null};
   const ns=v('cfg-senha');if(ns.length>=6)d.senha_hash=ns;
-  // Salva chave API (só se foi alterada - não começa com bullets)
-  const ak=v('cfg-api-key');
-  if(ak&&!ak.startsWith('•'))localStorage.setItem('anthropic_key',ak);
   const{error}=await db.from('usuarios').update(d).eq('id',U.id);
   if(error){showM('cfg-lj-msg','Erro: '+error.message);return;}
   U={...U,...d};localStorage.setItem('u',JSON.stringify(U));
@@ -1872,40 +1911,61 @@ async function initEnt(){
 }
 
 async function carregarLojaAtiva(){
-  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome,logo_url)').eq('entregador_id',U.id);
-  const entBox=$('ent-conectar-box'),selBox=$('ent-selecionar-loja-box'),infoBox=$('ent-loja-ativa-info');
-  if(!assoc||!assoc.length){
-    infoBox.innerHTML='<p style="font-size:12px;color:#999">Sem loja vinculada. Conecte abaixo.</p>';
-    selBox.classList.add('hidden');return;
-  }
-  // Mostra logo da loja ativa no header do entregador
+  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome,logo_url,codigo_loja)').eq('entregador_id',U.id);
+  const selBox=$('ent-selecionar-loja-box'),infoBox=$('ent-loja-ativa-info');
+
+  const renderLojaCard=(lj,ativa)=>{
+    const nomeLoja=lj.nome_loja||lj.nome;
+    const isOnline=U.online&&ativa;
+    return `<div style="background:${isOnline?'#e8f5e9':'#f5f5f5'};border-radius:10px;padding:11px;border:2px solid ${isOnline?'#00C9A7':'#ddd'};">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+        <span style="font-size:18px;">🏪</span>
+        <strong style="font-size:14px;color:${isOnline?'#1b5e20':'#444'};">${nomeLoja}</strong>
+      </div>
+      <p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${lj.codigo_loja||'---'}</strong></p>
+      <p style="font-size:11px;margin:2px 0;color:${isOnline?'#2e7d32':'#e65100'};font-weight:700;">${isOnline?'✅ Conectado e Online':'⏸️ Conectado — clique em Ficar Online'}</p>
+    </div>`;
+  };
+
   const mostrarLogoLoja=(lj)=>{
     const hdr=$('ent-loja-logo');
-    if(hdr&&lj&&lj.logo_url){
-      hdr.innerHTML=`<img src="${lj.logo_url}" style="max-height:45px;max-width:150px;object-fit:contain;display:block;margin:0 auto 4px;">`;
-    }else if(hdr){hdr.innerHTML='';}
+    if(hdr&&lj&&lj.logo_url)hdr.innerHTML=`<img src="${lj.logo_url}" style="max-height:45px;max-width:150px;object-fit:contain;display:block;margin:0 auto 4px;">`;
+    else if(hdr)hdr.innerHTML='';
   };
-  // Verificar loja ativa atual
+
+  if(!assoc||!assoc.length){
+    infoBox.innerHTML='<p style="font-size:12px;color:#999;">Sem loja vinculada. Digite o código abaixo.</p>';
+    selBox.classList.add('hidden');return;
+  }
   if(U.loja_ativa_id){
     const lojaAtiva=assoc.find(a=>a.loja_id===U.loja_ativa_id);
     if(lojaAtiva&&lojaAtiva.l){
-      infoBox.innerHTML=`<span class="badge b-em_rota">&#127978; ${lojaAtiva.l.nome_loja||lojaAtiva.l.nome}</span>`;
+      infoBox.innerHTML=renderLojaCard(lojaAtiva.l,true);
       mostrarLogoLoja(lojaAtiva.l);
-      selBox.classList.add('hidden');return;
+      selBox.classList.add('hidden');
+      if(assoc.length>1){
+        infoBox.innerHTML+=`<p style="font-size:11px;color:#888;margin-top:7px;">Você tem ${assoc.length} lojas. <button onclick="trocarLoja()" style="background:none;border:none;color:#004E89;font-weight:700;cursor:pointer;font-size:11px;padding:0;">Trocar loja</button></p>`;
+      }
+      return;
     }
   }
   if(assoc.length===1){
     await db.from('usuarios').update({loja_ativa_id:assoc[0].loja_id}).eq('id',U.id);
     U.loja_ativa_id=assoc[0].loja_id;localStorage.setItem('u',JSON.stringify(U));
-    infoBox.innerHTML=`<span class="badge b-em_rota">&#127978; ${assoc[0].l?assoc[0].l.nome_loja||assoc[0].l.nome:'Loja'}</span>`;
+    infoBox.innerHTML=renderLojaCard(assoc[0].l,false);
     mostrarLogoLoja(assoc[0].l);
     selBox.classList.add('hidden');
   }else{
-    infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;">&#9888; Voce esta vinculado a mais de uma loja. Selecione com qual vai trabalhar ao ficar online.</p>`;
+    infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;">⚠️ Você tem ${assoc.length} lojas. Selecione com qual vai trabalhar hoje.</p>`;
     const sel=$('ent-sel-loja-ativa');sel.innerHTML='';
     assoc.forEach(a=>sel.innerHTML+=`<option value="${a.loja_id}">${a.l?a.l.nome_loja||a.l.nome:'Loja'}</option>`);
     selBox.classList.remove('hidden');
   }
+}
+
+function trocarLoja(){
+  U.loja_ativa_id=null;localStorage.setItem('u',JSON.stringify(U));
+  carregarLojaAtiva();
 }
 
 async function confirmarLojaAtiva(){
@@ -1943,11 +2003,22 @@ function atuBtnOn(on){
 }
 
 async function toggleOnline(){
-  // Se tem multiplas lojas e nao tem loja ativa, mostrar seletor
   const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id);
-  if(!assoc||!assoc.length){alert('Voce precisa estar vinculado a uma loja primeiro.');return;}
-  if(!U.online&&assoc.length>1&&!U.loja_ativa_id){
-    $('ent-selecionar-loja-box').classList.remove('hidden');return;
+  // Se tentar ficar ONLINE sem loja
+  if(!U.online){
+    if(!assoc||!assoc.length){
+      alert('⚠️ Nenhuma loja conectada.\n\nDigite o código da loja no campo acima e clique em Conectar primeiro.');
+      return;
+    }
+    // Se tem múltiplas lojas e não tem loja ativa selecionada, mostrar seletor
+    if(assoc.length>1&&!U.loja_ativa_id){
+      $('ent-selecionar-loja-box').classList.remove('hidden');
+      return;
+    }
+    // Se tem apenas uma loja, define ela automaticamente
+    if(assoc.length===1&&!U.loja_ativa_id){
+      U.loja_ativa_id=assoc[0].loja_id;
+    }
   }
   const novo=!U.online;
   await db.from('usuarios').update({online:novo,loja_ativa_id:novo?U.loja_ativa_id:null}).eq('id',U.id);
@@ -1956,16 +2027,15 @@ async function toggleOnline(){
   atuBtnOn(novo);
   if(novo){
     inicRast();
-    // Mostra aviso de GPS background
     const av=$('gps-bg-aviso');
     if(av)av.classList.remove('hidden');
-  }
-  else{
+    await carregarLojaAtiva();
+  }else{
     if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
     if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
-    swPostMessage({type:'STOP_GPS'}); // Para SW background tracking
+    swPostMessage({type:'STOP_GPS'});
+    carregarLojaAtiva();
   }
-  if(!novo)carregarLojaAtiva();
 }
 
 function inicRast(){
@@ -2032,20 +2102,42 @@ async function uploadFoto(event){
 
 async function conectarCodigo(){
   const cod=v('cod-loja-inp').toUpperCase();const msg=$('msg-cod');
-  if(cod.length<4){msg.className='msg-error';msg.textContent='Digite o codigo';return;}
-  // Verificar se ja tem loja ativa
-  if(U.loja_ativa_id&&U.online){msg.className='msg-error';msg.textContent='Fique offline antes de conectar a outra loja.';return;}
-  const{data:loja}=await db.from('usuarios').select('id,nome_loja,nome').eq('codigo_loja',cod).eq('tipo','loja').single();
-  if(!loja){msg.className='msg-error';msg.textContent='Codigo nao encontrado.';return;}
+  if(cod.length<4){msg.className='msg-error';msg.textContent='Digite o codigo da loja';return;}
+  msg.className='';msg.textContent='Validando...';
+  const{data:loja}=await db.from('usuarios').select('id,nome_loja,nome,codigo_loja').eq('codigo_loja',cod).eq('tipo','loja').single();
+  if(!loja){msg.className='msg-error';msg.textContent='❌ Código não encontrado. Verifique e tente novamente.';return;}
+  const nomeLoja=loja.nome_loja||loja.nome;
+  // Tenta inserir associação (ignora se já existir)
   const{error}=await db.from('loja_entregadores').insert([{loja_id:loja.id,entregador_id:U.id}]);
-  if(error&&error.code==='23505'){msg.className='msg-error';msg.textContent='Voce ja esta vinculado a esta loja.';return;}
-  if(error){msg.className='msg-error';msg.textContent='Erro: '+error.message;return;}
-  msg.className='msg-ok';msg.textContent='Conectado a '+(loja.nome_loja||loja.nome)+'!';
-  $('cod-loja-inp').value='';setTimeout(()=>{msg.textContent='';},3000);
-  // Se for a primeira loja, definir como ativa
-  if(!U.loja_ativa_id){
-    await db.from('usuarios').update({loja_ativa_id:loja.id}).eq('id',U.id);
-    U.loja_ativa_id=loja.id;localStorage.setItem('u',JSON.stringify(U));
+  if(error&&error.code!=='23505'){msg.className='msg-error';msg.textContent='Erro: '+error.message;return;}
+  // Se já existe, apenas muda a loja ativa
+  // Define como loja ativa independente do status online
+  await db.from('usuarios').update({loja_ativa_id:loja.id}).eq('id',U.id);
+  U.loja_ativa_id=loja.id;localStorage.setItem('u',JSON.stringify(U));
+  $('cod-loja-inp').value='';
+  msg.className='msg-ok';
+  msg.textContent='';
+  // Mostra card de confirmação
+  const infoBox=$('ent-loja-ativa-info');
+  infoBox.innerHTML=`
+    <div style="background:#e8f5e9;border-radius:10px;padding:12px;border:2px solid #00C9A7;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span style="font-size:20px;">🏪</span>
+        <strong style="font-size:15px;color:#1b5e20;">${nomeLoja}</strong>
+      </div>
+      <p style="font-size:12px;color:#2e7d32;margin:2px 0;">🔑 Código: <strong>${loja.codigo_loja}</strong></p>
+      <p style="font-size:12px;color:#2e7d32;margin:2px 0;">✅ Status: <strong>Conectado</strong></p>
+    </div>`;
+  $('ent-selecionar-loja-box').classList.add('hidden');
+  // Se offline, atualiza botão para deixar online
+  if(!U.online){
+    const sel=$('ent-selecionar-loja-box');
+    if(sel)sel.classList.add('hidden');
+    // Avisa que pode ficar online agora
+    setTimeout(()=>{
+      msg.className='msg-ok';
+      msg.textContent='✅ Loja conectada! Agora clique em "Ficar Online"';
+    },200);
   }
   carregarLojaAtiva();
 }
@@ -2202,6 +2294,22 @@ async function ljFinalizarEntrega(id){
   carregarPedidos();
 }
 
+// ── Admin: Clicar no entregador foca no mapa ──
+function focarEntAdm(entId){
+  const mk=mrks['admin'];
+  const marker=mk[entId];
+  if(marker&&mapas['admin']){
+    seg['admin']=false;
+    mapas['admin'].setView(marker.getLatLng(),17,{animate:true});
+    marker.openPopup();
+    // Scroll até o mapa
+    const mapaEl=$('mapa-admin');
+    if(mapaEl)mapaEl.scrollIntoView({behavior:'smooth',block:'center'});
+  }else{
+    alert('Localização ainda não disponível para este entregador.');
+  }
+}
+
 // ── Loja: Clicar em entregador para focar no mapa ──
 function focarEntregadorMapa(entId){
   const mk=mrks['loja'];
@@ -2217,23 +2325,112 @@ function focarEntregadorMapa(entId){
     alert('Localização ainda não disponível. O entregador precisa ter o GPS ativo.');
   }
 }
+let _gnhFiltro='hoje';
+
+async function abrirGanhosEnt(){
+  openM('ganhos');
+  _gnhFiltro='hoje';
+  // Highlight botão ativo
+  ['hoje','ontem','semana','mes'].forEach(f=>{
+    const b=$('gnhf-'+f);if(b){b.style.background=f==='hoje'?'#00C9A7':'#888';b.style.opacity='1';}
+  });
+  await carregarResumoGanhos();
+  await carregarGanhos();
+}
+
+function filtroGanhos(per,btn){
+  _gnhFiltro=per;
+  ['hoje','ontem','semana','mes'].forEach(f=>{
+    const b=$('gnhf-'+f);if(b){b.style.background=f===per?'#00C9A7':'#888';}
+  });
+  carregarGanhos();
+}
+
+function periodoRange(per){
+  const agora=new Date();
+  let inicio,fim=new Date(agora);
+  fim.setHours(23,59,59,999);
+  if(per==='hoje'){inicio=new Date(agora);inicio.setHours(0,0,0,0);}
+  else if(per==='ontem'){inicio=new Date(agora);inicio.setDate(inicio.getDate()-1);inicio.setHours(0,0,0,0);fim=new Date(agora);fim.setDate(fim.getDate()-1);fim.setHours(23,59,59,999);}
+  else if(per==='semana'){inicio=new Date(agora);inicio.setDate(inicio.getDate()-inicio.getDay());inicio.setHours(0,0,0,0);}
+  else{inicio=new Date(agora.getFullYear(),agora.getMonth(),1,0,0,0,0);}
+  return{inicio:inicio.toISOString(),fim:fim.toISOString()};
+}
+
+async function carregarResumoGanhos(){
+  const el=$('gnh-resumo');el.innerHTML='';
+  // Busca hoje, semana, mês de uma vez
+  const hoje=new Date();
+  const inicioHoje=new Date(hoje);inicioHoje.setHours(0,0,0,0);
+  const inicioOntem=new Date(hoje);inicioOntem.setDate(inicioOntem.getDate()-1);inicioOntem.setHours(0,0,0,0);
+  const fimOntem=new Date(hoje);fimOntem.setDate(fimOntem.getDate()-1);fimOntem.setHours(23,59,59,999);
+  const inicioSem=new Date(hoje);inicioSem.setDate(inicioSem.getDate()-inicioSem.getDay());inicioSem.setHours(0,0,0,0);
+  const inicioMes=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+
+  const[rHoje,rOntem,rSem,rMes]=await Promise.all([
+    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()),
+    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString()),
+    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()),
+    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()),
+  ]);
+  const soma=arr=>(arr||[]).reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  const dH=rHoje.data||[],dO=rOntem.data||[],dS=rSem.data||[],dM=rMes.data||[];
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
+      <div style="background:#e8f5e9;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('hoje',$('gnhf-hoje'))">
+        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Hoje</p>
+        <p style="font-size:22px;font-weight:800;color:#2e7d32;">${fR(soma(dH))}</p>
+        <p style="font-size:11px;color:#555;">${dH.length} corridas</p>
+      </div>
+      <div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('ontem',$('gnhf-ontem'))">
+        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Ontem</p>
+        <p style="font-size:22px;font-weight:800;color:#e65100;">${fR(soma(dO))}</p>
+        <p style="font-size:11px;color:#555;">${dO.length} corridas</p>
+      </div>
+      <div style="background:#e3f2fd;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('semana',$('gnhf-semana'))">
+        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Esta Semana</p>
+        <p style="font-size:22px;font-weight:800;color:#1565C0;">${fR(soma(dS))}</p>
+        <p style="font-size:11px;color:#555;">${dS.length} corridas</p>
+      </div>
+      <div style="background:#f3e5f5;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('mes',$('gnhf-mes'))">
+        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Este Mês</p>
+        <p style="font-size:22px;font-weight:800;color:#6a1b9a;">${fR(soma(dM))}</p>
+        <p style="font-size:11px;color:#555;">${dM.length} corridas</p>
+      </div>
+    </div>`;
+}
+
 async function carregarGanhos(){
-  const p=$('gnh-f').value,el=$('gnh-dados');el.innerHTML='<p>Carregando...</p>';
-  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',iPer(p)).in('status',['entregue','em_rota','saiu_entrega','chegou_loja','aceito']);
-  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no periodo.</p>';return;}
+  const per=_gnhFiltro||'hoje';
+  const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
+  const{inicio,fim}=periodoRange(per);
+  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
+  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';return;}
   const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-  el.innerHTML=`<div style="background:#e8f5e9;padding:14px;border-radius:11px;text-align:center;margin-bottom:13px;">
-    <p style="font-size:11px;color:#666">Total do periodo</p>
-    <p style="font-size:30px;font-weight:700;color:#2e7d32">${fR(tot)}</p>
-    <p style="font-size:12px;color:#666">${data.length} entrega(s)</p>
-  </div>
-  ${data.map((e,i)=>`<div style="padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
-    <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Ent '+(i+1)}</strong><strong style="color:#2e7d32">${fR(e.valor_corrida||e.valor_entregador)}</strong></div>
-    <p style="color:#888">&#127978; ${e.l?e.l.nome_loja||e.l.nome:'Loja'}</p>
-    <p style="color:#555">&#128205; ${e.endereco_entrega}</p>
-    ${e.distancia_km>0?`<p style="color:#888">${parseFloat(e.distancia_km).toFixed(1)} km</p>`:''}
-    <span class="badge b-${e.status}">${e.status}</span>
-  </div>`).join('')}`;
+  const labels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',mes:'Este Mês'};
+  el.innerHTML=`
+    <div style="background:#e8f5e9;padding:12px;border-radius:11px;text-align:center;margin-bottom:12px;border:2px solid #00C9A7;">
+      <p style="font-size:11px;color:#666;">${labels[per]} — ${data.length} entrega(s)</p>
+      <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(tot)}</p>
+    </div>
+    <p style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">📋 Detalhes das corridas:</p>
+    ${data.map((e,i)=>{
+      const hr=e.entregue_at?new Date(e.entregue_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
+      const nomeLoja=e.l?e.l.nome_loja||e.l.nome:'Loja';
+      const endRetirada=e.l&&e.l.endereco?e.l.endereco:'Endereço da loja';
+      return `<div style="padding:10px;border-bottom:1px solid #f0f0f0;background:white;border-radius:8px;margin-bottom:5px;border:1px solid #eee;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <strong style="font-size:13px;">Corrida ${i+1}${e.numero_pedido?' — #'+e.numero_pedido:''}</strong>
+          <strong style="color:#2e7d32;font-size:14px;">${fR(e.valor_corrida||e.valor_entregador)}</strong>
+        </div>
+        <p style="font-size:11px;color:#666;margin:2px 0;">🕐 Horário: <strong>${hr}</strong></p>
+        <p style="font-size:11px;color:#666;margin:2px 0;">🏪 Loja: <strong>${nomeLoja}</strong></p>
+        <p style="font-size:11px;color:#555;margin:2px 0;">📤 Retirada: ${endRetirada}</p>
+        <p style="font-size:11px;color:#555;margin:2px 0;">📍 Entrega: ${e.endereco_entrega||'-'}</p>
+        ${e.distancia_km>0?`<p style="font-size:11px;color:#888;margin:2px 0;">📏 ${parseFloat(e.distancia_km).toFixed(1)} km</p>`:''}
+        <span class="badge b-entregue" style="margin-top:4px;display:inline-block;">✅ Entregue</span>
+      </div>`;
+    }).join('')}`;
 }
 
 async function abrirCfgEnt(){
