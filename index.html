@@ -1940,19 +1940,43 @@ async function initEnt(){
 }
 
 async function carregarLojaAtiva(){
-  const{data:assoc}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome,logo_url,codigo_loja)').eq('entregador_id',U.id);
+  // Tenta buscar loja_ativa_id do banco — mas não bloqueia se a coluna não existir
+  try{
+    const{data:userData}=await db.from('usuarios').select('loja_ativa_id').eq('id',U.id).single();
+    if(userData&&userData.loja_ativa_id){
+      U.loja_ativa_id=userData.loja_ativa_id;
+      localStorage.setItem('u',JSON.stringify(U));
+    }
+  }catch(e){console.warn('[loja_ativa_id coluna]',e);}
+
+  // Se tem dados no localStorage, usa imediatamente para resposta rápida
+  if(!U.loja_ativa_id&&U._loja_ativa_nome){
+    const infoBox=$('ent-loja-ativa-info');
+    const selBox=$('ent-selecionar-loja-box');
+    infoBox.innerHTML=`<div style="background:${U.online?'#e8f5e9':'#f0f4ff'};border-radius:10px;padding:11px;border:2px solid ${U.online?'#00C9A7':'#004E89'};">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+        <span style="font-size:18px;">🏪</span>
+        <strong style="font-size:15px;color:${U.online?'#1b5e20':'#004E89'};">${U._loja_ativa_nome}</strong>
+      </div>
+      ${U._loja_ativa_codigo?`<p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${U._loja_ativa_codigo}</strong></p>`:''}
+      <p style="font-size:12px;margin:4px 0;color:${U.online?'#2e7d32':'#e65100'};font-weight:700;">${U.online?'✅ Conectado e Online':'⏸️ Conectado — clique em Ficar Online'}</p>
+    </div>`;
+    selBox.classList.add('hidden');
+  }
+
+  const{data:assoc,error:assocErr}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome,logo_url,codigo_loja)').eq('entregador_id',U.id);
   const selBox=$('ent-selecionar-loja-box'),infoBox=$('ent-loja-ativa-info');
 
   const renderLojaCard=(lj,ativa)=>{
     const nomeLoja=lj.nome_loja||lj.nome;
     const isOnline=U.online&&ativa;
-    return `<div style="background:${isOnline?'#e8f5e9':'#f5f5f5'};border-radius:10px;padding:11px;border:2px solid ${isOnline?'#00C9A7':'#ddd'};">
+    return `<div style="background:${isOnline?'#e8f5e9':'#f0f4ff'};border-radius:10px;padding:11px;border:2px solid ${isOnline?'#00C9A7':'#004E89'};">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
         <span style="font-size:18px;">🏪</span>
-        <strong style="font-size:14px;color:${isOnline?'#1b5e20':'#444'};">${nomeLoja}</strong>
+        <strong style="font-size:15px;color:${isOnline?'#1b5e20':'#004E89'};">${nomeLoja}</strong>
       </div>
       <p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${lj.codigo_loja||'---'}</strong></p>
-      <p style="font-size:11px;margin:2px 0;color:${isOnline?'#2e7d32':'#e65100'};font-weight:700;">${isOnline?'✅ Conectado e Online':'⏸️ Conectado — clique em Ficar Online'}</p>
+      <p style="font-size:12px;margin:4px 0;color:${isOnline?'#2e7d32':'#e65100'};font-weight:700;">${isOnline?'✅ Conectado e Online':'⏸️ Conectado — clique em Ficar Online'}</p>
     </div>`;
   };
 
@@ -1963,33 +1987,50 @@ async function carregarLojaAtiva(){
   };
 
   if(!assoc||!assoc.length){
-    infoBox.innerHTML='<p style="font-size:12px;color:#999;">Sem loja vinculada. Digite o código abaixo.</p>';
+    // Só mostra "sem loja" se também não tem no localStorage
+    if(!U._loja_ativa_nome){
+      infoBox.innerHTML='<p style="font-size:12px;color:#999;">Sem loja vinculada. Digite o código abaixo.</p>';
+    }
     selBox.classList.add('hidden');return;
   }
+
+  // Tenta encontrar loja ativa
+  let lojaAtiva=null;
   if(U.loja_ativa_id){
-    const lojaAtiva=assoc.find(a=>a.loja_id===U.loja_ativa_id);
-    if(lojaAtiva&&lojaAtiva.l){
-      infoBox.innerHTML=renderLojaCard(lojaAtiva.l,true);
-      mostrarLogoLoja(lojaAtiva.l);
-      selBox.classList.add('hidden');
-      if(assoc.length>1){
-        infoBox.innerHTML+=`<p style="font-size:11px;color:#888;margin-top:7px;">Você tem ${assoc.length} lojas. <button onclick="trocarLoja()" style="background:none;border:none;color:#004E89;font-weight:700;cursor:pointer;font-size:11px;padding:0;">Trocar loja</button></p>`;
-      }
-      return;
-    }
+    lojaAtiva=assoc.find(a=>a.loja_id===U.loja_ativa_id);
   }
-  if(assoc.length===1){
-    await db.from('usuarios').update({loja_ativa_id:assoc[0].loja_id}).eq('id',U.id);
-    U.loja_ativa_id=assoc[0].loja_id;localStorage.setItem('u',JSON.stringify(U));
-    infoBox.innerHTML=renderLojaCard(assoc[0].l,false);
-    mostrarLogoLoja(assoc[0].l);
+  // Se não encontrou por ID, tenta pelo nome salvo no localStorage
+  if(!lojaAtiva&&U._loja_ativa_nome){
+    lojaAtiva=assoc.find(a=>a.l&&(a.l.nome_loja||a.l.nome)===U._loja_ativa_nome);
+  }
+  // Se só tem 1 loja, usa ela automaticamente
+  if(!lojaAtiva&&assoc.length===1){
+    lojaAtiva=assoc[0];
+    try{await db.from('usuarios').update({loja_ativa_id:lojaAtiva.loja_id}).eq('id',U.id);}catch(e){}
+    U.loja_ativa_id=lojaAtiva.loja_id;
+    if(lojaAtiva.l){U._loja_ativa_nome=lojaAtiva.l.nome_loja||lojaAtiva.l.nome;U._loja_ativa_codigo=lojaAtiva.l.codigo_loja;}
+    localStorage.setItem('u',JSON.stringify(U));
+  }
+
+  if(lojaAtiva&&lojaAtiva.l){
+    infoBox.innerHTML=renderLojaCard(lojaAtiva.l,true);
+    mostrarLogoLoja(lojaAtiva.l);
+    // Salva no localStorage para acesso offline
+    U._loja_ativa_nome=lojaAtiva.l.nome_loja||lojaAtiva.l.nome;
+    U._loja_ativa_codigo=lojaAtiva.l.codigo_loja;
+    localStorage.setItem('u',JSON.stringify(U));
     selBox.classList.add('hidden');
-  }else{
-    infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;">⚠️ Você tem ${assoc.length} lojas. Selecione com qual vai trabalhar hoje.</p>`;
-    const sel=$('ent-sel-loja-ativa');sel.innerHTML='';
-    assoc.forEach(a=>sel.innerHTML+=`<option value="${a.loja_id}">${a.l?a.l.nome_loja||a.l.nome:'Loja'}</option>`);
-    selBox.classList.remove('hidden');
+    if(assoc.length>1){
+      infoBox.innerHTML+=`<p style="font-size:11px;color:#888;margin-top:7px;">Você tem ${assoc.length} lojas. <button onclick="trocarLoja()" style="background:none;border:none;color:#004E89;font-weight:700;cursor:pointer;font-size:11px;padding:0;">Trocar loja</button></p>`;
+    }
+    return;
   }
+
+  // Múltiplas lojas sem ativa definida — mostrar seletor
+  infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;">⚠️ Selecione com qual loja vai trabalhar hoje:</p>`;
+  const sel=$('ent-sel-loja-ativa');sel.innerHTML='';
+  assoc.forEach(a=>sel.innerHTML+=`<option value="${a.loja_id}">${a.l?a.l.nome_loja||a.l.nome:'Loja'}</option>`);
+  selBox.classList.remove('hidden');
 }
 
 function trocarLoja(){
@@ -2133,20 +2174,22 @@ async function conectarCodigo(){
   const cod=v('cod-loja-inp').toUpperCase();const msg=$('msg-cod');
   if(cod.length<4){msg.className='msg-error';msg.textContent='Digite o codigo da loja';return;}
   msg.className='';msg.textContent='Validando...';
-  const{data:loja}=await db.from('usuarios').select('id,nome_loja,nome,codigo_loja').eq('codigo_loja',cod).eq('tipo','loja').single();
+  const{data:loja,error:ljErr}=await db.from('usuarios').select('id,nome_loja,nome,codigo_loja').eq('codigo_loja',cod).eq('tipo','loja').single();
   if(!loja){msg.className='msg-error';msg.textContent='❌ Código não encontrado. Verifique e tente novamente.';return;}
   const nomeLoja=loja.nome_loja||loja.nome;
-  // Tenta inserir associação (ignora se já existir)
-  const{error}=await db.from('loja_entregadores').insert([{loja_id:loja.id,entregador_id:U.id}]);
-  if(error&&error.code!=='23505'){msg.className='msg-error';msg.textContent='Erro: '+error.message;return;}
-  // Se já existe, apenas muda a loja ativa
-  // Define como loja ativa independente do status online
-  await db.from('usuarios').update({loja_ativa_id:loja.id}).eq('id',U.id);
-  U.loja_ativa_id=loja.id;localStorage.setItem('u',JSON.stringify(U));
+  // Insere associação (ignora duplicata)
+  const{error:insErr}=await db.from('loja_entregadores').insert([{loja_id:loja.id,entregador_id:U.id}]);
+  if(insErr&&insErr.code!=='23505'){msg.className='msg-error';msg.textContent='Erro ao vincular: '+insErr.message;return;}
+  // Salva loja ativa no banco
+  const{error:updErr}=await db.from('usuarios').update({loja_ativa_id:loja.id}).eq('id',U.id);
+  if(updErr){console.warn('[loja_ativa_id]',updErr.message);}
+  // Salva localmente também (fallback se coluna não existir no banco)
+  U.loja_ativa_id=loja.id;
+  U._loja_ativa_nome=nomeLoja;
+  U._loja_ativa_codigo=loja.codigo_loja;
+  localStorage.setItem('u',JSON.stringify(U));
   $('cod-loja-inp').value='';
-  msg.className='msg-ok';
-  msg.textContent='';
-  // Mostra card de confirmação
+  // Mostra card de confirmação imediatamente
   const infoBox=$('ent-loja-ativa-info');
   infoBox.innerHTML=`
     <div style="background:#e8f5e9;border-radius:10px;padding:12px;border:2px solid #00C9A7;">
@@ -2155,20 +2198,17 @@ async function conectarCodigo(){
         <strong style="font-size:15px;color:#1b5e20;">${nomeLoja}</strong>
       </div>
       <p style="font-size:12px;color:#2e7d32;margin:2px 0;">🔑 Código: <strong>${loja.codigo_loja}</strong></p>
-      <p style="font-size:12px;color:#2e7d32;margin:2px 0;">✅ Status: <strong>Conectado</strong></p>
+      <p style="font-size:12px;color:#2e7d32;margin:2px 0;font-weight:700;">✅ Loja conectada com sucesso!</p>
     </div>`;
   $('ent-selecionar-loja-box').classList.add('hidden');
-  // Se offline, atualiza botão para deixar online
   if(!U.online){
-    const sel=$('ent-selecionar-loja-box');
-    if(sel)sel.classList.add('hidden');
-    // Avisa que pode ficar online agora
-    setTimeout(()=>{
-      msg.className='msg-ok';
-      msg.textContent='✅ Loja conectada! Agora clique em "Ficar Online"';
-    },200);
+    msg.className='msg-ok';
+    msg.textContent='✅ Loja conectada! Agora clique em "Ficar Online"';
+  }else{
+    msg.className='msg-ok';
+    msg.textContent='✅ Loja conectada!';
   }
-  carregarLojaAtiva();
+  setTimeout(()=>carregarLojaAtiva(),500);
 }
 
 // ===== ROTA ENTREGADOR COM STATUS GPS =====
