@@ -1798,10 +1798,12 @@ function abrirEditarPedido(id,num,cli,tel,rua,nend,bairro,cidade,comp,obs){
   clearM('edit-msg');openM('editar');
 }
 async function salvarEdicaoPedido(){
-  const id=$('edit-id').value;if(!id)return;
+  const id=$('edit-id').value;if(!id){showM('edit-msg','Erro: ID do pedido não encontrado.',false);return;}
+  const btn=document.querySelector('#m-editar .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
   const rua=v('edit-rua'),nend=v('edit-nend'),bairro=v('edit-bairro'),cidade=v('edit-cidade')||'Ribeirao Preto',comp=v('edit-comp');
   const endereco=fEnd(rua,nend,bairro,cidade,comp);
-  await db.from('entregas').update({
+  const{error}=await db.from('entregas').update({
     numero_pedido:v('edit-num')||null,
     cliente_nome:v('edit-cli'),
     cliente_telefone:v('edit-tel'),
@@ -1809,8 +1811,14 @@ async function salvarEdicaoPedido(){
     endereco_complemento:comp,endereco_entrega:endereco,
     observacoes:v('edit-obs')
   }).eq('id',id);
-  showM('edit-msg','Pedido atualizado!',true);
-  setTimeout(()=>{closeM('editar');carregarPedidos();},800);
+  if(btn){btn.disabled=false;btn.textContent='✓ Salvar Alteracoes';}
+  if(error){
+    console.error('[editar]',error);
+    showM('edit-msg','❌ Erro ao salvar: '+error.message,false);
+    return;
+  }
+  showM('edit-msg','✅ Pedido atualizado!',true);
+  setTimeout(()=>{closeM('editar');carregarPedidos();},1000);
 }
 
 async function marcarEnt(id){
