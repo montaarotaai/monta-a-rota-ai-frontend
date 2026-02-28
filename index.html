@@ -332,9 +332,14 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="container">
     <!-- Banner GPS: só aparece aqui dentro, só para entregador -->
     <div id="gps-banner" class="hidden" style="background:#e65100;color:white;padding:9px 14px;border-radius:9px;margin-bottom:10px;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span style="flex:1;">&#128205; Localizacao desligada. Ative o GPS do aparelho para rastrear sua posicao.</span>
+      <span style="flex:1;">📍 Localização desligada. Ative o GPS do aparelho para rastrear sua posição.</span>
       <button onclick="pedirGPS()" style="background:white;color:#e65100;border:none;padding:5px 11px;border-radius:6px;font-weight:700;cursor:pointer;font-size:11px;">Ativar</button>
       <button onclick="$('gps-banner').classList.add('hidden')" style="background:transparent;color:white;border:none;font-size:18px;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <!-- Aviso background GPS -->
+    <div id="gps-bg-aviso" class="hidden" style="background:#fff3e0;border:1.5px solid #FF6B35;border-radius:9px;padding:9px 13px;margin-bottom:10px;font-size:11px;color:#e65100;">
+      📱 <strong>GPS em background:</strong> Mantenha a tela do app visível ou a tela do celular ligada enquanto estiver em rota. Se fechar o app, a localização pode não atualizar.
+      <button onclick="$('gps-bg-aviso').classList.add('hidden')" style="float:right;background:none;border:none;font-size:16px;cursor:pointer;color:#e65100;line-height:1;">&times;</button>
     </div>
     <div id="gps-debug" style="font-size:10px;color:#888;text-align:center;margin-bottom:4px;"></div>
     <div id="ent-pedido-alerta" class="hidden" style="background:#FF6B35;color:white;padding:12px;border-radius:10px;margin-bottom:10px;text-align:center;font-weight:700;font-size:14px;cursor:pointer;" onclick="abrirRotaEnt()">
@@ -892,7 +897,7 @@ async function initAdmin(){
   await carregarDadosAdmin();
   await carregarAdmGpsToggle();
   criarMapa('admin');await pullAdm();
-  ivs.mAdm=setInterval(pullAdm,8000);
+  ivs.mAdm=setInterval(pullAdm,5000);
   iniciarRealtimeDrivers('admin');
   await carregarAdmImpersonar();
 }
@@ -1163,7 +1168,7 @@ async function initLoja(){
   if(U.loja_lat&&U.loja_lng){lojaGeoCache={lat:U.loja_lat,lng:U.loja_lng};}
   else if(U.endereco){geocode(U.endereco).then(g=>{if(g){lojaGeoCache=g;db.from('usuarios').update({loja_lat:g.lat,loja_lng:g.lng}).eq('id',U.id);}});}
   criarMapa('loja');await pullLj();
-  ivs.mLj=setInterval(pullLj,8000);
+  ivs.mLj=setInterval(pullLj,5000);
   iniciarRealtimeDrivers('loja');
 }
 
@@ -1257,25 +1262,66 @@ async function lerComanda(event){
   $('ocr-img').src=url;$('ocr-prev').classList.remove('hidden');
   const loadEl=$('ocr-load');
   loadEl.classList.remove('hidden');
-  loadEl.innerHTML='<span style="font-size:12px;color:#555">⏳ Iniciando leitura...</span>';
+  loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 Lendo comanda com IA...</span>';
 
   try{
-    const result=await Tesseract.recognize(file,'por+eng',{
-      logger:m=>{
-        if(m.status==='recognizing text'){
-          const pct=Math.round(m.progress*100);
-          loadEl.innerHTML=`<div style="background:#eee;border-radius:4px;height:8px;margin:4px 0;"><div style="background:#FF6B35;height:8px;border-radius:4px;width:${pct}%"></div></div><span style="font-size:11px;color:#666">Lendo comanda... ${pct}%</span>`;
-        }else if(m.status==='loading tesseract core'||m.status==='initializing tesseract'){
-          loadEl.innerHTML='<span style="font-size:11px;color:#666">⏳ Carregando motor OCR (primeira vez demora ~20s)...</span>';
-        }
-      }
+    // Converte imagem para base64
+    const base64=await new Promise((res,rej)=>{
+      const reader=new FileReader();
+      reader.onload=e=>res(e.target.result.split(',')[1]);
+      reader.onerror=rej;
+      reader.readAsDataURL(file);
+    });
+    const mime=file.type||'image/jpeg';
+
+    loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 IA analisando a comanda...</span>';
+
+    // Chama Claude Vision API
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image',source:{type:'base64',media_type:mime,data:base64}},
+            {type:'text',text:`Leia esta comanda de delivery e extraia SOMENTE um JSON com estes campos (sem markdown, só o JSON puro):
+{
+  "numero_pedido": "número ou código do pedido",
+  "nome_cliente": "nome do cliente (apenas o nome, sem telefone nem título)",
+  "telefone": "telefone com DDD, só números",
+  "rua": "nome da rua ou avenida SEM número",
+  "numero_end": "número da residência",
+  "bairro": "bairro",
+  "complemento": "complemento se houver (ex: Apto 22, Bloco B), vazio se não tiver",
+  "codigo_confirmacao": "código de coleta parceira iFood se houver, vazio caso contrário"
+}
+Regras:
+- nome_cliente: NUNCA coloque nome de loja/restaurante, apenas o nome do cliente final
+- Se campo não encontrado deixe string vazia ""
+- numero_end: apenas o número, sem letras ou texto
+- rua: apenas o nome, ex: "Rua Patrocínio" sem o número`}
+          ]
+        }]
+      })
     });
 
     loadEl.classList.add('hidden');
-    const texto=result.data.text||'';
-    if(!texto.trim()){showM('ped-msg','Não foi possível ler. Melhore a iluminação e tente novamente.',false);return;}
-
-    const parsed=parsearComanda(texto);
+    if(!resp.ok){showM('ped-msg','❌ Erro na leitura. Tente novamente.',false);return;}
+    const data=await resp.json();
+    const rawText=(data.content||[]).map(c=>c.text||'').join('');
+    let parsed;
+    try{
+      const clean=rawText.replace(/```json|```/g,'').trim();
+      parsed=JSON.parse(clean);
+    }catch(e){
+      // fallback: tenta extrair JSON do texto
+      const m=rawText.match(/\{[\s\S]*\}/);
+      if(m){try{parsed=JSON.parse(m[0]);}catch(e2){}}
+    }
+    if(!parsed){showM('ped-msg','❌ Não consegui ler a comanda. Tente foto mais nítida.',false);return;}
 
     if(parsed.numero_pedido)$('p-num').value=parsed.numero_pedido;
     if(parsed.nome_cliente)$('p-cli').value=parsed.nome_cliente;
@@ -1599,17 +1645,21 @@ async function carregarAdmGpsToggle(){
 // ============ SUPABASE REALTIME GPS ============
 function iniciarRealtimeDrivers(tipo){
   // Cancela canal anterior se houver
-  if(realtimeCh){try{realtimeCh.unsubscribe();}catch(e){}realtimeCh=null;}
-  realtimeCh=db.channel('gps-drivers-'+tipo)
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'usuarios'},
-      async (payload)=>{
-        const p=payload.new;
-        if(!p.online||p.tipo!=='entregador')return;
+  if(realtimeCh){try{db.removeChannel(realtimeCh);}catch(e){}realtimeCh=null;}
+  // Canal dedicado por tipo para evitar conflito
+  realtimeCh=db.channel('gps-live-'+tipo+'-'+Date.now())
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'usuarios',filter:'tipo=eq.entregador'},
+      async ()=>{
+        // Qualquer update num entregador: recarrega o mapa imediatamente
         if(tipo==='admin')await pullAdm();
         else if(tipo==='loja')await pullLj();
       })
-    .subscribe((status)=>{
-      console.log('[Realtime]',tipo,status);
+    .subscribe((status,err)=>{
+      console.log('[Realtime]',tipo,status,err||'');
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        // Reconecta automaticamente após 3s
+        setTimeout(()=>iniciarRealtimeDrivers(tipo),3000);
+      }
     });
 }
 
@@ -1864,7 +1914,12 @@ async function toggleOnline(){
   U.online=novo;if(!novo)U.loja_ativa_id=null;
   localStorage.setItem('u',JSON.stringify(U));
   atuBtnOn(novo);
-  if(novo)inicRast();
+  if(novo){
+    inicRast();
+    // Mostra aviso de GPS background
+    const av=$('gps-bg-aviso');
+    if(av)av.classList.remove('hidden');
+  }
   else{
     if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
     if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
