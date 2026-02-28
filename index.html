@@ -530,6 +530,29 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="btn btn-primary" onclick="salvarEdicaoPedido()">&#10003; Salvar Alteracoes</button>
 </div></div>
 
+<!-- Confirmação iFood -->
+<div id="m-ifood-conf" class="modal"><div class="modal-box">
+  <button class="modal-close" onclick="closeM('ifood-conf')">&times;</button>
+  <div style="text-align:center;margin-bottom:14px;">
+    <div style="font-size:40px;">📱</div>
+    <h2 style="color:#ea1d2c;margin-bottom:4px;">Confirmação iFood</h2>
+    <p style="font-size:12px;color:#888;">Pedido <strong id="ifood-conf-num"></strong></p>
+  </div>
+  <div style="background:#fff3e0;border:1.5px solid #FF6B35;border-radius:10px;padding:12px;margin-bottom:14px;">
+    <p style="font-size:13px;color:#e65100;font-weight:700;margin-bottom:6px;">Como confirmar:</p>
+    <p style="font-size:12px;color:#555;line-height:1.6;">1. Chegue ao endereço de entrega<br>2. Mostre o pedido ao cliente<br>3. O <strong>cliente</strong> vai fornecer um código de confirmação<br>4. Digite o código abaixo e finalize</p>
+  </div>
+  <a id="ifood-conf-link" href="#" target="_blank" style="display:block;background:#ea1d2c;color:white;text-align:center;padding:11px;border-radius:9px;font-weight:700;font-size:14px;text-decoration:none;margin-bottom:12px;">
+    🔗 Abrir iFood para Confirmar
+  </a>
+  <div class="fg">
+    <label>Código fornecido pelo cliente</label>
+    <input type="number" id="ifood-cod-input" placeholder="Ex: 1234" style="font-size:22px;text-align:center;letter-spacing:6px;font-weight:700;" autofocus>
+  </div>
+  <div id="ifood-conf-msg" style="margin-bottom:8px;"></div>
+  <button class="btn btn-green" onclick="finalizarComCodigoIfood()">✅ Confirmar e Finalizar Entrega</button>
+</div></div>
+
 <!-- Config Entregador -->
 <div id="m-cfg-ent" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('cfg-ent')">&times;</button>
@@ -571,6 +594,50 @@ window.onload=()=>{
   const s=localStorage.getItem('u');
   if(s){U=JSON.parse(s);showPg(U.tipo);}
 };
+
+
+// ── GPS EM BACKGROUND: Wake Lock + Visibility API ──
+// Mantém o rastreamento ativo mesmo com tela em segundo plano
+let _wakeLock=null;
+
+async function ativarWakeLock(){
+  if(!('wakeLock' in navigator))return;
+  try{
+    _wakeLock=await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release',()=>{
+      // Tenta reativar se ainda estiver online
+      if(U&&U.online)setTimeout(ativarWakeLock,2000);
+    });
+  }catch(e){console.warn('[WakeLock]',e);}
+}
+
+function liberarWakeLock(){
+  if(_wakeLock){_wakeLock.release().catch(()=>{});_wakeLock=null;}
+}
+
+// Quando app volta ao foco, retoma GPS imediatamente
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&U&&U.online&&U.tipo==='entregador'){
+    // App voltou ao foco — envia posição imediatamente
+    if(myLat&&myLng){
+      db.from('usuarios').update({latitude:myLat,longitude:myLng}).eq('id',U.id);
+    }
+    navigator.geolocation&&navigator.geolocation.getCurrentPosition(
+      p=>{myLat=p.coords.latitude;myLng=p.coords.longitude;
+          db.from('usuarios').update({latitude:myLat,longitude:myLng}).eq('id',U.id);},
+      ()=>{},
+      {enableHighAccuracy:true,timeout:10000,maximumAge:5000}
+    );
+    // Reativa Wake Lock se perdeu
+    ativarWakeLock();
+  }
+});
+
+function swPostMessage(msg){
+  // Mantido por compatibilidade — agora usando Wake Lock em vez de SW
+  if(msg.type==='STOP_GPS')liberarWakeLock();
+}
+
 
 // Helper seguro para banner GPS (so existe na tela do entregador)
 function showGpsBanner(show){
@@ -843,18 +910,33 @@ async function carregarDadosAdmin(){
   const{data:ativ}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome),entregador:entregador_id(nome,telefone)').in('status',['aceito','chegou_loja','saiu_entrega','em_rota']).order('created_at',{ascending:false}).limit(20);
   const el=$('adm-entregas-realtime');
   if(!ativ||!ativ.length){el.innerHTML='<p style="color:#999;font-size:13px;">Nenhuma entrega ativa agora.</p>';return;}
-  el.innerHTML=ativ.map(e=>`
-    <div style="padding:9px;border-radius:8px;background:#f8f9fa;margin-bottom:7px;border-left:3px solid #FF6B35;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+  el.innerHTML=ativ.map(e=>{
+    const st=e.status_detalhado||e.status;
+    const stColor={'aceito':'#1565C0','chegou_loja':'#e65100','saiu_entrega':'#FF6B35','em_rota':'#6a1b9a'}[st]||'#555';
+    const stLabel={'aceito':'Aceito','chegou_loja':'Na Loja','saiu_entrega':'A Caminho','em_rota':'Em Rota'}[st]||st;
+    return `<div style="border-radius:10px;background:white;margin-bottom:8px;border:1.5px solid #e0e0e0;overflow:hidden;">
+      <div style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="this.nextElementSibling.classList.toggle('hidden')">
         <div>
-          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
-          <span class="badge b-${e.status_detalhado||e.status}" style="margin-left:5px;">${e.status_detalhado||e.status}</span><br>
-          <small style="color:#888;">&#127978; ${e.loja?e.loja.nome_loja||e.loja.nome:'?'} | &#128757; ${e.entregador?e.entregador.nome:'Nao atribuido'}</small><br>
-          <small style="color:#555;">&#128205; ${e.endereco_entrega}</small>
+          <span style="font-weight:700;font-size:13px;">${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</span>
+          <span style="background:${stColor};color:white;font-size:10px;padding:2px 7px;border-radius:10px;margin-left:6px;">${stLabel}</span>
+          <div style="font-size:11px;color:#888;margin-top:2px;">🛵 ${e.entregador?e.entregador.nome:'Não atribuído'} &nbsp;|&nbsp; 🏪 ${e.loja?e.loja.nome_loja||e.loja.nome:'?'}</div>
         </div>
-        <div style="text-align:right;font-size:11px;color:#888;">${e.valor_corrida>0?fR(e.valor_corrida):''}</div>
+        <span style="font-size:11px;color:#aaa;">▼ detalhes</span>
       </div>
-    </div>`).join('');
+      <div class="hidden" style="padding:0 12px 12px;border-top:1px solid #f0f0f0;">
+        <p style="font-size:12px;color:#555;margin:6px 0;">📍 ${e.endereco_entrega}</p>
+        ${e.cliente_nome?`<p style="font-size:11px;color:#888;">👤 ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89">📞 ${e.cliente_telefone}</a>`:''}</p>`:''}
+        ${e.distancia_km>0?`<p style="font-size:11px;color:#888;">📏 ${parseFloat(e.distancia_km).toFixed(1)}km | <strong style="color:#2e7d32">${fR(e.valor_corrida||0)}</strong></p>`:''}
+        ${e.entregador?`<p style="font-size:11px;color:#1565C0;font-weight:700;">🛵 Entregador: ${e.entregador.nome}${e.entregador.telefone?' | '+e.entregador.telefone:''}</p>`:''}
+        ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">🔑 Cód. iFood: ${e.codigo_confirmacao}</p>`:''}
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="admFinalizarEntrega('${e.id}')" style="background:#2e7d32;color:white;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">✅ Finalizar</button>
+          <button onclick="admForcarStatus('${e.id}','cancelado')" style="background:#c62828;color:white;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">✖ Cancelar</button>
+          ${e.entregador_id?`<button onclick="admRealocarEntrega('${e.id}')" style="background:#e65100;color:white;border:none;padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Trocar Entregador</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 async function pullAdm(){
@@ -1090,19 +1172,20 @@ async function pullLj(){
   const el=$('lista-on-lj');
   if(!assoc||!assoc.length){el.innerHTML='<span style="font-size:12px;color:#999">Nenhum entregador vinculado.</span>';$('lj-online-cnt').textContent='0';return;}
   const ids=assoc.map(a=>a.entregador_id);
-  // Busca todos os entregadores vinculados (online ou não)
   const{data:todos}=await db.from('usuarios').select('id,nome,telefone,latitude,longitude,online').in('id',ids);
   const entsOnline=(todos||[]).filter(e=>e.online);
   $('lj-online-cnt').textContent=entsOnline.length;
-  // Busca quais têm entrega ativa (em_rota, aceito, chegou_loja, saiu_entrega)
   const{data:ativas}=entsOnline.length?await db.from('entregas').select('entregador_id').in('entregador_id',entsOnline.map(e=>e.id)).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']):{data:[]};
   const comPedidoIds=new Set((ativas||[]).map(a=>a.entregador_id));
-  // Monta lista com flag com_pedido
   const entsParaMapa=entsOnline.map(e=>({...e,com_pedido:comPedidoIds.has(e.id)}));
-  // Lista visual
+  // Lista clicável — clica no nome e o mapa foca nele
   el.innerHTML=entsOnline.length?entsOnline.map(e=>{
     const cp=comPedidoIds.has(e.id);
-    return `<span class="badge" style="background:${cp?'#1565C0':'#2e7d32'};color:white;">&#128757; ${e.nome}${cp?' 🔵':' 🟢'}</span>`;
+    const bg=cp?'#1565C0':'#2e7d32';
+    const status=cp?'🔵 Em rota':'🟢 Livre';
+    return `<span onclick="focarEntregadorMapa('${e.id}')" style="background:${bg};color:white;padding:5px 11px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;margin:2px;" title="Clique para ver no mapa">
+      🛵 ${e.nome} <span style="font-size:10px;opacity:.85">${status}</span>
+    </span>`;
   }).join(''):'<span style="font-size:12px;color:#999">Nenhum online agora.</span>';
   await atuMapa('loja',entsParaMapa);
 }
@@ -1474,10 +1557,10 @@ async function carregarPedidos(){
       ${e.status==='pendente'?`<div style="margin-top:6px;"><label style="font-size:11px;font-weight:700;color:#555;">Atribuir a:</label><select class="ent-select" onchange="atribuirEnt('${e.id}',this.value)"><option value="">Selecione entregador...</option>${entOptions}</select></div>`:''}
       ${e.entregador?`<p style="font-size:11px;color:#004E89;margin-top:4px;">&#128757; ${e.entregador.nome}</p>`:''}
       <div class="row" style="margin-top:7px;flex-wrap:wrap;">
-        <button class="btn-sm blue" onclick="abrirEditarPedido('${e.id}','${(e.numero_pedido||'').replace(/'/g,"\\'")}','${(e.cliente_nome||'').replace(/'/g,"\\'")}','${e.cliente_telefone||''}','${(e.endereco_rua||'').replace(/'/g,"\\'")}','${e.endereco_numero||''}','${(e.endereco_bairro||'').replace(/'/g,"\\'")}','${(e.endereco_cidade||'').replace(/'/g,"\\'")}','${(e.endereco_complemento||'').replace(/'/g,"\\'")}','${(e.observacoes||'').replace(/'/g,"\\'")}')">&#9998; Editar</button>
-        <button class="btn-sm green" onclick="marcarEnt('${e.id}')">&#10003; Entregue</button>
-        <button class="btn-sm red" onclick="cancelarEnt('${e.id}')">Cancelar</button>
-        ${e.status==='pendente'?`<button class="btn-sm orange" onclick="avisarPedidoPronto()">&#128226; Pronto</button>`:''}
+        <button class="btn-sm blue" onclick="abrirEditarPedido('${e.id}','${(e.numero_pedido||'').replace(/'/g,"\\'")}','${(e.cliente_nome||'').replace(/'/g,"\\'")}','${e.cliente_telefone||''}','${(e.endereco_rua||'').replace(/'/g,"\\'")}','${e.endereco_numero||''}','${(e.endereco_bairro||'').replace(/'/g,"\\'")}','${(e.endereco_cidade||'').replace(/'/g,"\\'")}','${(e.endereco_complemento||'').replace(/'/g,"\\'")}','${(e.observacoes||'').replace(/'/g,"\\'")}')">✏️ Editar</button>
+        <button class="btn-sm green" onclick="ljFinalizarEntrega('${e.id}')">✅ Finalizar</button>
+        <button class="btn-sm red" onclick="cancelarEnt('${e.id}')">✖ Cancelar</button>
+        ${e.status==='pendente'?`<button class="btn-sm orange" onclick="avisarPedidoPronto()">🔔 Pronto</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -1785,36 +1868,34 @@ async function toggleOnline(){
   else{
     if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
     if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
+    swPostMessage({type:'STOP_GPS'}); // Para SW background tracking
   }
   if(!novo)carregarLojaAtiva();
 }
 
 function inicRast(){
-  // Para watches anteriores
-  if(ivs.rast!=null){
-    try{navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);}catch(e){}
-    ivs.rast=null;
-  }
+  if(ivs.rast!=null){try{navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);}catch(e){}ivs.rast=null;}
   if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
   if(!navigator.geolocation)return;
+
+  // Ativa Wake Lock: impede tela de apagar enquanto online (mantém GPS ativo)
+  ativarWakeLock();
 
   const salvarPos=async (lat,lng)=>{
     myLat=lat;myLng=lng;gpsOk=true;
     showGpsBanner(false);
     const dbg=$('gps-debug');
-    if(dbg)dbg.innerHTML=`<span style="color:#888">📡 ${lat.toFixed(5)}, ${lng.toFixed(5)} — salvando...</span>`;
+    if(dbg)dbg.innerHTML=`<span style="color:#27ae60;font-size:10px;">📡 GPS ativo: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>`;
     if(U&&U.online){
-      const{error,data}=await db.from('usuarios').update({latitude:lat,longitude:lng}).eq('id',U.id).select();
-      if(error){
-        console.error('[GPS Save Error]',error);
-        if(dbg)dbg.innerHTML=`<span style="color:red;font-weight:700">❌ GPS ERRO: ${error.message||error.code||JSON.stringify(error)}</span>`;
-      } else {
-        if(dbg)dbg.innerHTML=`<span style="color:#27ae60">✅ GPS salvo: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>`;
-      }
+      db.from('usuarios').update({latitude:lat,longitude:lng}).eq('id',U.id)
+        .then(({error})=>{if(error)console.error('[GPS]',error);});
     }
   };
 
-  // ESTRATEGIA 1: watchPosition (atualiza quando o dispositivo detecta movimento)
+  // Inicia SW com timer de backup (a cada 15s mesmo app fechado)
+  if(U&&U.id)swPostMessage({type:'START_GPS',userId:U.id,sbUrl:SB_URL,sbKey:SB_KEY,intervalMs:15000});
+
+  // watchPosition: atualiza a cada movimento detectado pelo dispositivo
   try{
     ivs.rast=navigator.geolocation.watchPosition(
       p=>salvarPos(p.coords.latitude,p.coords.longitude),
@@ -1823,27 +1904,21 @@ function inicRast(){
     );
   }catch(e){ivs.rast=null;}
 
-  // ESTRATEGIA 2: getCurrentPosition a cada 12s como garantia
+  // Intervalo de 5s como garantia (funciona mesmo sem movimento)
   ivs.rastPush=setInterval(()=>{
     if(!U||!U.online)return;
     navigator.geolocation.getCurrentPosition(
       p=>salvarPos(p.coords.latitude,p.coords.longitude),
-      err=>{
-        // Mesmo sem nova posicao, reenvia a ultima conhecida
-        if(myLat&&myLng&&U&&U.online){
-          db.from('usuarios').update({latitude:myLat,longitude:myLng}).eq('id',U.id);
-        }
-        if(err.code===1)showGpsBanner(true);
-      },
-      {enableHighAccuracy:true,timeout:8000,maximumAge:30000}
+      ()=>{if(myLat&&myLng&&U&&U.online)db.from('usuarios').update({latitude:myLat,longitude:myLng}).eq('id',U.id);},
+      {enableHighAccuracy:true,timeout:8000,maximumAge:10000}
     );
-  },12000);
+  },5000);
 
-  // Pega posicao imediatamente ao entrar online
+  // Posição imediata ao entrar online
   navigator.geolocation.getCurrentPosition(
     p=>salvarPos(p.coords.latitude,p.coords.longitude),
     err=>{if(err.code===1)showGpsBanner(true);},
-    {enableHighAccuracy:true,timeout:10000,maximumAge:5000}
+    {enableHighAccuracy:true,timeout:10000,maximumAge:0}
   );
 }
 
@@ -1898,39 +1973,53 @@ async function carregarRotaEnt(){
   // Waze: melhor para motos no Brasil
   // Botoes de navegacao no topo (rota completa)
   const mapsUrlRota=`https://www.google.com/maps/dir/?api=1&destination=${dest}${wp?'&waypoints='+wp:''}&travelmode=two-wheeler`;
-  el.innerHTML=`<div class="row" style="margin-bottom:12px;gap:7px;">
-    <a href="${mapsUrlRota}" target="_blank" style="flex:1;"><button class="btn btn-blue" style="padding:10px;width:100%;font-size:12px;">&#127758; Google Maps</button></a>
-    <a href="https://waze.com/ul?q=${dest}&navigate=yes" target="_blank" style="flex:1;"><button class="btn" style="padding:10px;width:100%;font-size:12px;background:#00BBCC;color:white;">&#128663; Waze</button></a>
+  const wazeUrlRota=`waze://ul?q=${dest}&navigate=yes`;
+  const totalEnts=data.length;
+  el.innerHTML=`<div style="margin-bottom:14px;">
+    <p style="font-size:11px;color:#888;margin-bottom:6px;text-align:center;">📍 ${totalEnts === 1 ? 'Navegar para a entrega' : 'Rota completa com '+totalEnts+' paradas'}</p>
+    <div class="row" style="gap:7px;">
+      <a href="${mapsUrlRota}" target="_blank" style="flex:1;">
+        <button class="btn btn-blue" style="padding:10px;width:100%;font-size:13px;">🗺️ Google Maps</button>
+      </a>
+      <a href="${wazeUrlRota}" target="_blank" style="flex:1;" onclick="if(!this.href.startsWith('waze'))return;setTimeout(()=>{if(document.hasFocus())this.href='https://waze.com/ul?q=${dest}&navigate=yes';},500)">
+        <button class="btn" style="padding:10px;width:100%;font-size:13px;background:#00BBCC;color:white;">🚗 Waze</button>
+      </a>
+    </div>
   </div>`;
   data.forEach((e,i)=>{
     const st=e.status_detalhado||e.status;
     const lojaLat=e.loja&&e.loja.loja_lat||RP_LAT,lojaLng=e.loja&&e.loja.loja_lng||RP_LNG;
-    const lojaEndereco=e.loja&&e.loja.endereco||'';
+    const temCodIfood=!!(e.codigo_confirmacao);
     // Botoes de status
     let botoesHtml='';
-    if(st==='aceito'||st==='pendente'){botoesHtml+=`<button class="btn-sm blue" onclick="entStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="margin:2px">&#127968; Cheguei na Loja</button>`;}
-    if(st==='chegou_loja'){botoesHtml+=`<button class="btn-sm orange" onclick="entStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="margin:2px">&#128757; Saindo para Entrega</button>`;}
-    if(st==='saiu_entrega'||st==='em_rota'){botoesHtml+=`<button class="btn-sm green" onclick="entStatus('${e.id}','entregue',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})" style="margin:2px">&#10003; Confirmar Entrega</button>`;}
+    if(st==='aceito'||st==='pendente'){botoesHtml+=`<button class="btn-sm blue" onclick="entStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="margin:2px">🏪 Cheguei na Loja</button>`;}
+    if(st==='chegou_loja'){botoesHtml+=`<button class="btn-sm orange" onclick="entStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="margin:2px">🛵 Saindo para Entrega</button>`;}
+    if(st==='saiu_entrega'||st==='em_rota'){
+      if(temCodIfood){
+        // Exige código antes de finalizar
+        botoesHtml+=`<button class="btn-sm green" onclick="confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})" style="margin:2px">✅ Confirmar Entrega</button>`;
+      } else {
+        botoesHtml+=`<button class="btn-sm green" onclick="entStatus('${e.id}','entregue',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})" style="margin:2px">✅ Confirmar Entrega</button>`;
+      }
+    }
     const steps=['aceito','chegou_loja','saiu_entrega','entregue'];
     const curI=steps.indexOf(st);
     const flowHtml=steps.map((s,idx)=>`<div class="sf-step ${idx<curI?'done':idx===curI?'current':''}">${['Aceito','Na Loja','A Caminho','Entregue'][idx]}</div>`).join('');
     const endEnc=encodeURIComponent(e.endereco_entrega);
+    // Link Maps abre app externo via deep link
+    const mapsLink=`https://www.google.com/maps/dir/?api=1&destination=${endEnc}&travelmode=two-wheeler`;
+    const wazeLink=`waze://ul?q=${endEnc}&navigate=yes`;
     el.innerHTML+=`<div class="ecard rota">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${st}">${st}</span></div>
       <div class="status-flow">${flowHtml}</div>
-      <p style="font-size:12px;color:#555;margin:3px 0">&#128205; ${e.endereco_entrega}</p>
-      ${e.cliente_nome?`<p style="font-size:11px;color:#888">&#128100; ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89;font-weight:700">&#128222; ${e.cliente_telefone}</a>`:''}</p>`:''}
-      ${e.distancia_km>0?`<p style="font-size:11px;color:#888">&#128205; ${parseFloat(e.distancia_km).toFixed(1)}km | <strong style="color:#2e7d32">${fR(e.valor_corrida||e.valor_entregador)}</strong></p>`:''}
-      ${e.codigo_confirmacao?`<div style="background:#fff0f0;padding:9px;border-radius:8px;margin:5px 0;border:1.5px solid #ea1d2c;">
-        <p style="font-size:12px;font-weight:700;color:#ea1d2c;margin-bottom:5px;">&#128273; Codigo iFood: <strong style="font-size:18px;letter-spacing:4px;">${e.codigo_confirmacao}</strong></p>
-        <a href="${IFOOD_URL}${e.numero_pedido||''}" target="_blank" style="display:block;background:#ea1d2c;color:white;text-align:center;padding:10px;border-radius:7px;font-weight:700;font-size:14px;text-decoration:none;">&#128247; Confirmar Entrega no iFood</a>
-      </div>`:`<div style="margin:5px 0;">
-        <a href="${IFOOD_URL}" target="_blank" style="display:inline-block;background:#ea1d2c;color:white;padding:7px 14px;border-radius:7px;font-weight:700;font-size:12px;text-decoration:none;">&#128247; Confirmar no iFood</a>
-      </div>`}
-      <div class="row" style="margin-top:7px;flex-wrap:wrap;">
+      <p style="font-size:12px;color:#555;margin:3px 0">📍 ${e.endereco_entrega}</p>
+      ${e.cliente_nome?`<p style="font-size:11px;color:#888">👤 ${e.cliente_nome}${e.cliente_telefone?` | <a href="tel:${e.cliente_telefone}" style="color:#004E89;font-weight:700">📞 ${e.cliente_telefone}</a>`:''}</p>`:''}
+      ${e.distancia_km>0?`<p style="font-size:11px;color:#888">📏 ${parseFloat(e.distancia_km).toFixed(1)}km | <strong style="color:#2e7d32">${fR(e.valor_corrida||e.valor_entregador)}</strong></p>`:''}
+      ${temCodIfood?`<div style="background:#fff3e0;padding:8px;border-radius:8px;margin:5px 0;border:1.5px solid #FF6B35;">
+        <p style="font-size:11px;font-weight:700;color:#e65100;margin:0">⚠️ Esta entrega exige confirmação no iFood ao entregar</p>
+      </div>`:''}
+      <div class="row" style="margin-top:7px;flex-wrap:wrap;gap:4px;">
         ${botoesHtml}
-        <a href="https://www.google.com/maps/dir/?api=1&destination=${endEnc}&travelmode=two-wheeler" target="_blank"><button class="btn-sm blue" style="margin:2px">&#127758; Maps</button></a>
-        <a href="https://waze.com/ul?q=${endEnc}&navigate=yes" target="_blank"><button class="btn-sm" style="margin:2px;background:#00BBCC;color:white;border:none;padding:6px 11px;border-radius:6px;cursor:pointer;font-size:11px;white-space:nowrap;font-weight:700;">&#128663; Waze</button></a>
       </div>
     </div>`;
   });
@@ -1968,7 +2057,71 @@ async function entStatus(id,novoStatus,refLat,refLng){
   carregarRotaEnt();initEnt();
 }
 
-async function abrirGanhosEnt(){openM('ganhos');carregarGanhos();}
+// ── Confirmação de Entrega com Código iFood (modal) ──
+let _ifoodPedId=null,_ifoodRefLat=null,_ifoodRefLng=null;
+
+async function confirmarEntregaComCodigo(pedId,numPedido,refLat,refLng){
+  _ifoodPedId=pedId;_ifoodRefLat=refLat;_ifoodRefLng=refLng;
+  $('ifood-conf-num').textContent=numPedido?'#'+numPedido:'';
+  $('ifood-conf-link').href=`${IFOOD_URL}${numPedido||''}`;
+  $('ifood-cod-input').value='';
+  clearM('ifood-conf-msg');
+  openM('ifood-conf');
+  setTimeout(()=>{try{$('ifood-cod-input').focus();}catch(e){}},300);
+}
+
+async function finalizarComCodigoIfood(){
+  const cod=($('ifood-cod-input').value||'').trim();
+  if(!cod||cod.length<3){showM('ifood-conf-msg','⚠️ Digite o código fornecido pelo cliente.',false);return;}
+  showM('ifood-conf-msg','Finalizando...', true);
+  await db.from('entregas').update({codigo_confirmacao_cliente:cod}).eq('id',_ifoodPedId);
+  closeM('ifood-conf');
+  await entStatus(_ifoodPedId,'entregue',_ifoodRefLat,_ifoodRefLng);
+}
+
+// ── Admin: Finalizar entrega manualmente ──
+async function admFinalizarEntrega(id){
+  if(!confirm('Finalizar esta entrega manualmente pelo painel administrativo?'))return;
+  await db.from('entregas').update({status:'entregue',status_detalhado:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
+  await carregarDadosAdmin();
+}
+
+// ── Admin: Realocar entrega para outro entregador ──
+async function admRealocarEntrega(pedId){
+  const{data:ents}=await db.from('usuarios').select('id,nome').eq('tipo','entregador').eq('online',true);
+  if(!ents||!ents.length){alert('Nenhum entregador online no momento.');return;}
+  const opts=ents.map((e,i)=>`${i+1}. ${e.nome}`).join('\n');
+  const escolha=prompt(`Escolha o novo entregador (digite o número):\n\n${opts}`);
+  if(!escolha)return;
+  const idx=parseInt(escolha)-1;
+  if(isNaN(idx)||idx<0||idx>=ents.length){alert('Opção inválida.');return;}
+  await db.from('entregas').update({entregador_id:ents[idx].id}).eq('id',pedId);
+  await carregarDadosAdmin();
+  alert(`✅ Entrega realocada para ${ents[idx].nome}`);
+}
+
+// ── Loja: Finalizar entrega manualmente (sem código) ──
+async function ljFinalizarEntrega(id){
+  if(!confirm('Finalizar esta entrega?\nNenhum código de confirmação é necessário.'))return;
+  await db.from('entregas').update({status:'entregue',status_detalhado:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
+  carregarPedidos();
+}
+
+// ── Loja: Clicar em entregador para focar no mapa ──
+function focarEntregadorMapa(entId){
+  const mk=mrks['loja'];
+  const marker=mk[entId];
+  if(marker&&mapas['loja']){
+    seg['loja']=false;
+    mapas['loja'].setView(marker.getLatLng(),17,{animate:true});
+    marker.openPopup();
+    // Destaca o badge clicado
+    document.querySelectorAll('#lista-on-lj span').forEach(s=>s.style.outline='');
+    event&&event.currentTarget&&(event.currentTarget.style.outline='3px solid #FFD700');
+  }else{
+    alert('Localização ainda não disponível. O entregador precisa ter o GPS ativo.');
+  }
+}
 async function carregarGanhos(){
   const p=$('gnh-f').value,el=$('gnh-dados');el.innerHTML='<p>Carregando...</p>';
   const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',iPer(p)).in('status',['entregue','em_rota','saiu_entrega','chegou_loja','aceito']);
