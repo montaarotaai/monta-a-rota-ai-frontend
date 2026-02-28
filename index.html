@@ -578,6 +578,8 @@ const LOGO_URL='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGB
 const SB_URL='https://dfvjaweyxfenhjgusekq.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdmphd2V5eGZlbmhqZ3VzZWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIwMzk4NTMsImV4cCI6MjA4NzYxNTg1M30.MT9pzSQgc3ZNGiIV95DwjVtNvSZI0Lz-SKMkvMys1Kg';
 const db=window.supabase.createClient(SB_URL,SB_KEY);
+// ⚠️ CHAVE API ANTHROPIC — gere em console.anthropic.com e cole aqui
+const ANTHROPIC_KEY='SUA_CHAVE_AQUI';
 const RP_LAT=-21.1767, RP_LNG=-47.8208;
 
 let U=null;
@@ -1262,67 +1264,97 @@ async function lerComanda(event){
   $('ocr-img').src=url;$('ocr-prev').classList.remove('hidden');
   const loadEl=$('ocr-load');
   loadEl.classList.remove('hidden');
-  loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 Lendo comanda com IA...</span>';
+  loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 Preparando imagem...</span>';
 
   try{
-    // Converte imagem para base64
+    // Verifica chave configurada
+    if(!ANTHROPIC_KEY||ANTHROPIC_KEY==='SUA_CHAVE_AQUI'){
+      loadEl.classList.add('hidden');
+      showM('ped-msg','⚠️ Chave API não configurada. Fale com o administrador do sistema.',false);
+      return;
+    }
+
+    // Redimensiona imagem para max 1200px (economiza tokens e acelera)
     const base64=await new Promise((res,rej)=>{
-      const reader=new FileReader();
-      reader.onload=e=>res(e.target.result.split(',')[1]);
-      reader.onerror=rej;
-      reader.readAsDataURL(file);
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1200;
+        let w=img.width,h=img.height;
+        if(w>MAX||h>MAX){if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;}}
+        const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+        const ctx=cv.getContext('2d');ctx.drawImage(img,0,0,w,h);
+        res(cv.toDataURL('image/jpeg',0.85).split(',')[1]);
+      };
+      img.onerror=rej;
+      img.src=URL.createObjectURL(file);
     });
-    const mime=file.type||'image/jpeg';
 
-    loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 IA analisando a comanda...</span>';
+    loadEl.innerHTML='<span style="font-size:12px;color:#555">🤖 IA lendo a comanda... aguarde</span>';
 
-    // Chama Claude Vision API
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':ANTHROPIC_KEY,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
       body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:600,
         messages:[{
           role:'user',
           content:[
-            {type:'image',source:{type:'base64',media_type:mime,data:base64}},
-            {type:'text',text:`Leia esta comanda de delivery e extraia SOMENTE um JSON com estes campos (sem markdown, só o JSON puro):
-{
-  "numero_pedido": "número ou código do pedido",
-  "nome_cliente": "nome do cliente (apenas o nome, sem telefone nem título)",
-  "telefone": "telefone com DDD, só números",
-  "rua": "nome da rua ou avenida SEM número",
-  "numero_end": "número da residência",
-  "bairro": "bairro",
-  "complemento": "complemento se houver (ex: Apto 22, Bloco B), vazio se não tiver",
-  "codigo_confirmacao": "código de coleta parceira iFood se houver, vazio caso contrário"
-}
-Regras:
-- nome_cliente: NUNCA coloque nome de loja/restaurante, apenas o nome do cliente final
-- Se campo não encontrado deixe string vazia ""
-- numero_end: apenas o número, sem letras ou texto
-- rua: apenas o nome, ex: "Rua Patrocínio" sem o número`}
+            {type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},
+            {type:'text',text:`Esta é uma foto de comanda/cupom de delivery brasileiro. Pode ser iFood, Takeat, Stone, ou outro sistema.
+Extraia os dados de entrega e responda APENAS com JSON puro, sem markdown, sem explicação:
+
+{"numero_pedido":"","nome_cliente":"","telefone":"","rua":"","numero_end":"","bairro":"","complemento":"","codigo_confirmacao":""}
+
+Regras importantes:
+- numero_pedido: número grande no topo (ex: 8589, 5823, 178) OU "Pedido #X"
+- nome_cliente: SOMENTE o nome do cliente final. NUNCA nome de restaurante/loja/empresa
+- telefone: só os números com DDD, sem traços ou espaços
+- rua: nome da rua/avenida SEM o número (ex: "Rua Patrocínio", "Av. Luiz Eduardo Toledo Prado")
+- numero_end: só o número da casa/apto residencial (ex: "98", "200", "4100")  
+- bairro: nome do bairro (ex: "Campos Elíseos", "Golf", "Condomínio Mirante Sul")
+- complemento: apto, bloco, tower (ex: "Ap802", "bloco 01 Ap 508"). Se tiver traço "-" sozinho, deixe vazio ""
+- codigo_confirmacao: APENAS o "CODIGO DE COLETA PARCEIRA" do iFood (ex: "3027", "3266"). Se não houver, deixe ""
+- Campos não encontrados: string vazia ""`}
           ]
         }]
       })
     });
 
     loadEl.classList.add('hidden');
-    if(!resp.ok){showM('ped-msg','❌ Erro na leitura. Tente novamente.',false);return;}
+
+    if(!resp.ok){
+      const errData=await resp.json().catch(()=>({}));
+      const errMsg=errData.error?.message||resp.statusText||resp.status;
+      console.error('[OCR API]',resp.status,errMsg);
+      if(resp.status===401)showM('ped-msg','❌ Chave API inválida. Verifique a configuração.',false);
+      else if(resp.status===429)showM('ped-msg','⚠️ Muitas requisições. Aguarde alguns segundos e tente novamente.',false);
+      else showM('ped-msg','❌ Erro na leitura ('+resp.status+'). Tente novamente.',false);
+      return;
+    }
+
     const data=await resp.json();
-    const rawText=(data.content||[]).map(c=>c.text||'').join('');
+    const rawText=(data.content||[]).map(c=>c.text||'').join('').trim();
     let parsed;
     try{
-      const clean=rawText.replace(/```json|```/g,'').trim();
+      const clean=rawText.replace(/^```[\w]*\n?/,'').replace(/\n?```$/,'').trim();
       parsed=JSON.parse(clean);
     }catch(e){
-      // fallback: tenta extrair JSON do texto
-      const m=rawText.match(/\{[\s\S]*\}/);
-      if(m){try{parsed=JSON.parse(m[0]);}catch(e2){}}
+      const m=rawText.match(/\{[\s\S]*?\}/);
+      if(m){try{parsed=JSON.parse(m[0]);}catch(e2){console.error('[OCR parse]',e2,rawText);}}
     }
-    if(!parsed){showM('ped-msg','❌ Não consegui ler a comanda. Tente foto mais nítida.',false);return;}
+    if(!parsed){
+      console.error('[OCR] Resposta inesperada:',rawText);
+      showM('ped-msg','❌ Não consegui interpretar a comanda. Tente foto mais nítida e centralizada.',false);
+      return;
+    }
 
+    // Preenche campos
     if(parsed.numero_pedido)$('p-num').value=parsed.numero_pedido;
     if(parsed.nome_cliente)$('p-cli').value=parsed.nome_cliente;
     if(parsed.telefone)$('p-tel').value=parsed.telefone;
@@ -1331,18 +1363,26 @@ Regras:
     if(parsed.bairro)$('p-bairro').value=parsed.bairro;
     if(parsed.complemento)$('p-comp').value=parsed.complemento;
     window._ocrCodConf=parsed.codigo_confirmacao||'';
-    if(parsed.codigo_confirmacao){$('p-codconf-area').classList.remove('hidden');$('p-cod-conf').value=parsed.codigo_confirmacao;}
+    if(parsed.codigo_confirmacao){
+      const ca=$('p-codconf-area');if(ca)ca.classList.remove('hidden');
+      $('p-cod-conf').value=parsed.codigo_confirmacao;
+    }
     setTimeout(atualizarValorCorrida,400);
 
     const preenchidos=[parsed.nome_cliente,parsed.rua,parsed.numero_end,parsed.bairro].filter(Boolean).length;
     if(preenchidos>=3)showM('ped-msg','✅ Comanda lida com sucesso! Confira os campos.',true);
     else if(preenchidos>=1)showM('ped-msg','⚠️ Leitura parcial — complete os campos vazios.',false);
-    else showM('ped-msg','❌ Não consegui ler. Preencha manualmente ou tire foto melhor.',false);
+    else showM('ped-msg','❌ Não consegui ler. Preencha manualmente.',false);
 
   }catch(err){
     loadEl.classList.add('hidden');
     console.error('[OCR erro]',err);
-    showM('ped-msg','Erro ao processar imagem. Tente novamente.',false);
+    const msg=err.message||'';
+    if(msg.includes('Failed to fetch')||msg.includes('NetworkError')){
+      showM('ped-msg','❌ Sem conexão com a internet. Verifique a rede e tente novamente.',false);
+    }else{
+      showM('ped-msg','❌ Erro ao processar: '+msg.slice(0,60),false);
+    }
   }
 }
 
