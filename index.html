@@ -456,8 +456,21 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <div id="m-qtd-ent" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('qtd-ent')">&times;</button>
   <h2 style="margin-bottom:4px;">🔢 Distribuição de Pedidos</h2>
-  <p style="font-size:12px;color:#888;margin-bottom:4px;">Defina quantas entregas cada entregador vai levar.</p>
-  <p style="font-size:11px;color:#e65100;margin-bottom:12px;">A IA vai agrupar pedidos no mesmo sentido/bairro, com o mais perto da loja primeiro.</p>
+  <p style="font-size:12px;color:#888;margin-bottom:4px;">Defina o máximo de pedidos por entregador. A IA distribui automaticamente.</p>
+  <p style="font-size:11px;color:#e65100;margin-bottom:12px;">A IA agrupa pedidos no mesmo sentido/bairro, com o mais perto da loja primeiro.</p>
+
+  <!-- Limite global por entregador -->
+  <div style="background:#f0f4ff;border:2px solid #004E89;border-radius:11px;padding:14px;margin-bottom:14px;text-align:center;">
+    <p style="font-size:11px;font-weight:700;color:#004E89;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">📦 Máximo de pedidos por entregador</p>
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
+      <button onclick="ajustarLimiteGlobal(-1)" style="width:40px;height:40px;border-radius:50%;border:2px solid #e0e0e0;background:white;font-size:24px;font-weight:700;cursor:pointer;line-height:1;">−</button>
+      <div id="qtd-limite-val" style="min-width:50px;text-align:center;font-size:36px;font-weight:800;color:#004E89;">4</div>
+      <button onclick="ajustarLimiteGlobal(1)" style="width:40px;height:40px;border-radius:50%;border:2px solid #004E89;background:#004E89;color:white;font-size:24px;font-weight:700;cursor:pointer;line-height:1;">+</button>
+    </div>
+    <p style="font-size:10px;color:#888;margin-top:6px;">Salvo automaticamente para próximas vezes • máx. 10</p>
+  </div>
+
+  <!-- Lista de entregadores disponíveis -->
   <div id="qtd-ent-body">
     <p style="text-align:center;color:#888;">Carregando entregadores...</p>
   </div>
@@ -1488,8 +1501,14 @@ async function initLoja(){
   $('lj-ts').textContent=fR(U.taxa_sistema);
   // App logo
   const ljLogo=$('lj-app-logo');if(ljLogo)ljLogo.src=LOGO_URL;
-  // Logo da loja
+  // Logo da loja — sempre busca do banco para garantir persistência
   if(U.logo_url)mostrarLogo(U.logo_url,'loja-logo-box');
+  db.from('usuarios').select('logo_url').eq('id',U.id).single().then(({data:ld})=>{
+    if(ld&&ld.logo_url){
+      mostrarLogo(ld.logo_url,'loja-logo-box');
+      if(U.logo_url!==ld.logo_url){U.logo_url=ld.logo_url;try{localStorage.setItem('u',JSON.stringify(U));}catch(e){}}
+    }
+  });
   // GPS toggle
   atuToggleGps(U.gps_validacao_obrigatorio||false);
   // Taxa tipo
@@ -1952,14 +1971,26 @@ let _rotaPlanoEnts=[];
 let _qtdEntData={}; // {entId: {nome, qtd}}
 let _rotaIAGrupos=[]; // [{entId, entNome, pedidos:[]}]
 
-// Salva limite max por entregador (config da loja)
-function salvarLimiteEnt(entId,qtd){
-  const key='loja_max_'+U.id+'_'+entId;
-  localStorage.setItem(key,qtd);
+// Salva/carrega limite GLOBAL da loja (único para todos os entregadores)
+function salvarLimiteGlobal(qtd){
+  localStorage.setItem('loja_limite_global_'+U.id, Math.min(10,Math.max(1,qtd)));
 }
-function carregarLimiteEnt(entId){
-  const key='loja_max_'+U.id+'_'+entId;
-  return parseInt(localStorage.getItem(key)||'0')||0;
+function carregarLimiteGlobal(){
+  return parseInt(localStorage.getItem('loja_limite_global_'+U.id)||'4')||4;
+}
+// Mantém funções antigas para compatibilidade (não usadas mais)
+function salvarLimiteEnt(entId,qtd){}
+function carregarLimiteEnt(entId){return carregarLimiteGlobal();}
+
+let _limiteGlobal=4; // limite de pedidos por entregador (configuração da loja)
+
+function ajustarLimiteGlobal(delta){
+  _limiteGlobal=Math.min(10,Math.max(1,_limiteGlobal+delta));
+  const el=$('qtd-limite-val');if(el)el.textContent=_limiteGlobal;
+  salvarLimiteGlobal(_limiteGlobal);
+  // Atualiza _qtdEntData com o novo limite para todos
+  Object.keys(_qtdEntData).forEach(id=>{_qtdEntData[id].qtd=_limiteGlobal;});
+  atuQtdTotal(window._qtdPendTotal||0);
 }
 
 async function abrirDefinirQuantidade(){
@@ -1970,29 +2001,48 @@ async function abrirDefinirQuantidade(){
   const online=(assoc||[]).filter(a=>a.e&&a.e.online);
   if(!online.length){alert('Nenhum entregador online no momento.');return;}
 
-  _qtdEntData={};
-  online.forEach(a=>{
-    // Carrega limite salvo para esse entregador nessa loja
-    const savedQtd=carregarLimiteEnt(a.entregador_id);
-    _qtdEntData[a.entregador_id]={nome:a.e.nome,qtd:savedQtd};
-  });
-  _rotaPlanoEnts=online;
+  // Filtra entregadores que JÁ TÊM pedidos ativos — não podem receber novas rotas
+  const idsOnline=online.map(a=>a.entregador_id);
+  const{data:ocupados}=await db.from('entregas').select('entregador_id').in('entregador_id',idsOnline).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']);
+  const idsOcupados=new Set((ocupados||[]).map(x=>x.entregador_id));
+  const livres=online.filter(a=>!idsOcupados.has(a.entregador_id));
+  const emRota=online.filter(a=>idsOcupados.has(a.entregador_id));
 
-  $('qtd-ent-body').innerHTML=`
-  <p style="font-size:11px;color:#888;margin-bottom:10px;">Os limites são salvos automaticamente para cada entregador.</p>`+
-  online.map(a=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:9px;margin-bottom:8px;">
-      <div style="font-size:22px;">🛵</div>
+  if(!livres.length){
+    alert('Todos os entregadores online já estão com pedidos em andamento. Aguarde finalizarem para distribuir novas rotas.');
+    return;
+  }
+
+  // Carrega limite global salvo
+  _limiteGlobal=carregarLimiteGlobal();
+  const el=$('qtd-limite-val');if(el)el.textContent=_limiteGlobal;
+
+  // Monta _qtdEntData apenas com entregadores LIVRES
+  _qtdEntData={};
+  livres.forEach(a=>{_qtdEntData[a.entregador_id]={nome:a.e.nome,qtd:_limiteGlobal};});
+  _rotaPlanoEnts=livres;
+
+  // Monta lista visual dos entregadores
+  const listLivres=livres.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#f0faf5;border:1.5px solid #00C9A7;border-radius:9px;margin-bottom:7px;">
+      <div style="font-size:20px;">🛵</div>
       <div style="flex:1;">
-        <div style="font-weight:700;font-size:14px;">${a.e.nome}</div>
-        <div style="font-size:11px;color:#2e7d32;">● Online</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <button onclick="ajustarQtd('${a.entregador_id}',-1)" style="width:32px;height:32px;border-radius:50%;border:2px solid #e0e0e0;background:white;font-size:20px;font-weight:700;cursor:pointer;line-height:1;">−</button>
-        <div id="qtd-val-${a.entregador_id}" style="min-width:36px;text-align:center;font-size:22px;font-weight:700;color:#004E89;">${_qtdEntData[a.entregador_id].qtd}</div>
-        <button onclick="ajustarQtd('${a.entregador_id}',1)" style="width:32px;height:32px;border-radius:50%;border:2px solid #004E89;background:#004E89;color:white;font-size:20px;font-weight:700;cursor:pointer;line-height:1;">+</button>
+        <div style="font-weight:700;font-size:13px;">${a.e.nome}</div>
+        <div style="font-size:11px;color:#2e7d32;font-weight:600;">✅ Livre — receberá até ${_limiteGlobal} pedido${_limiteGlobal>1?'s':''}</div>
       </div>
     </div>`).join('');
+
+  const listOcupados=emRota.length?`<div style="margin-top:4px;margin-bottom:10px;">
+    <p style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:5px;">🔵 Em rota (não receberão pedidos agora):</p>
+    ${emRota.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fff3e0;border-radius:8px;margin-bottom:5px;opacity:.7;">
+      <span style="font-size:16px;">🛵</span>
+      <div style="font-size:12px;color:#e65100;font-weight:600;">${a.e.nome} — finalizando entregas...</div>
+    </div>`).join('')}
+  </div>`:'';
+
+  $('qtd-ent-body').innerHTML=`
+    <p style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px;">Entregadores disponíveis (${livres.length}):</p>
+    ${listLivres}${listOcupados}`;
 
   atuQtdTotal(peds.length);
   $('qtd-msg').textContent='';
@@ -2002,29 +2052,21 @@ async function abrirDefinirQuantidade(){
   openM('qtd-ent');
 }
 
-function ajustarQtd(entId,delta){
-  const atual=_qtdEntData[entId]?.qtd||0;
-  const novo=Math.max(0,atual+delta);
-  _qtdEntData[entId].qtd=novo;
-  $('qtd-val-'+entId).textContent=novo;
-  salvarLimiteEnt(entId,novo); // Salva automaticamente
-  atuQtdTotal(window._qtdPendTotal||0);
-}
+// Mantida por compatibilidade (não usada na nova UI)
+function ajustarQtd(entId,delta){}
 
 function atuQtdTotal(total){
-  const distribuido=Object.values(_qtdEntData).reduce((s,v)=>s+v.qtd,0);
-  const restante=total-distribuido;
+  const nLivres=Object.keys(_qtdEntData).length;
+  const capacidade=nLivres*(_limiteGlobal||4);
   const el=$('qtd-total-info');
   if(!el)return;
-  if(restante>0){
-    el.innerHTML=`📦 <strong>${distribuido}</strong> de <strong>${total}</strong> pedidos distribuídos — <span style="color:#e65100;font-weight:700;">${restante} sem entregador</span>`;
-    el.style.background='#fff3e0';
-  } else if(restante<0){
-    el.innerHTML=`⚠️ Você distribuiu <strong>${distribuido}</strong> para ${total} pedidos — <span style="color:#c62828;font-weight:700;">${Math.abs(restante)} a mais</span>`;
-    el.style.background='#ffebee';
-  } else {
-    el.innerHTML=`✅ <strong>${total}</strong> pedidos distribuídos perfeitamente!`;
+  if(total<=0){el.innerHTML='Sem pedidos pendentes.';el.style.background='#f5f5f5';return;}
+  if(capacidade>=total){
+    el.innerHTML=`✅ <strong>${nLivres}</strong> entregador${nLivres>1?'es':''} × <strong>${_limiteGlobal||4}</strong> pedidos = capacidade de <strong>${capacidade}</strong> (${total} pendentes)`;
     el.style.background='#e8f5e9';
+  } else {
+    el.innerHTML=`⚠️ Capacidade: <strong>${capacidade}</strong> pedidos, mas há <strong>${total}</strong> pendentes — <span style="color:#c62828;font-weight:700;">${total-capacidade} ficam sem entregador</span>`;
+    el.style.background='#ffebee';
   }
 }
 
@@ -2032,8 +2074,8 @@ async function gerarRotaComIA(){
   const peds=window._qtdPendPeds||[];
   if(!peds.length){showM('qtd-msg','Sem pedidos pendentes.',false);return;}
 
-  const distribuicao=Object.entries(_qtdEntData).filter(([,v])=>v.qtd>0);
-  if(!distribuicao.length){showM('qtd-msg','⚠️ Defina ao menos 1 pedido para algum entregador.',false);return;}
+  const distribuicao=Object.entries(_qtdEntData).map(([id,v])=>([id,{...v,qtd:_limiteGlobal}]));
+  if(!distribuicao.length){showM('qtd-msg','⚠️ Nenhum entregador disponível.',false);return;}
 
   const btn=$('btn-gerar-rota');
   btn.textContent='⏳ Calculando rotas...';btn.disabled=true;
@@ -2045,27 +2087,32 @@ async function gerarRotaComIA(){
   const pedsGeo=[];
   for(const p of peds){
     let lat=parseFloat(p.lat_entrega||0),lng=parseFloat(p.lng_entrega||0);
+    let geocodeFailed=false;
     if(!lat||!lng){
       const g=await geocode(p.endereco_entrega);
       if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}
-      else{lat=lojaLat;lng=lojaLng;}
+      else{geocodeFailed=true;lat=0;lng=0;} // NÃO usa coordenadas da loja como fallback
     }
-    const dist=distKm(lojaLat,lojaLng,lat,lng);
-    const ang=((angleDeg(lojaLat,lojaLng,lat,lng)%360)+360)%360;
-    pedsGeo.push({id:p.id,num:p.numero_pedido||'',nome:p.cliente_nome||'Cliente',end:p.endereco_entrega||'',lat,lng,dist,ang});
+    const dist=geocodeFailed?999:distKm(lojaLat,lojaLng,lat,lng);
+    const ang=geocodeFailed?0:((angleDeg(lojaLat,lojaLng,lat,lng)%360)+360)%360;
+    pedsGeo.push({id:p.id,num:p.numero_pedido||'',nome:p.cliente_nome||'Cliente',end:p.endereco_entrega||'',lat,lng,dist,ang,geocodeFailed});
   }
 
   // PASSO 2: Mesclar pedidos do MESMO endereço (distância < 80m = mesmo local)
+  // ATENÇÃO: só agrupa pedidos com coordenadas válidas — evita agrupar pedidos sem GPS
   const grupos_end=[];
   const usados=new Set();
   pedsGeo.forEach((p,i)=>{
     if(usados.has(i))return;
     const grupo=[p];
     usados.add(i);
-    pedsGeo.forEach((q,j)=>{
-      if(i===j||usados.has(j))return;
-      if(distKm(p.lat,p.lng,q.lat,q.lng)*1000<80){grupo.push(q);usados.add(j);}
-    });
+    // Só agrupa se AMBOS têm coordenadas válidas E estão muito próximos
+    if(!p.geocodeFailed){
+      pedsGeo.forEach((q,j)=>{
+        if(i===j||usados.has(j)||q.geocodeFailed)return;
+        if(distKm(p.lat,p.lng,q.lat,q.lng)*1000<80){grupo.push(q);usados.add(j);}
+      });
+    }
     grupos_end.push(grupo);
   });
   // Cada "item de entrega" agora é um grupo de pedidos no mesmo endereço
@@ -2380,13 +2427,18 @@ async function uploadLogoLoja(event){
   const file=event.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=async(e)=>{
-    const b64=e.target.result; // data:image/...;base64,...
+    const b64=e.target.result;
+    // Salva no banco (fonte de verdade)
     await db.from('usuarios').update({logo_url:b64}).eq('id',U.id);
-    U.logo_url=b64;localStorage.setItem('u',JSON.stringify(U));
+    U.logo_url=b64;
+    // Tenta salvar no localStorage (pode falhar se imagem for muito grande)
+    try{localStorage.setItem('u',JSON.stringify(U));}catch(ex){}
+    // Salva logo em chave dedicada (mais chance de caber)
+    try{localStorage.setItem('loja_logo_'+U.id,b64);}catch(ex){}
     mostrarLogo(b64,'loja-logo-box');
     const prev=$('cfg-logo-prev');
     if(prev)prev.innerHTML=`<img src="${b64}" style="max-height:70px;max-width:200px;object-fit:contain;border-radius:6px;display:block;margin:0 auto;">`;
-    showM('cfg-lj-msg','Logo salvo!',true);setTimeout(()=>clearM('cfg-lj-msg'),2000);
+    showM('cfg-lj-msg','✅ Logo salva com sucesso!',true);setTimeout(()=>clearM('cfg-lj-msg'),2000);
   };
   reader.readAsDataURL(file);
 }
