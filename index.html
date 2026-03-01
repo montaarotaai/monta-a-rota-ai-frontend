@@ -1952,8 +1952,18 @@ let _rotaPlanoEnts=[];
 let _qtdEntData={}; // {entId: {nome, qtd}}
 let _rotaIAGrupos=[]; // [{entId, entNome, pedidos:[]}]
 
+// Salva limite max por entregador (config da loja)
+function salvarLimiteEnt(entId,qtd){
+  const key='loja_max_'+U.id+'_'+entId;
+  localStorage.setItem(key,qtd);
+}
+function carregarLimiteEnt(entId){
+  const key='loja_max_'+U.id+'_'+entId;
+  return parseInt(localStorage.getItem(key)||'0')||0;
+}
+
 async function abrirDefinirQuantidade(){
-  const{data:peds}=await db.from('entregas').select('id,numero_pedido,cliente_nome,endereco_entrega,distancia_km').eq('loja_id',U.id).eq('status','pendente');
+  const{data:peds}=await db.from('entregas').select('id,numero_pedido,cliente_nome,endereco_entrega,distancia_km,lat_entrega,lng_entrega').eq('loja_id',U.id).eq('status','pendente');
   if(!peds||!peds.length){alert('Sem pedidos pendentes para distribuir.');return;}
 
   const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(id,nome,online)').eq('loja_id',U.id);
@@ -1961,10 +1971,16 @@ async function abrirDefinirQuantidade(){
   if(!online.length){alert('Nenhum entregador online no momento.');return;}
 
   _qtdEntData={};
-  online.forEach(a=>{_qtdEntData[a.entregador_id]={nome:a.e.nome,qtd:0};});
+  online.forEach(a=>{
+    // Carrega limite salvo para esse entregador nessa loja
+    const savedQtd=carregarLimiteEnt(a.entregador_id);
+    _qtdEntData[a.entregador_id]={nome:a.e.nome,qtd:savedQtd};
+  });
   _rotaPlanoEnts=online;
 
-  $('qtd-ent-body').innerHTML=online.map(a=>`
+  $('qtd-ent-body').innerHTML=`
+  <p style="font-size:11px;color:#888;margin-bottom:10px;">Os limites são salvos automaticamente para cada entregador.</p>`+
+  online.map(a=>`
     <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:9px;margin-bottom:8px;">
       <div style="font-size:22px;">🛵</div>
       <div style="flex:1;">
@@ -1972,9 +1988,9 @@ async function abrirDefinirQuantidade(){
         <div style="font-size:11px;color:#2e7d32;">● Online</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <button onclick="ajustarQtd('${a.entregador_id}',-1)" style="width:30px;height:30px;border-radius:50%;border:2px solid #e0e0e0;background:white;font-size:18px;font-weight:700;cursor:pointer;line-height:1;">−</button>
-        <div id="qtd-val-${a.entregador_id}" style="min-width:30px;text-align:center;font-size:20px;font-weight:700;color:#004E89;">0</div>
-        <button onclick="ajustarQtd('${a.entregador_id}',1)" style="width:30px;height:30px;border-radius:50%;border:2px solid #004E89;background:#004E89;color:white;font-size:18px;font-weight:700;cursor:pointer;line-height:1;">+</button>
+        <button onclick="ajustarQtd('${a.entregador_id}',-1)" style="width:32px;height:32px;border-radius:50%;border:2px solid #e0e0e0;background:white;font-size:20px;font-weight:700;cursor:pointer;line-height:1;">−</button>
+        <div id="qtd-val-${a.entregador_id}" style="min-width:36px;text-align:center;font-size:22px;font-weight:700;color:#004E89;">${_qtdEntData[a.entregador_id].qtd}</div>
+        <button onclick="ajustarQtd('${a.entregador_id}',1)" style="width:32px;height:32px;border-radius:50%;border:2px solid #004E89;background:#004E89;color:white;font-size:20px;font-weight:700;cursor:pointer;line-height:1;">+</button>
       </div>
     </div>`).join('');
 
@@ -1990,7 +2006,8 @@ function ajustarQtd(entId,delta){
   const atual=_qtdEntData[entId]?.qtd||0;
   const novo=Math.max(0,atual+delta);
   _qtdEntData[entId].qtd=novo;
-  $(`qtd-val-${entId}`).textContent=novo;
+  $('qtd-val-'+entId).textContent=novo;
+  salvarLimiteEnt(entId,novo); // Salva automaticamente
   atuQtdTotal(window._qtdPendTotal||0);
 }
 
@@ -2018,112 +2035,144 @@ async function gerarRotaComIA(){
   const distribuicao=Object.entries(_qtdEntData).filter(([,v])=>v.qtd>0);
   if(!distribuicao.length){showM('qtd-msg','⚠️ Defina ao menos 1 pedido para algum entregador.',false);return;}
 
-  const totalDist=distribuicao.reduce((s,[,v])=>s+v.qtd,0);
-  if(totalDist>peds.length){showM('qtd-msg','⚠️ Total distribuído maior que pedidos disponíveis.',false);return;}
-
   const btn=$('btn-gerar-rota');
-  btn.textContent='🤖 Gerando com IA...';btn.disabled=true;
-  showM('qtd-msg','Consultando IA para otimizar rotas...',true);
+  btn.textContent='⏳ Calculando rotas...';btn.disabled=true;
+  showM('qtd-msg','Otimizando rotas...',true);
 
-  // Geocode para ter distâncias
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
+
+  // PASSO 1: Geocode todos os pedidos
   const pedsGeo=[];
   for(const p of peds){
     let lat=parseFloat(p.lat_entrega||0),lng=parseFloat(p.lng_entrega||0);
-    if(!lat||!lng){const g=await geocode(p.endereco_entrega);if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}}
-    const dist=distKm(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng);
-    const ang=angleDeg(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng);
-    pedsGeo.push({id:p.id,num:p.numero_pedido||'',nome:p.cliente_nome||'Cliente',end:p.endereco_entrega||'',dist:dist.toFixed(2),ang:ang.toFixed(0)});
-  }
-
-  // Monta prompt para Claude API
-  const NL='\n';
-  const pedidosTexto=pedsGeo.map((p,i)=>(i+1)+'. ID:'+p.id+' | Pedido:#'+p.num+' | Cliente:'+p.nome+' | Endereco:'+p.end+' | Distancia:'+p.dist+'km | Angulo:'+p.ang+'graus').join(NL);
-  const entregadoresTexto=distribuicao.map(([id,v])=>'- '+v.nome+' (ID:'+id+'): maximo '+v.qtd+' entregas').join(NL);
-
-  const prompt=`Você é um otimizador de rotas de delivery. 
-
-PEDIDOS PENDENTES:
-${pedidosTexto}
-
-ENTREGADORES DISPONÍVEIS E LIMITES:
-${entregadoresTexto}
-
-REGRAS:
-1. Agrupe pedidos por direção/bairro similar (mesmo ângulo ±30°)
-2. Dentro de cada grupo, ordene do mais próximo ao mais distante da loja
-3. Respeite o limite de pedidos por entregador
-4. Atribua primeiro os pedidos mais próximos da loja
-5. Se sobrar pedidos após os limites, distribua pelos que tiverem espaço
-
-Responda APENAS com JSON válido, sem texto extra:
-{
-  "grupos": [
-    {
-      "entregador_id": "ID_DO_ENTREGADOR",
-      "entregador_nome": "NOME",
-      "pedidos": ["ID_PEDIDO_1", "ID_PEDIDO_2"],
-      "descricao": "Ex: Setor Sul — 3 entregas"
+    if(!lat||!lng){
+      const g=await geocode(p.endereco_entrega);
+      if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}
+      else{lat=lojaLat;lng=lojaLng;}
     }
-  ]
-}`;
-
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const data=await resp.json();
-    const txt=(data.content||[]).map(b=>b.text||'').join('');
-    const jsonMatch=txt.match(/\{[\s\S]*\}/);
-    if(!jsonMatch)throw new Error('IA não retornou JSON válido');
-    const parsed=JSON.parse(jsonMatch[0]);
-    if(!parsed.grupos||!parsed.grupos.length)throw new Error('Nenhum grupo retornado');
-
-    // Monta _rotaIAGrupos com objetos completos
-    _rotaIAGrupos=parsed.grupos.map(g=>{
-      const pedObjs=g.pedidos.map(pid=>pedsGeo.find(p=>p.id===pid)).filter(Boolean);
-      return{entId:g.entregador_id,entNome:g.entregador_nome,descricao:g.descricao||'',pedidos:pedObjs};
-    });
-    _rotaPlanoGrupos=_rotaIAGrupos; // compat
-
-    // Exibe no modal de plano
-    const body=$('rota-plano-body');
-    const coresEnt=['#004E89','#FF6B35','#00C9A7','#8e44ad','#e74c3c','#27ae60'];
-    body.innerHTML=`<div style="background:#e8f5e9;border-radius:9px;padding:11px;margin-bottom:12px;font-size:13px;color:#2e7d32;font-weight:700;">
-      🤖 IA gerou ${_rotaIAGrupos.length} rota${_rotaIAGrupos.length>1?'s':''}  para ${totalDist} entrega${totalDist>1?'s':''}
-    </div>`+_rotaIAGrupos.map((g,gi)=>`
-    <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid ${coresEnt[gi%coresEnt.length]};">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="font-size:16px;">🛵</span>
-        <div>
-          <div style="font-weight:700;font-size:14px;color:${coresEnt[gi%coresEnt.length]};">${g.entNome}</div>
-          <div style="font-size:11px;color:#888;">${g.descricao}</div>
-        </div>
-        <span style="margin-left:auto;background:${coresEnt[gi%coresEnt.length]};color:white;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;">${g.pedidos.length}x</span>
-      </div>
-      ${g.pedidos.map((p,pi)=>`<div style="padding:5px 0;border-bottom:1px solid #eee;font-size:12px;display:flex;gap:6px;align-items:start;">
-        <span style="background:#004E89;color:white;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${pi+1}</span>
-        <div><strong>${p.num?'#'+p.num:p.nome}</strong><br><span style="color:#555;">📍 ${p.end}</span>${parseFloat(p.dist)>0?`<span style="color:#888;"> • ${p.dist}km</span>`:''}</div>
-      </div>`).join('')}
-    </div>`).join('');
-
-    closeM('qtd-ent');
-    openM('rota-plano');
-  }catch(err){
-    console.error('[IA Rota]',err);
-    // Fallback: usa agrupamento local por ângulo
-    showM('qtd-msg','⚠️ IA indisponível — usando agrupamento automático.',false);
-    await otimizarRotaInteligente();
-  }finally{
-    btn.textContent='🤖 Gerar Rota com IA';btn.disabled=false;
+    const dist=distKm(lojaLat,lojaLng,lat,lng);
+    const ang=((angleDeg(lojaLat,lojaLng,lat,lng)%360)+360)%360;
+    pedsGeo.push({id:p.id,num:p.numero_pedido||'',nome:p.cliente_nome||'Cliente',end:p.endereco_entrega||'',lat,lng,dist,ang});
   }
+
+  // PASSO 2: Mesclar pedidos do MESMO endereço (distância < 80m = mesmo local)
+  const grupos_end=[];
+  const usados=new Set();
+  pedsGeo.forEach((p,i)=>{
+    if(usados.has(i))return;
+    const grupo=[p];
+    usados.add(i);
+    pedsGeo.forEach((q,j)=>{
+      if(i===j||usados.has(j))return;
+      if(distKm(p.lat,p.lng,q.lat,q.lng)*1000<80){grupo.push(q);usados.add(j);}
+    });
+    grupos_end.push(grupo);
+  });
+  // Cada "item de entrega" agora é um grupo de pedidos no mesmo endereço
+  const itens=grupos_end.map(g=>({
+    ids:g.map(x=>x.id),
+    labels:g.map(x=>x.num?'#'+x.num:x.nome),
+    end:g[0].end,lat:g[0].lat,lng:g[0].lng,dist:g[0].dist,ang:g[0].ang
+  })).sort((a,b)=>a.dist-b.dist); // Ordena: mais próximos primeiro
+
+  // PASSO 3: Distribuir itens por ângulo entre entregadores
+  // Ordena entregadores por quantidade (maior primeiro = mais eficiente)
+  const entsOrdenados=distribuicao.sort((a,b)=>b[1].qtd-a[1].qtd);
+  const grupos_ent=entsOrdenados.map(([id,v])=>({entId:id,entNome:v.nome,limite:v.qtd,itens:[],totalPeds:0}));
+  
+  // Algoritmo: atribui item ao entregador que:
+  // 1. Ainda tem espaço (totalPeds < limite)
+  // 2. Cuja rota existente está na mesma direção (ângulo similar)
+  // 3. Se empate, escolhe o que tem menos pedidos
+  itens.forEach(item=>{
+    // Conta quantos pedidos individuais esse item representa
+    const qtdItem=item.ids.length;
+    
+    // Encontra melhor entregador para esse item
+    let melhor=null,melhorScore=Infinity;
+    grupos_ent.forEach(g=>{
+      if(g.totalPeds+qtdItem>g.limite)return; // Sem espaço
+      let score=0;
+      if(g.itens.length===0){
+        // Entregador sem pedidos ainda — usa ângulo médio livre
+        score=50; // score neutro
+      } else {
+        // Calcula ângulo médio dos itens já atribuídos
+        const angMedio=g.itens.reduce((s,it)=>s+it.ang,0)/g.itens.length;
+        const diff=Math.abs(((item.ang-angMedio+540)%360)-180);
+        score=diff; // menor diferença angular = melhor score
+      }
+      // Desempate: prefere quem tem mais espaço proporcional
+      const espacoProporcional=(g.limite-g.totalPeds)/g.limite;
+      score-=espacoProporcional*10;
+      if(score<melhorScore){melhorScore=score;melhor=g;}
+    });
+    
+    if(melhor){
+      melhor.itens.push(item);
+      melhor.totalPeds+=qtdItem;
+    } else {
+      // Item não cabe em nenhum — distribui para quem tem mais espaço disponível
+      const comEspaco=grupos_ent.filter(g=>g.totalPeds<g.limite)
+        .sort((a,b)=>(b.limite-b.totalPeds)-(a.limite-a.totalPeds));
+      if(comEspaco.length){comEspaco[0].itens.push(item);comEspaco[0].totalPeds+=qtdItem;}
+      else grupos_ent[0].itens.push(item); // força no primeiro
+    }
+  });
+
+  // Remove entregadores sem pedidos
+  _rotaIAGrupos=grupos_ent
+    .filter(g=>g.itens.length>0)
+    .map(g=>{
+      // Reordena: mais próximos da loja primeiro
+      g.itens.sort((a,b)=>a.dist-b.dist);
+      const bairroTexto=g.itens.map(it=>it.end.split(',')[1]?.trim()||'').filter(Boolean);
+      const unicos=[...new Set(bairroTexto)].slice(0,2).join(' / ');
+      return{
+        entId:g.entId,entNome:g.entNome,
+        descricao:unicos?('📍 '+unicos):(''+g.itens.length+' parada'+( g.itens.length>1?'s':'')),
+        pedidos:g.itens.flatMap(it=>it.ids.map(id=>{
+          const orig=pedsGeo.find(p=>p.id===id);
+          return orig?{...orig,end:it.end,labels:it.labels}:null;
+        })).filter(Boolean)
+      };
+    });
+  _rotaPlanoGrupos=_rotaIAGrupos;
+
+  // Exibe resultado
+  const body=$('rota-plano-body');
+  const coresEnt=['#004E89','#FF6B35','#00C9A7','#8e44ad','#e74c3c','#27ae60'];
+  const totalPeds=_rotaIAGrupos.reduce((s,g)=>s+g.pedidos.length,0);
+  const sobrou=itens.reduce((s,it)=>s+it.ids.length,0)-totalPeds;
+
+  body.innerHTML=`<div style="background:#e8f5e9;border-radius:9px;padding:11px;margin-bottom:12px;font-size:13px;color:#2e7d32;font-weight:700;">
+    🤖 Rota otimizada: ${_rotaIAGrupos.length} entregador${_rotaIAGrupos.length>1?'es':''} • ${totalPeds} pedido${totalPeds>1?'s':''}${sobrou>0?` • <span style="color:#e65100;">${sobrou} sem entregador</span>`:''}
+  </div>`+_rotaIAGrupos.map((g,gi)=>`
+  <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid ${coresEnt[gi%coresEnt.length]};">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="font-size:16px;">🛵</span>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:${coresEnt[gi%coresEnt.length]};">${g.entNome}</div>
+        <div style="font-size:11px;color:#888;">${g.descricao}</div>
+      </div>
+      <span style="margin-left:auto;background:${coresEnt[gi%coresEnt.length]};color:white;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;">${g.pedidos.length}x</span>
+    </div>
+    ${g.pedidos.map((p,pi)=>`<div style="padding:5px 0;border-bottom:1px solid #eee;font-size:12px;display:flex;gap:6px;align-items:start;">
+      <span style="background:${coresEnt[gi%coresEnt.length]};color:white;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${pi+1}</span>
+      <div>
+        <strong>${p.num?'#'+p.num:p.nome}</strong>
+        <br><span style="color:#555;font-size:11px;">📍 ${p.end}</span>
+        ${p.dist>0?`<span style="color:#888;font-size:10px;"> • ${p.dist.toFixed(1)}km</span>`:''}
+      </div>
+    </div>`).join('')}
+  </div>`).join('');
+
+  btn.textContent='🤖 Gerar Rota com IA';btn.disabled=false;
+  $('qtd-msg').textContent='';
+  closeM('qtd-ent');
+  openM('rota-plano');
 }
+
 
 async function otimizarRotaInteligente(){
   const{data:peds}=await db.from('entregas').select('*').eq('loja_id',U.id).eq('status','pendente').order('created_at');
@@ -2734,12 +2783,13 @@ async function carregarLojaAtiva(){
   const selBox=$('ent-selecionar-loja-box');
 
   // PASSO 1: Mostra imediatamente o que está no localStorage (resposta instantânea)
-  function renderCard(nome,codigo,ativa){
+  function renderCard(nome,codigo,ativa,lojaId){
     const cor=ativa?'#e8f5e9':'#f0f4ff';
     const borda=ativa?'#00C9A7':'#004E89';
     const corText=ativa?'#1b5e20':'#004E89';
     const status=ativa?'✅ Online — trabalhando agora':'⏸️ Conectado — clique em Ficar Online';
     const corStatus=ativa?'#2e7d32':'#e65100';
+    const btnDesv=lojaId&&!ativa?`<button onclick="desvinculardaLoja('${lojaId}')" style="margin-top:7px;width:100%;background:#ffebee;color:#c62828;border:1px solid #ef9a9a;border-radius:7px;padding:6px;font-size:11px;font-weight:700;cursor:pointer;">🔓 Desvincular desta loja</button>`:'';
     return `<div style="background:${cor};border-radius:10px;padding:11px;border:2px solid ${borda};">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
         <span style="font-size:20px;">🏪</span>
@@ -2747,11 +2797,12 @@ async function carregarLojaAtiva(){
       </div>
       ${codigo?`<p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${codigo}</strong></p>`:''}
       <p style="font-size:12px;margin:4px 0;color:${corStatus};font-weight:700;">${status}</p>
+      ${btnDesv}
     </div>`;
   }
 
   if(U._loja_ativa_nome){
-    infoBox.innerHTML=renderCard(U._loja_ativa_nome,U._loja_ativa_codigo,U.online);
+    infoBox.innerHTML=renderCard(U._loja_ativa_nome,U._loja_ativa_codigo,U.online,U.loja_ativa_id);
     selBox.classList.add('hidden');
   }
 
@@ -2780,7 +2831,7 @@ async function carregarLojaAtiva(){
     const lj=lojaAtiva.l;
     const nomeLoja=lj.nome_loja||lj.nome;
     // Atualiza UI com dados reais do banco
-    infoBox.innerHTML=renderCard(nomeLoja,lj.codigo_loja,U.online);
+    infoBox.innerHTML=renderCard(nomeLoja,lj.codigo_loja,U.online,lojaAtiva.loja_id);
     // Logo da loja
     const hdr=$('ent-loja-logo');
     if(hdr)hdr.innerHTML=lj.logo_url?`<img src="${lj.logo_url}" style="max-height:45px;max-width:150px;object-fit:contain;display:block;margin:0 auto 4px;">`:'' ;
@@ -2956,6 +3007,19 @@ async function uploadFoto(event){
   reader.readAsDataURL(file);
 }
 
+async function desvinculardaLoja(lojaId,lojaIdConfirm){
+  if(!confirm('Tem certeza que deseja se DESVINCULAR desta loja?\nVocê não receberá mais pedidos dela.'))return;
+  await db.from('loja_entregadores').delete().eq('entregador_id',U.id).eq('loja_id',lojaId);
+  await db.from('usuarios').update({online:false}).eq('id',U.id);
+  U.online=false;U.loja_ativa_id=null;U._loja_ativa_nome=null;U._loja_ativa_codigo=null;
+  localStorage.setItem('u',JSON.stringify(U));
+  localStorage.removeItem('loja_vinc_'+U.id);
+  atuBtnOn(false);
+  carregarLojaAtiva();
+  $('msg-cod').className='msg-ok';
+  $('msg-cod').textContent='Desvinculado com sucesso.';
+}
+
 async function conectarCodigo(){
   const cod=v('cod-loja-inp').toUpperCase();const msg=$('msg-cod');
   if(cod.length<4){msg.className='msg-error';msg.textContent='Digite o codigo da loja';return;}
@@ -2963,6 +3027,13 @@ async function conectarCodigo(){
   const{data:loja,error:ljErr}=await db.from('usuarios').select('id,nome_loja,nome,codigo_loja').eq('codigo_loja',cod).eq('tipo','loja').single();
   if(!loja){msg.className='msg-error';msg.textContent='❌ Código não encontrado. Verifique e tente novamente.';return;}
   const nomeLoja=loja.nome_loja||loja.nome;
+  // REGRA: entregador pode estar vinculado a múltiplas lojas, mas só trabalhar em UMA por vez
+  // Verifica se já está online em outra loja
+  if(U.online&&U.loja_ativa_id&&U.loja_ativa_id!==loja.id){
+    msg.className='msg-error';
+    msg.textContent='⚠️ Você está online em outra loja. Fique Offline primeiro antes de trocar de loja.';
+    return;
+  }
   // Insere associação (ignora duplicata)
   const{error:insErr}=await db.from('loja_entregadores').insert([{loja_id:loja.id,entregador_id:U.id}]);
   if(insErr&&insErr.code!=='23505'){msg.className='msg-error';msg.textContent='Erro ao vincular: '+insErr.message;return;}
@@ -3074,25 +3145,51 @@ async function carregarRotaEnt(){
 }
 
 async function entStatus(id,novoStatus,refLat,refLng){
-  const RAIO_M=400;
+  const RAIO_M=350; // metros — raio de validação
   if(novoStatus==='chegou_loja'||novoStatus==='entregue'){
-    // Busca configuracao da loja para saber se GPS eh obrigatorio
-    const{data:ped}=await db.from('entregas').select('loja_id').eq('id',id).single();
-    let gpsObrigatorio=false;
-    if(ped&&ped.loja_id){
-      const{data:loja}=await db.from('usuarios').select('gps_validacao_obrigatorio').eq('id',ped.loja_id).single();
-      gpsObrigatorio=loja&&loja.gps_validacao_obrigatorio;
+    // 1) Verifica GPS global (localStorage é mais confiável que banco pois sync pode atrasar)
+    const gpsGlobalLocal=localStorage.getItem('adm_gps_global')==='1';
+    let gpsObrigatorio=gpsGlobalLocal;
+    // 2) Confirma com banco se o localStorage diz false (pode estar desatualizado)
+    if(!gpsObrigatorio){
+      try{
+        const{data:ped}=await db.from('entregas').select('loja_id').eq('id',id).single();
+        if(ped?.loja_id){
+          const{data:lj}=await db.from('usuarios').select('gps_validacao_obrigatorio').eq('id',ped.loja_id).single();
+          gpsObrigatorio=lj?.gps_validacao_obrigatorio||false;
+          // Sincroniza localStorage com banco
+          if(gpsObrigatorio)localStorage.setItem('adm_gps_global','1');
+        }
+      }catch(e){}
     }
     if(gpsObrigatorio){
+      // Pede posição FRESCA (maximumAge:0 = não usa cache)
       try{
-        const pos=await obterPosicaoAgora();
-        const dist=distKm(pos.lat,pos.lng,refLat,refLng)*1000;
-        if(dist>RAIO_M){
-          alert('Validacao de GPS ativa: voce precisa estar a menos de '+RAIO_M+'m do local.\nDistancia atual: '+Math.round(dist)+'m\n\nSolicite ao responsavel da loja para finalizar se necessario.');
-          return;
+        const pos=await new Promise((resolve,reject)=>{
+          const timer=setTimeout(()=>{
+            // Timeout: tenta usar a última posição conhecida mesmo que velha
+            if(myLat&&myLng)resolve({lat:myLat,lng:myLng,stale:true});
+            else reject('timeout');
+          },10000);
+          navigator.geolocation.getCurrentPosition(
+            p=>{clearTimeout(timer);myLat=p.coords.latitude;myLng=p.coords.longitude;resolve({lat:p.coords.latitude,lng:p.coords.longitude,stale:false});},
+            err=>{clearTimeout(timer);if(myLat&&myLng)resolve({lat:myLat,lng:myLng,stale:true});else reject('bloqueado');},
+            {enableHighAccuracy:true,timeout:9000,maximumAge:0}
+          );
+        });
+        if(!refLat||!refLng||refLat===0){
+          // Sem coordenada de referência — não bloqueia mas avisa
+          console.warn('[GPS] refLat/refLng ausente, pulando validação');
+        } else {
+          const dist=distKm(pos.lat,pos.lng,refLat,refLng)*1000;
+          const aviso=pos.stale?' (GPS desatualizado)':'';
+          if(dist>RAIO_M){
+            alert('📍 Validação de GPS ativa'+aviso+'\n\nVocê precisa estar a menos de '+RAIO_M+'m do local.\nDistância atual: '+Math.round(dist)+'m\n\nCertifique-se de estar no endereço correto antes de confirmar.');
+            return;
+          }
         }
       }catch(e){
-        alert('GPS nao disponivel. A loja exige validacao de localizacao para esta acao.');
+        alert('📍 GPS obrigatório mas não disponível.\nAtive o GPS do celular e tente novamente.\n('+e+')');
         return;
       }
     }
