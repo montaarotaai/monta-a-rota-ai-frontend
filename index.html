@@ -505,14 +505,6 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="cfg-bairro"></div><div class="fg"><label>Cidade</label><input type="text" id="cfg-cidade"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="cfg-comp"></div>
   <div class="g2b"><div class="fg"><label>Abertura</label><input type="time" id="cfg-ab"></div><div class="fg"><label>Fechamento</label><input type="time" id="cfg-fch"></div></div>
-  <div class="fg">
-    <label>🔑 Chave Google Vision API (OCR de comandas)</label>
-    <div style="display:flex;gap:6px;">
-      <input type="text" id="cfg-google-key" placeholder="Cole aqui sua chave AIzaSy..." style="flex:1;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;">
-      <button onclick="salvarGoogleKey()" style="background:#34a853;color:white;border:none;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">✓ Salvar</button>
-    </div>
-    <p style="font-size:10px;color:#888;margin-top:3px;" id="cfg-google-key-status"></p>
-  </div>
   <div class="fg"><label>Nova Senha (em branco = nao alterar)</label><input type="password" id="cfg-senha"></div>
   <div id="cfg-lj-msg"></div>
   <button class="btn btn-primary" onclick="salvarCfgLj()">Salvar</button>
@@ -1228,17 +1220,23 @@ async function salvarTaxaLj(){
     kmLim=parseFloat(v('lj-km-limite')||5);
     kmExc=parseFloat(v('lj-taxa-km-exc')||0);
   }else if(tipo==='fixo_mais_km'){
-    fixoBase=parseFloat(v('lj-taxa-fixo-base')||0); // fixo mensal/semanal (nao cobrado por corrida)
-    base=parseFloat(v('lj-taxa-por-ent')||0);       // valor por entrega ate X km
+    fixoBase=parseFloat(v('lj-taxa-fixo-base')||0);
+    base=parseFloat(v('lj-taxa-por-ent')||0);
     kmLim=parseFloat(v('lj-km-limite2')||7);
     kmExc=parseFloat(v('lj-taxa-km-exc2')||0);
   }else{
     base=parseFloat(v('lj-taxa-new')||0);kmLim=5;kmExc=0;
   }
-  await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc,taxa_fixo_base:fixoBase}).eq('id',U.id);
+  const{error}=await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc,taxa_fixo_base:fixoBase}).eq('id',U.id);
+  if(error){
+    $('taxa-msg').style.color='#e53935';
+    $('taxa-msg').textContent='❌ Erro ao salvar: '+error.message;
+    console.error('[salvarTaxa]',error);
+    return;
+  }
   U.taxa_entrega=base;U.taxa_tipo=tipo;U.taxa_km_limite=kmLim;U.taxa_km_excedente=kmExc;U.taxa_fixo_base=fixoBase;
   localStorage.setItem('u',JSON.stringify(U));
-  $('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='Configuracao salva!';
+  $('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='✅ Configuracao salva!';
   setTimeout(()=>{$('taxa-msg').textContent='';},2000);
 }
 
@@ -1803,20 +1801,29 @@ async function salvarEdicaoPedido(){
   if(btn){btn.disabled=true;btn.textContent='Salvando...';}
   const rua=v('edit-rua'),nend=v('edit-nend'),bairro=v('edit-bairro'),cidade=v('edit-cidade')||'Ribeirao Preto',comp=v('edit-comp');
   const endereco=fEnd(rua,nend,bairro,cidade,comp);
-  const{error}=await db.from('entregas').update({
+  // Monta objeto de update sem campos que podem nao existir no banco
+  const upd={
     numero_pedido:v('edit-num')||null,
     cliente_nome:v('edit-cli'),
     cliente_telefone:v('edit-tel'),
     endereco_rua:rua,endereco_numero:nend,endereco_bairro:bairro,endereco_cidade:cidade,
-    endereco_complemento:comp,endereco_entrega:endereco,
-    observacoes:v('edit-obs')
-  }).eq('id',id);
-  if(btn){btn.disabled=false;btn.textContent='✓ Salvar Alteracoes';}
-  if(error){
+    endereco_complemento:comp,endereco_entrega:endereco
+  };
+  // Tenta adicionar observacoes - se coluna nao existir, tenta notas
+  const obsVal=v('edit-obs');
+  const{error}=await db.from('entregas').update({...upd,observacoes:obsVal||null}).eq('id',id);
+  if(error&&(error.message.includes('observacoes')||error.message.includes('schema cache'))){
+    // Coluna observacoes nao existe - tenta salvar sem ela
+    const{error:e2}=await db.from('entregas').update(upd).eq('id',id);
+    if(btn){btn.disabled=false;btn.textContent='✓ Salvar Alteracoes';}
+    if(e2){showM('edit-msg','❌ Erro ao salvar: '+e2.message,false);return;}
+  }else if(error){
+    if(btn){btn.disabled=false;btn.textContent='✓ Salvar Alteracoes';}
     console.error('[editar]',error);
     showM('edit-msg','❌ Erro ao salvar: '+error.message,false);
     return;
   }
+  if(btn){btn.disabled=false;btn.textContent='✓ Salvar Alteracoes';}
   showM('edit-msg','✅ Pedido atualizado!',true);
   setTimeout(()=>{closeM('editar');carregarPedidos();},1000);
 }
@@ -2091,8 +2098,10 @@ async function toggleOnline(){
     }
   }
   const novo=!U.online;
-  await db.from('usuarios').update({online:novo,loja_ativa_id:novo?U.loja_ativa_id:null}).eq('id',U.id);
-  U.online=novo;if(!novo)U.loja_ativa_id=null;
+  // Ao ficar offline, NAO zera a loja ativa — ela deve persistir o turno todo
+  await db.from('usuarios').update({online:novo}).eq('id',U.id);
+  U.online=novo;
+  // Nao zera loja_ativa_id ao ficar offline
   localStorage.setItem('u',JSON.stringify(U));
   atuBtnOn(novo);
   if(novo){
