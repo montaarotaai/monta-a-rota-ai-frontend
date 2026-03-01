@@ -6,6 +6,7 @@
 <title>Monta a Rota Ai</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -217,12 +218,20 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <!-- Financeiro -->
     <div id="adm-financeiro" class="hidden">
       <div class="secao">
-        <div class="s-title">Filtrar por periodo</div>
-        <select id="adm-fin-per" onchange="carregarFinAdm()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;">
-          <option value="hoje">Hoje</option>
-          <option value="semana">Esta semana</option>
-          <option value="mes">Este mes</option>
-        </select>
+        <div class="s-title">📊 Relatório Financeiro — Admin</div>
+        <div class="g2b" style="gap:8px;margin-bottom:8px;">
+          <select id="adm-fin-per" onchange="carregarFinAdm()" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;">
+            <option value="hoje">Hoje</option>
+            <option value="semana" selected>Esta semana (Seg-Dom)</option>
+            <option value="mes">Este mês</option>
+            <option value="semana_passada">Semana passada</option>
+            <option value="mes_passado">Mês passado</option>
+          </select>
+          <select id="adm-fin-loja" onchange="carregarFinAdm()" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;">
+            <option value="">Todas as lojas</option>
+          </select>
+        </div>
+        <button onclick="carregarFinAdm()" class="btn btn-blue" style="margin-bottom:4px;">🔄 Atualizar</button>
       </div>
       <div id="adm-fin-dados"></div>
     </div>
@@ -1027,42 +1036,219 @@ async function carregarAdmEnt(){
 }
 
 async function carregarFinAdm(){
-  const p=$('adm-fin-per').value,el=$('adm-fin-dados');el.innerHTML='<p>Carregando...</p>';
-  const{data:lojas}=await db.from('usuarios').select('*').eq('tipo','loja');
-  const{data:entregas}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome),entregador:entregador_id(nome)').gte('created_at',iPer(p));
-  if(!entregas||!entregas.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Sem dados no periodo.</p>';return;}
+  const p=$('adm-fin-per').value;
+  const lojaFiltro=$('adm-fin-loja')?.value||'';
+  const el=$('adm-fin-dados');
+  el.innerHTML='<p style="text-align:center;padding:20px;color:#888;">⏳ Carregando dados...</p>';
+
+  // Calcula período
+  function getPeriodo(per){
+    const now=new Date();
+    const hoje=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    if(per==='hoje') return {ini:hoje,fim:new Date(hoje.getTime()+86400000-1)};
+    if(per==='semana'){
+      const d=new Date(hoje);d.setDate(d.getDate()-((d.getDay()+6)%7));// segunda
+      return{ini:d,fim:new Date(d.getTime()+7*86400000-1)};
+    }
+    if(per==='semana_passada'){
+      const d=new Date(hoje);d.setDate(d.getDate()-((d.getDay()+6)%7)-7);
+      return{ini:d,fim:new Date(d.getTime()+7*86400000-1)};
+    }
+    if(per==='mes'){const d=new Date(now.getFullYear(),now.getMonth(),1);return{ini:d,fim:new Date(now.getFullYear(),now.getMonth()+1,0,23,59,59)};}
+    if(per==='mes_passado'){const d=new Date(now.getFullYear(),now.getMonth()-1,1);return{ini:d,fim:new Date(now.getFullYear(),now.getMonth(),0,23,59,59)};}
+    return{ini:hoje,fim:new Date(hoje.getTime()+86400000-1)};
+  }
+  const{ini,fim}=getPeriodo(p);
+
+  let q=db.from('entregas').select('*,loja:loja_id(nome_loja,nome,id),entregador:entregador_id(nome,id)')
+    .gte('created_at',ini.toISOString()).lte('created_at',fim.toISOString());
+  if(lojaFiltro) q=q.eq('loja_id',lojaFiltro);
+  const{data:entregas}=await q.order('created_at',{ascending:false});
+  const{data:lojas}=await db.from('usuarios').select('id,nome_loja,nome').eq('tipo','loja');
+
+  // Popula filtro de lojas (uma vez)
+  const selLoja=$('adm-fin-loja');
+  if(selLoja&&selLoja.options.length<=1&&lojas){
+    lojas.forEach(l=>{if(!selLoja.querySelector(`option[value="${l.id}"]`)){const o=document.createElement('option');o.value=l.id;o.textContent=l.nome_loja||l.nome;selLoja.appendChild(o);}});
+  }
+
+  if(!entregas||!entregas.length){el.innerHTML='<p style="color:#999;text-align:center;padding:30px;">Sem entregas no período selecionado.</p>';return;}
+
+  const KM_LIMITE=5; // km limite padrão para categorização
   const totSis=entregas.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
   const totEnt=entregas.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  const entPorEntregador={};
+  entregas.forEach(e=>{
+    const eid=e.entregador_id||'sem';
+    const enome=e.entregador?.nome||'Sem entregador';
+    if(!entPorEntregador[eid])entPorEntregador[eid]={nome:enome,corridas:[],totalVal:0,abaixoKm:0,acimaKm:0,valAbaixo:0,valAcima:0};
+    const d=parseFloat(e.distancia_km||0);
+    const v=parseFloat(e.valor_corrida||e.valor_entregador||0);
+    entPorEntregador[eid].corridas.push(e);
+    entPorEntregador[eid].totalVal+=v;
+    if(d>0&&d<=KM_LIMITE){entPorEntregador[eid].abaixoKm++;entPorEntregador[eid].valAbaixo+=v;}
+    else if(d>KM_LIMITE){entPorEntregador[eid].acimaKm++;entPorEntregador[eid].valAcima+=v;}
+    else{entPorEntregador[eid].abaixoKm++;entPorEntregador[eid].valAbaixo+=v;}
+  });
+
+  // Entregas por dia para gráfico de linha
+  const porDia={};
+  entregas.forEach(e=>{
+    const dia=e.created_at?.split('T')[0]||'';
+    if(!porDia[dia])porDia[dia]={entregas:0,sistema:0,entregadores:0};
+    porDia[dia].entregas++;
+    porDia[dia].sistema+=parseFloat(e.valor_sistema||0);
+    porDia[dia].entregadores+=parseFloat(e.valor_corrida||e.valor_entregador||0);
+  });
+  const dias=Object.keys(porDia).sort();
+  const diasLabel=dias.map(d=>{const[,m,dd]=d.split('-');return`${dd}/${m}`;});
+
+  // HTML do relatório
+  const entradoresArr=Object.values(entPorEntregador).sort((a,b)=>b.totalVal-a.totalVal);
+  const coresEnt=['#FF6B35','#004E89','#00C9A7','#8e44ad','#e74c3c','#27ae60','#f39c12'];
+
   el.innerHTML=`
-    <div class="secao">
-      <div class="s-title">Resumo do Periodo</div>
-      <div class="g3">
-        <div style="text-align:center;padding:10px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888;">Total Entregas</p><p style="font-size:20px;font-weight:700;color:#FF6B35;">${entregas.length}</p></div>
-        <div style="text-align:center;padding:10px;background:#e3f2fd;border-radius:8px;"><p style="font-size:10px;color:#888;">Taxa Sistema</p><p style="font-size:14px;font-weight:700;color:#004E89;">${fR(totSis)}</p></div>
-        <div style="text-align:center;padding:10px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888;">Pago Entregad.</p><p style="font-size:14px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p></div>
+  <!-- RESUMO GERAL -->
+  <div class="secao" style="background:linear-gradient(135deg,#004E89,#FF6B35);color:white;border-radius:12px;padding:14px;margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;opacity:.8;margin-bottom:8px;text-transform:uppercase;">Resumo do Período</div>
+    <div class="g3">
+      <div style="text-align:center;background:rgba(255,255,255,.15);border-radius:8px;padding:10px;">
+        <div style="font-size:10px;opacity:.8;">Entregas</div>
+        <div style="font-size:24px;font-weight:700;">${entregas.length}</div>
+      </div>
+      <div style="text-align:center;background:rgba(255,255,255,.15);border-radius:8px;padding:10px;">
+        <div style="font-size:10px;opacity:.8;">Taxa Sistema</div>
+        <div style="font-size:16px;font-weight:700;">${fR(totSis)}</div>
+      </div>
+      <div style="text-align:center;background:rgba(255,255,255,.15);border-radius:8px;padding:10px;">
+        <div style="font-size:10px;opacity:.8;">A Pagar Ent.</div>
+        <div style="font-size:16px;font-weight:700;">${fR(totEnt)}</div>
       </div>
     </div>
+  </div>
+
+  <!-- GRÁFICO ENTREGAS POR DIA -->
+  ${dias.length>1?`<div class="secao">
+    <div class="s-title">📈 Entregas por Dia</div>
+    <canvas id="chart-dias" height="160"></canvas>
+  </div>`:''}
+
+  <!-- GRÁFICO PIZZA ENTREGADORES -->
+  ${entradoresArr.length>1?`<div class="secao">
+    <div class="s-title">🥧 Distribuição por Entregador</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <canvas id="chart-pizza" width="160" height="160" style="max-width:160px;"></canvas>
+      <div style="flex:1;">
+        ${entradoresArr.map((e,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <div style="width:12px;height:12px;border-radius:50%;background:${coresEnt[i%coresEnt.length]};flex-shrink:0;"></div>
+          <span style="font-size:12px;">${e.nome}</span>
+          <span style="margin-left:auto;font-weight:700;font-size:12px;">${e.corridas.length}x</span>
+        </div>`).join('')}
+      </div>
+    </div>
+  </div>`:''}
+
+  <!-- DETALHAMENTO POR ENTREGADOR -->
+  <div class="secao">
+    <div class="s-title">🛵 Detalhamento por Entregador — Limite: ${KM_LIMITE}km</div>
+    ${entradoresArr.map((ent,i)=>`
+    <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid ${coresEnt[i%coresEnt.length]};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <strong style="font-size:14px;">${ent.nome}</strong>
+        <span style="background:#004E89;color:white;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700;">${fR(ent.totalVal)}</span>
+      </div>
+      <div class="g3" style="margin-bottom:8px;">
+        <div style="background:white;border-radius:7px;padding:8px;text-align:center;">
+          <div style="font-size:10px;color:#888;">Total corridas</div>
+          <div style="font-size:18px;font-weight:700;color:#FF6B35;">${ent.corridas.length}</div>
+        </div>
+        <div style="background:white;border-radius:7px;padding:8px;text-align:center;">
+          <div style="font-size:10px;color:#888;">Até ${KM_LIMITE}km</div>
+          <div style="font-size:14px;font-weight:700;color:#00C9A7;">${ent.abaixoKm}x<br><small>${fR(ent.valAbaixo)}</small></div>
+        </div>
+        <div style="background:white;border-radius:7px;padding:8px;text-align:center;">
+          <div style="font-size:10px;color:#888;">Acima ${KM_LIMITE}km</div>
+          <div style="font-size:14px;font-weight:700;color:#e74c3c;">${ent.acimaKm}x<br><small>${fR(ent.valAcima)}</small></div>
+        </div>
+      </div>
+      <!-- Lista de corridas -->
+      <details>
+        <summary style="font-size:12px;color:#004E89;cursor:pointer;font-weight:600;">Ver ${ent.corridas.length} corridas ▼</summary>
+        <div style="margin-top:8px;">
+          ${ent.corridas.map(c=>`<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:11px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong>${c.cliente_nome||'Cliente'}</strong><br>
+              <span style="color:#888;">${c.endereco_bairro||''} | ${parseFloat(c.distancia_km||0).toFixed(1)}km | ${c.created_at?.split('T')[0]||''}</span>
+            </div>
+            <span style="font-weight:700;color:#2e7d32;white-space:nowrap;">${fR(c.valor_corrida||c.valor_entregador)}</span>
+          </div>`).join('')}
+        </div>
+      </details>
+    </div>`).join('')}
+  </div>
+
+  <!-- RESUMO POR LOJA -->
+  <div class="secao">
+    <div class="s-title">🏪 Resumo por Loja</div>
     ${(lojas||[]).map(lj=>{
       const ljEnt=entregas.filter(e=>e.loja_id===lj.id);
-      if(!ljEnt.length)return '';
+      if(!ljEnt.length)return'';
       const ljSis=ljEnt.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
-      const ljEntVal=ljEnt.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-      return `<div class="secao">
-        <div class="s-title">&#127978; ${lj.nome_loja||lj.nome} (${ljEnt.length} entregas)</div>
-        <div class="row" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <span class="badge b-pendente">Sistema: ${fR(ljSis)}</span>
-          <span class="badge b-ativo">Entregadores: ${fR(ljEntVal)}</span>
+      const ljEntV=ljEnt.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+      return`<div style="background:#f8f9fa;border-radius:10px;padding:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${lj.nome_loja||lj.nome}</strong>
+          <span style="font-size:12px;color:#888;">${ljEnt.length} entregas</span>
         </div>
-        ${ljEnt.map(e=>`<div style="padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
-          <div style="display:flex;justify-content:space-between;">
-            <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
-            <span style="font-weight:700;color:#2e7d32;">${fR(e.valor_corrida||e.valor_entregador)}</span>
+        <div class="g2b" style="margin-top:6px;gap:6px;">
+          <div style="background:#e3f2fd;border-radius:6px;padding:7px;text-align:center;font-size:11px;">
+            <div style="color:#888;">Taxa Sistema</div><strong style="color:#004E89;">${fR(ljSis)}</strong>
           </div>
-          <p style="color:#555;">&#128205; ${e.endereco_entrega}</p>
-          <p style="color:#888;">&#128757; ${e.entregador?e.entregador.nome:'Sem entregador'} | <span class="badge b-${e.status}">${e.status}</span></p>
-        </div>`).join('')}
+          <div style="background:#e8f5e9;border-radius:6px;padding:7px;text-align:center;font-size:11px;">
+            <div style="color:#888;">A Pagar Ent.</div><strong style="color:#2e7d32;">${fR(ljEntV)}</strong>
+          </div>
+        </div>
       </div>`;
-    }).join('')}`;
+    }).join('')}
+  </div>`;
+
+  // Renderiza gráficos após DOM atualizado
+  setTimeout(()=>{
+    // Gráfico de linha por dia
+    if(dias.length>1){
+      const ctx=document.getElementById('chart-dias');
+      if(ctx){
+        if(ctx._chart)ctx._chart.destroy();
+        ctx._chart=new Chart(ctx,{
+          type:'line',
+          data:{
+            labels:diasLabel,
+            datasets:[
+              {label:'Entregas',data:dias.map(d=>porDia[d].entregas),borderColor:'#FF6B35',backgroundColor:'rgba(255,107,53,.1)',tension:.3,fill:true,yAxisID:'y'},
+              {label:'Taxa Sistema',data:dias.map(d=>porDia[d].sistema),borderColor:'#004E89',backgroundColor:'transparent',tension:.3,borderDash:[4,4],yAxisID:'y2'},
+              {label:'Pago Entregad.',data:dias.map(d=>porDia[d].entregadores),borderColor:'#00C9A7',backgroundColor:'transparent',tension:.3,yAxisID:'y2'}
+            ]
+          },
+          options:{responsive:true,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{position:'left',ticks:{font:{size:10}}},y2:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10},callback:v=>'R$'+v.toFixed(0)}}}}
+        });
+      }
+    }
+    // Gráfico pizza
+    if(entradoresArr.length>1){
+      const ctx2=document.getElementById('chart-pizza');
+      if(ctx2){
+        if(ctx2._chart)ctx2._chart.destroy();
+        ctx2._chart=new Chart(ctx2,{
+          type:'doughnut',
+          data:{
+            labels:entradoresArr.map(e=>e.nome),
+            datasets:[{data:entradoresArr.map(e=>e.corridas.length),backgroundColor:entradoresArr.map((_,i)=>coresEnt[i%coresEnt.length])}]
+          },
+          options:{responsive:false,plugins:{legend:{display:false}},cutout:'60%'}
+        });
+      }
+    }
+  },100);
 }
 
 async function toggleStAdm(id,st,tipo){
@@ -1227,11 +1413,16 @@ async function salvarTaxaLj(){
   }else{
     base=parseFloat(v('lj-taxa-new')||0);kmLim=5;kmExc=0;
   }
-  const{error}=await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc,taxa_fixo_base:fixoBase}).eq('id',U.id);
+  // Tenta salvar com taxa_fixo_base
+  let{error}=await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc,taxa_fixo_base:fixoBase}).eq('id',U.id);
+  // Se coluna taxa_fixo_base nao existe, salva sem ela
+  if(error&&error.message&&error.message.includes('taxa_fixo_base')){
+    const r2=await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc}).eq('id',U.id);
+    error=r2.error;
+  }
   if(error){
     $('taxa-msg').style.color='#e53935';
     $('taxa-msg').textContent='❌ Erro ao salvar: '+error.message;
-    console.error('[salvarTaxa]',error);
     return;
   }
   U.taxa_entrega=base;U.taxa_tipo=tipo;U.taxa_km_limite=kmLim;U.taxa_km_excedente=kmExc;U.taxa_fixo_base=fixoBase;
@@ -1385,12 +1576,12 @@ async function lerComanda(event){
 
     if(!resp.ok){
       const errData=await resp.json().catch(()=>({}));
-      const errMsg=errData.error?.message||resp.statusText||resp.status;
-      console.error('[OCR Google]',resp.status,errMsg);
-      if(resp.status===400&&errMsg.toLowerCase().includes('key'))showM('ped-msg','❌ Chave Google inválida. Verifique a configuração.',false);
-      else if(resp.status===403)showM('ped-msg','❌ Permissão negada. Ative a Cloud Vision API no Google Cloud Console.',false);
-      else if(resp.status===429)showM('ped-msg','⚠️ Muitas requisições. Aguarde alguns segundos.',false);
-      else showM('ped-msg','❌ Erro Google Vision ('+resp.status+'). Tente novamente.',false);
+      const errMsg=errData.error?.message||resp.statusText||String(resp.status);
+      const errCode=errData.error?.code||resp.status;
+      const errDetails=errData.error?.details||errData.error?.errors||[];
+      console.error('[OCR Google]',errCode,errMsg,errDetails);
+      // Mostra mensagem técnica completa para diagnóstico
+      showM('ped-msg','❌ Erro Google ('+errCode+'): '+errMsg,false);
       return;
     }
 
