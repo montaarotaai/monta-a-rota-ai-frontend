@@ -452,13 +452,28 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
 <!-- Pedidos/Rota Loja -->
 <!-- Modal Plano de Rota -->
+<!-- Modal: Definir Quantidade por Entregador -->
+<div id="m-qtd-ent" class="modal"><div class="modal-box">
+  <button class="modal-close" onclick="closeM('qtd-ent')">&times;</button>
+  <h2 style="margin-bottom:4px;">🔢 Distribuição de Pedidos</h2>
+  <p style="font-size:12px;color:#888;margin-bottom:4px;">Defina quantas entregas cada entregador vai levar.</p>
+  <p style="font-size:11px;color:#e65100;margin-bottom:12px;">A IA vai agrupar pedidos no mesmo sentido/bairro, com o mais perto da loja primeiro.</p>
+  <div id="qtd-ent-body">
+    <p style="text-align:center;color:#888;">Carregando entregadores...</p>
+  </div>
+  <div id="qtd-total-info" style="background:#e3f2fd;border-radius:8px;padding:10px;margin:10px 0;font-size:13px;text-align:center;"></div>
+  <div id="qtd-msg" style="margin-bottom:8px;"></div>
+  <button class="btn btn-primary" onclick="gerarRotaComIA()" id="btn-gerar-rota">🤖 Gerar Rota com IA</button>
+</div></div>
+
 <div id="m-rota-plano" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('rota-plano')">&times;</button>
   <h2 style="margin-bottom:4px;">🗺️ Plano de Rota</h2>
-  <p style="font-size:12px;color:#888;margin-bottom:12px;">Escolha qual entregador faz cada grupo de entregas</p>
+  <p style="font-size:12px;color:#888;margin-bottom:12px;">Revise as rotas geradas pela IA e confirme</p>
   <div id="rota-plano-body"></div>
-  <div style="margin-top:12px;">
-    <button class="btn btn-primary" onclick="confirmarRotaPlano()" id="btn-confirmar-rota">✅ Confirmar e Despachar</button>
+  <div style="margin-top:12px;display:flex;gap:8px;">
+    <button class="btn btn-secondary" onclick="closeM('rota-plano');openM('qtd-ent')" style="flex:1;background:#f5f5f5;color:#555;border:none;padding:11px;border-radius:9px;font-weight:700;cursor:pointer;">← Voltar</button>
+    <button class="btn btn-primary" onclick="confirmarRotaPlano()" id="btn-confirmar-rota" style="flex:2;">✅ Confirmar e Despachar</button>
   </div>
 </div></div>
 
@@ -466,8 +481,9 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="modal-close" onclick="closeM('rota')">&times;</button>
   <h2 style="margin-bottom:9px;">&#128230; Pedidos e Rota</h2>
   <div class="row" style="margin-bottom:11px;flex-wrap:wrap;gap:6px;">
-    <button class="btn-sm blue" onclick="otimizarRotaInteligente()" style="padding:8px 13px;">&#129302; Otimizar Inteligente</button>
-    <button class="btn-sm orange" onclick="avisarPedidoPronto()" style="padding:8px 13px;">&#128226; Pedido Pronto</button>
+    <button class="btn-sm blue" onclick="abrirDefinirQuantidade()" style="padding:8px 13px;background:#004E89;">🔢 Definir Qtd / Rota IA</button>
+    <button class="btn-sm blue" onclick="otimizarRotaInteligente()" style="padding:8px 13px;">🤖 Otimizar Auto</button>
+    <button class="btn-sm orange" onclick="avisarPedidoPronto()" style="padding:8px 13px;">📢 Pedido Pronto</button>
   </div>
   <div id="rota-lst"></div>
 </div></div>
@@ -576,18 +592,14 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <p style="font-size:12px;color:#888;">Pedido <strong id="ifood-conf-num"></strong></p>
   </div>
   <div style="background:#fff3e0;border:1.5px solid #FF6B35;border-radius:10px;padding:12px;margin-bottom:14px;">
-    <p style="font-size:13px;color:#e65100;font-weight:700;margin-bottom:6px;">Como confirmar:</p>
-    <p style="font-size:12px;color:#555;line-height:1.6;">1. Chegue ao endereço de entrega<br>2. Mostre o pedido ao cliente<br>3. O <strong>cliente</strong> vai fornecer um código de confirmação<br>4. Digite o código abaixo e finalize</p>
+    <p style="font-size:13px;color:#e65100;font-weight:700;margin-bottom:4px;">Como confirmar:</p>
+    <p style="font-size:12px;color:#555;line-height:1.7;">1. Chegue ao endereço de entrega<br>2. Abra o iFood e confirme a entrega no app<br>3. Volte aqui e clique em <strong>Finalizar</strong></p>
   </div>
-  <a id="ifood-conf-link" href="#" target="_blank" style="display:block;background:#ea1d2c;color:white;text-align:center;padding:11px;border-radius:9px;font-weight:700;font-size:14px;text-decoration:none;margin-bottom:12px;">
+  <a id="ifood-conf-link" href="#" target="_blank" style="display:block;background:#ea1d2c;color:white;text-align:center;padding:14px;border-radius:9px;font-weight:700;font-size:15px;text-decoration:none;margin-bottom:12px;">
     🔗 Abrir iFood para Confirmar
   </a>
-  <div class="fg">
-    <label>Código fornecido pelo cliente</label>
-    <input type="number" id="ifood-cod-input" placeholder="Ex: 1234" style="font-size:22px;text-align:center;letter-spacing:6px;font-weight:700;" autofocus>
-  </div>
   <div id="ifood-conf-msg" style="margin-bottom:8px;"></div>
-  <button class="btn btn-green" onclick="finalizarComCodigoIfood()">✅ Confirmar e Finalizar Entrega</button>
+  <button class="btn btn-green" onclick="finalizarSemCodigoIfood()" style="font-size:16px;padding:14px;">✅ Entregue — Finalizar</button>
 </div></div>
 
 <!-- Config Entregador -->
@@ -874,6 +886,16 @@ function showPg(tipo){
 function sair(){
   pararIvs();
   if(U&&U.online)db.from('usuarios').update({online:false}).eq('id',U.id);
+  // PRESERVA vínculo de loja em chave separada por entregador
+  // Assim o nome da loja permanece mesmo após logout/fechar app
+  if(U&&U.tipo==='entregador'&&U._loja_ativa_nome){
+    const lojaKey='loja_vinc_'+U.id;
+    localStorage.setItem(lojaKey,JSON.stringify({
+      loja_ativa_id:U.loja_ativa_id||null,
+      _loja_ativa_nome:U._loja_ativa_nome,
+      _loja_ativa_codigo:U._loja_ativa_codigo||''
+    }));
+  }
   U=null;localStorage.removeItem('u');
   ['pg-admin','pg-loja','pg-entregador'].forEach(id=>$(id).classList.add('hidden'));
   $('pg-login').classList.remove('hidden');
@@ -1136,6 +1158,21 @@ async function carregarFinAdm(){
   const dias=Object.keys(porDia).sort();
   const diasLabel=dias.map(d=>{const[,m,dd]=d.split('-');return`${dd}/${m}`;});
 
+  // Bairros top 8
+  const porBairro={};
+  entregas.forEach(e=>{
+    const b=(e.endereco_bairro||'Sem bairro').trim()||'Sem bairro';
+    if(!porBairro[b])porBairro[b]={cnt:0,val:0};
+    porBairro[b].cnt++;
+    porBairro[b].val+=parseFloat(e.valor_corrida||e.valor_entregador||0);
+  });
+  const bairrosArr=Object.entries(porBairro).sort((a,b)=>b[1].cnt-a[1].cnt).slice(0,8);
+
+  // Métricas
+  const ticketMedio=entregas.length>0?totEnt/entregas.length:0;
+  const kmTotal=entregas.reduce((s,e)=>s+parseFloat(e.distancia_km||0),0);
+  const custoKm=kmTotal>0?(totEnt/kmTotal):0;
+
   // HTML do relatório
   const entradoresArr=Object.values(entPorEntregador).sort((a,b)=>b.totalVal-a.totalVal);
   const coresEnt=['#FF6B35','#004E89','#00C9A7','#8e44ad','#e74c3c','#27ae60','#f39c12'];
@@ -1220,6 +1257,18 @@ async function carregarFinAdm(){
     </div>`).join('')}
   </div>
 
+  <!-- GRÁFICO BARRAS: TOP BAIRROS -->
+  <div class="secao" id="adm-fin-bairros-sec">
+    <div class="s-title">📍 Top Bairros</div>
+    <canvas id="chart-bairros-adm" height="160"></canvas>
+  </div>
+
+  <!-- MÉTRICAS FINANCEIRAS -->
+  <div class="secao">
+    <div class="s-title">💡 Métricas do Período</div>
+    <div id="adm-fin-metricas"></div>
+  </div>
+
   <!-- RESUMO POR LOJA -->
   <div class="secao">
     <div class="s-title">🏪 Resumo por Loja</div>
@@ -1266,6 +1315,53 @@ async function carregarFinAdm(){
         });
       }
     }
+    // Gráfico barras bairros
+    if(bairrosArr.length>0){
+      const ctxB=document.getElementById('chart-bairros-adm');
+      if(ctxB){
+        if(ctxB._chart)ctxB._chart.destroy();
+        ctxB._chart=new Chart(ctxB,{
+          type:'bar',
+          data:{
+            labels:bairrosArr.map(b=>b[0]),
+            datasets:[{
+              label:'Entregas',
+              data:bairrosArr.map(b=>b[1].cnt),
+              backgroundColor:'rgba(0,78,137,.7)',
+              borderColor:'#004E89',borderWidth:1,borderRadius:4
+            }]
+          },
+          options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9},maxRotation:30}},y:{ticks:{font:{size:10},stepSize:1}}}}
+        });
+      } else {
+        const sec=$('adm-fin-bairros-sec');if(sec)sec.style.display='none';
+      }
+    } else {
+      const sec=$('adm-fin-bairros-sec');if(sec)sec.style.display='none';
+    }
+
+    // Métricas financeiras
+    const metEl=$('adm-fin-metricas');
+    if(metEl){
+      metEl.innerHTML=`
+      <div class="g2b" style="gap:8px;">
+        <div style="background:#e3f2fd;border-radius:10px;padding:11px;text-align:center;">
+          <div style="font-size:10px;color:#555;margin-bottom:4px;">🎟️ Ticket Médio</div>
+          <div style="font-size:18px;font-weight:700;color:#004E89;">${fR(ticketMedio)}</div>
+          <div style="font-size:10px;color:#888;">por corrida</div>
+        </div>
+        <div style="background:#e8f5e9;border-radius:10px;padding:11px;text-align:center;">
+          <div style="font-size:10px;color:#555;margin-bottom:4px;">📏 Km Rodado</div>
+          <div style="font-size:18px;font-weight:700;color:#2e7d32;">${kmTotal.toFixed(1)}km</div>
+          <div style="font-size:10px;color:#888;">${fR(custoKm)}/km</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;background:#fff3e0;border-radius:10px;padding:11px;text-align:center;">
+        <div style="font-size:10px;color:#555;margin-bottom:4px;">📊 Média diária</div>
+        <div style="font-size:18px;font-weight:700;color:#e65100;">${dias.length>0?(entregas.length/dias.length).toFixed(1):0} entregas/dia</div>
+      </div>`;
+    }
+
     // Gráfico pizza
     if(entradoresArr.length>1){
       const ctx2=document.getElementById('chart-pizza');
@@ -1850,16 +1946,191 @@ async function salvarPedido(){
 let _rotaPlanoGrupos=[];
 let _rotaPlanoEnts=[];
 
+// ============================================================
+// DISTRIBUIÇÃO INTELIGENTE COM IA
+// ============================================================
+let _qtdEntData={}; // {entId: {nome, qtd}}
+let _rotaIAGrupos=[]; // [{entId, entNome, pedidos:[]}]
+
+async function abrirDefinirQuantidade(){
+  const{data:peds}=await db.from('entregas').select('id,numero_pedido,cliente_nome,endereco_entrega,distancia_km').eq('loja_id',U.id).eq('status','pendente');
+  if(!peds||!peds.length){alert('Sem pedidos pendentes para distribuir.');return;}
+
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(id,nome,online)').eq('loja_id',U.id);
+  const online=(assoc||[]).filter(a=>a.e&&a.e.online);
+  if(!online.length){alert('Nenhum entregador online no momento.');return;}
+
+  _qtdEntData={};
+  online.forEach(a=>{_qtdEntData[a.entregador_id]={nome:a.e.nome,qtd:0};});
+  _rotaPlanoEnts=online;
+
+  $('qtd-ent-body').innerHTML=online.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#f8f9fa;border-radius:9px;margin-bottom:8px;">
+      <div style="font-size:22px;">🛵</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:14px;">${a.e.nome}</div>
+        <div style="font-size:11px;color:#2e7d32;">● Online</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button onclick="ajustarQtd('${a.entregador_id}',-1)" style="width:30px;height:30px;border-radius:50%;border:2px solid #e0e0e0;background:white;font-size:18px;font-weight:700;cursor:pointer;line-height:1;">−</button>
+        <div id="qtd-val-${a.entregador_id}" style="min-width:30px;text-align:center;font-size:20px;font-weight:700;color:#004E89;">0</div>
+        <button onclick="ajustarQtd('${a.entregador_id}',1)" style="width:30px;height:30px;border-radius:50%;border:2px solid #004E89;background:#004E89;color:white;font-size:18px;font-weight:700;cursor:pointer;line-height:1;">+</button>
+      </div>
+    </div>`).join('');
+
+  atuQtdTotal(peds.length);
+  $('qtd-msg').textContent='';
+  window._qtdPendTotal=peds.length;
+  window._qtdPendPeds=peds;
+  closeM('rota');
+  openM('qtd-ent');
+}
+
+function ajustarQtd(entId,delta){
+  const atual=_qtdEntData[entId]?.qtd||0;
+  const novo=Math.max(0,atual+delta);
+  _qtdEntData[entId].qtd=novo;
+  $(`qtd-val-${entId}`).textContent=novo;
+  atuQtdTotal(window._qtdPendTotal||0);
+}
+
+function atuQtdTotal(total){
+  const distribuido=Object.values(_qtdEntData).reduce((s,v)=>s+v.qtd,0);
+  const restante=total-distribuido;
+  const el=$('qtd-total-info');
+  if(!el)return;
+  if(restante>0){
+    el.innerHTML=`📦 <strong>${distribuido}</strong> de <strong>${total}</strong> pedidos distribuídos — <span style="color:#e65100;font-weight:700;">${restante} sem entregador</span>`;
+    el.style.background='#fff3e0';
+  } else if(restante<0){
+    el.innerHTML=`⚠️ Você distribuiu <strong>${distribuido}</strong> para ${total} pedidos — <span style="color:#c62828;font-weight:700;">${Math.abs(restante)} a mais</span>`;
+    el.style.background='#ffebee';
+  } else {
+    el.innerHTML=`✅ <strong>${total}</strong> pedidos distribuídos perfeitamente!`;
+    el.style.background='#e8f5e9';
+  }
+}
+
+async function gerarRotaComIA(){
+  const peds=window._qtdPendPeds||[];
+  if(!peds.length){showM('qtd-msg','Sem pedidos pendentes.',false);return;}
+
+  const distribuicao=Object.entries(_qtdEntData).filter(([,v])=>v.qtd>0);
+  if(!distribuicao.length){showM('qtd-msg','⚠️ Defina ao menos 1 pedido para algum entregador.',false);return;}
+
+  const totalDist=distribuicao.reduce((s,[,v])=>s+v.qtd,0);
+  if(totalDist>peds.length){showM('qtd-msg','⚠️ Total distribuído maior que pedidos disponíveis.',false);return;}
+
+  const btn=$('btn-gerar-rota');
+  btn.textContent='🤖 Gerando com IA...';btn.disabled=true;
+  showM('qtd-msg','Consultando IA para otimizar rotas...',true);
+
+  // Geocode para ter distâncias
+  const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
+  const pedsGeo=[];
+  for(const p of peds){
+    let lat=parseFloat(p.lat_entrega||0),lng=parseFloat(p.lng_entrega||0);
+    if(!lat||!lng){const g=await geocode(p.endereco_entrega);if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}}
+    const dist=distKm(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng);
+    const ang=angleDeg(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng);
+    pedsGeo.push({id:p.id,num:p.numero_pedido||'',nome:p.cliente_nome||'Cliente',end:p.endereco_entrega||'',dist:dist.toFixed(2),ang:ang.toFixed(0)});
+  }
+
+  // Monta prompt para Claude API
+  const NL='\n';
+  const pedidosTexto=pedsGeo.map((p,i)=>(i+1)+'. ID:'+p.id+' | Pedido:#'+p.num+' | Cliente:'+p.nome+' | Endereco:'+p.end+' | Distancia:'+p.dist+'km | Angulo:'+p.ang+'graus').join(NL);
+  const entregadoresTexto=distribuicao.map(([id,v])=>'- '+v.nome+' (ID:'+id+'): maximo '+v.qtd+' entregas').join(NL);
+
+  const prompt=`Você é um otimizador de rotas de delivery. 
+
+PEDIDOS PENDENTES:
+${pedidosTexto}
+
+ENTREGADORES DISPONÍVEIS E LIMITES:
+${entregadoresTexto}
+
+REGRAS:
+1. Agrupe pedidos por direção/bairro similar (mesmo ângulo ±30°)
+2. Dentro de cada grupo, ordene do mais próximo ao mais distante da loja
+3. Respeite o limite de pedidos por entregador
+4. Atribua primeiro os pedidos mais próximos da loja
+5. Se sobrar pedidos após os limites, distribua pelos que tiverem espaço
+
+Responda APENAS com JSON válido, sem texto extra:
+{
+  "grupos": [
+    {
+      "entregador_id": "ID_DO_ENTREGADOR",
+      "entregador_nome": "NOME",
+      "pedidos": ["ID_PEDIDO_1", "ID_PEDIDO_2"],
+      "descricao": "Ex: Setor Sul — 3 entregas"
+    }
+  ]
+}`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data=await resp.json();
+    const txt=(data.content||[]).map(b=>b.text||'').join('');
+    const jsonMatch=txt.match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error('IA não retornou JSON válido');
+    const parsed=JSON.parse(jsonMatch[0]);
+    if(!parsed.grupos||!parsed.grupos.length)throw new Error('Nenhum grupo retornado');
+
+    // Monta _rotaIAGrupos com objetos completos
+    _rotaIAGrupos=parsed.grupos.map(g=>{
+      const pedObjs=g.pedidos.map(pid=>pedsGeo.find(p=>p.id===pid)).filter(Boolean);
+      return{entId:g.entregador_id,entNome:g.entregador_nome,descricao:g.descricao||'',pedidos:pedObjs};
+    });
+    _rotaPlanoGrupos=_rotaIAGrupos; // compat
+
+    // Exibe no modal de plano
+    const body=$('rota-plano-body');
+    const coresEnt=['#004E89','#FF6B35','#00C9A7','#8e44ad','#e74c3c','#27ae60'];
+    body.innerHTML=`<div style="background:#e8f5e9;border-radius:9px;padding:11px;margin-bottom:12px;font-size:13px;color:#2e7d32;font-weight:700;">
+      🤖 IA gerou ${_rotaIAGrupos.length} rota${_rotaIAGrupos.length>1?'s':''}  para ${totalDist} entrega${totalDist>1?'s':''}
+    </div>`+_rotaIAGrupos.map((g,gi)=>`
+    <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid ${coresEnt[gi%coresEnt.length]};">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:16px;">🛵</span>
+        <div>
+          <div style="font-weight:700;font-size:14px;color:${coresEnt[gi%coresEnt.length]};">${g.entNome}</div>
+          <div style="font-size:11px;color:#888;">${g.descricao}</div>
+        </div>
+        <span style="margin-left:auto;background:${coresEnt[gi%coresEnt.length]};color:white;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;">${g.pedidos.length}x</span>
+      </div>
+      ${g.pedidos.map((p,pi)=>`<div style="padding:5px 0;border-bottom:1px solid #eee;font-size:12px;display:flex;gap:6px;align-items:start;">
+        <span style="background:#004E89;color:white;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${pi+1}</span>
+        <div><strong>${p.num?'#'+p.num:p.nome}</strong><br><span style="color:#555;">📍 ${p.end}</span>${parseFloat(p.dist)>0?`<span style="color:#888;"> • ${p.dist}km</span>`:''}</div>
+      </div>`).join('')}
+    </div>`).join('');
+
+    closeM('qtd-ent');
+    openM('rota-plano');
+  }catch(err){
+    console.error('[IA Rota]',err);
+    // Fallback: usa agrupamento local por ângulo
+    showM('qtd-msg','⚠️ IA indisponível — usando agrupamento automático.',false);
+    await otimizarRotaInteligente();
+  }finally{
+    btn.textContent='🤖 Gerar Rota com IA';btn.disabled=false;
+  }
+}
+
 async function otimizarRotaInteligente(){
   const{data:peds}=await db.from('entregas').select('*').eq('loja_id',U.id).eq('status','pendente').order('created_at');
   if(!peds||!peds.length){alert('Sem pedidos pendentes para otimizar.');return;}
-
-  // Busca todos entregadores online vinculados
   const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(id,nome,online)').eq('loja_id',U.id);
   const onlineEnts=(assoc||[]).filter(a=>a.e&&a.e.online);
   if(!onlineEnts.length){alert('Nenhum entregador online vinculado à loja.');return;}
-
-  // Geocode pedidos sem coordenadas
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
   const pedsGeo=[];
   for(const p of peds){
@@ -1867,19 +2138,15 @@ async function otimizarRotaInteligente(){
     if(!lat||!lng){const g=await geocode(p.endereco_entrega);if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}}
     pedsGeo.push({...p,lat:lat||lojaLat,lng:lng||lojaLng,dist:distKm(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng),ang:angleDeg(lojaLat,lojaLng,lat||lojaLat,lng||lojaLng)});
   }
-
-  // Agrupa por setor de 60 graus (por direção)
   const setoresMap={};
   pedsGeo.forEach(p=>{const s=Math.floor((p.ang+180)/60);if(!setoresMap[s])setoresMap[s]=[];setoresMap[s].push(p);});
   Object.values(setoresMap).forEach(s=>s.sort((a,b)=>a.dist-b.dist));
   _rotaPlanoGrupos=Object.values(setoresMap);
   _rotaPlanoEnts=onlineEnts;
-
-  // Monta o modal de plano
   const entOptions=onlineEnts.map(a=>`<option value="${a.entregador_id}">${a.e.nome}</option>`).join('');
   const body=$('rota-plano-body');
   body.innerHTML=`<div style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#2e7d32;">
-    📦 ${peds.length} entrega${peds.length>1?'s':''} organizadas em ${_rotaPlanoGrupos.length} grupo${_rotaPlanoGrupos.length>1?'s':''} por direção
+    📦 ${peds.length} entrega${peds.length>1?'s':''} em ${_rotaPlanoGrupos.length} grupo${_rotaPlanoGrupos.length>1?'s':''} por direção
   </div>`+_rotaPlanoGrupos.map((grupo,gi)=>`
     <div class="secao" style="margin-bottom:10px;">
       <div class="s-title">Grupo ${gi+1} — ${grupo.length} entrega${grupo.length>1?'s':''}</div>
@@ -1889,34 +2156,46 @@ async function otimizarRotaInteligente(){
         ${p.distancia_km>0?`<span style="color:#888;font-size:11px;"> • ${parseFloat(p.distancia_km).toFixed(1)}km</span>`:''}
       </div>`).join('')}
       <div style="margin-top:8px;">
-        <label style="font-size:11px;font-weight:700;color:#333;">🛵 Atribuir ao entregador:</label>
+        <label style="font-size:11px;font-weight:700;color:#333;">🛵 Entregador:</label>
         <select id="rota-ent-${gi}" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:7px;margin-top:4px;font-size:13px;">
           <option value="">— Selecione —</option>${entOptions}
         </select>
       </div>
     </div>`).join('');
-
-  closeM('rota');
-  openM('rota-plano');
+  closeM('rota');openM('rota-plano');
 }
 
 async function confirmarRotaPlano(){
-  let algumAtribuido=false;
-  let ordem=1;
-  for(let gi=0;gi<_rotaPlanoGrupos.length;gi++){
-    const eid=$(`rota-ent-${gi}`)?.value;
-    if(!eid)continue;
-    algumAtribuido=true;
-    for(const p of _rotaPlanoGrupos[gi]){
-      await db.from('entregas').update({entregador_id:eid,status:'aceito',status_detalhado:'aceito',ordem_rota:ordem,pedido_pronto:true,aceito_at:new Date().toISOString()}).eq('id',p.id);
-      ordem++;
+  const btn=$('btn-confirmar-rota');
+  btn.textContent='Salvando...';btn.disabled=true;
+  let algumAtribuido=false,ordem=1;
+  // Verifica se veio da IA (grupos com entId definido)
+  if(_rotaIAGrupos.length){
+    for(const g of _rotaIAGrupos){
+      if(!g.entId)continue;
+      algumAtribuido=true;
+      for(const p of g.pedidos){
+        await db.from('entregas').update({entregador_id:g.entId,status:'aceito',status_detalhado:'aceito',ordem_rota:ordem,pedido_pronto:true,aceito_at:new Date().toISOString()}).eq('id',p.id);
+        ordem++;
+      }
+    }
+    _rotaIAGrupos=[];
+  } else {
+    for(let gi=0;gi<_rotaPlanoGrupos.length;gi++){
+      const eid=$(`rota-ent-${gi}`)?.value;
+      if(!eid)continue;
+      algumAtribuido=true;
+      for(const p of _rotaPlanoGrupos[gi]){
+        await db.from('entregas').update({entregador_id:eid,status:'aceito',status_detalhado:'aceito',ordem_rota:ordem,pedido_pronto:true,aceito_at:new Date().toISOString()}).eq('id',p.id);
+        ordem++;
+      }
     }
   }
-  if(!algumAtribuido){alert('Selecione pelo menos um entregador para confirmar.');return;}
-  closeM('rota-plano');
-  openM('rota');
+  btn.textContent='✅ Confirmar e Despachar';btn.disabled=false;
+  if(!algumAtribuido){alert('Nenhum grupo com entregador atribuído.');return;}
+  closeM('rota-plano');openM('rota');
   carregarPedidos();
-  alert('✅ Rota despachada com sucesso!');
+  alert(`✅ ${ordem-1} entrega${ordem>2?'s':''} despachada${ordem>2?'s':''}!`);
 }
 
 async function abrirPedidosLj(){openM('rota');carregarPedidos();}
@@ -1976,13 +2255,38 @@ async function admAtuToggleGps(ativo){
 }
 async function admToggleGpsGlobal(){
   const novo=!gpsValidacaoAtiva;
-  // Atualiza todas as lojas de uma vez
-  await db.from('usuarios').update({gps_validacao_obrigatorio:novo}).eq('tipo','loja');
-  await admAtuToggleGps(novo);
+  admAtuToggleGps(novo);
+  // Salva em 3 camadas para garantir persistência total
+  // 1) localStorage - persistência imediata e offline
+  localStorage.setItem('adm_gps_global',novo?'1':'0');
+  // 2) Admin user row
+  try{await db.from('usuarios').update({gps_validacao_obrigatorio:novo}).eq('id',U.id);}catch(e){}
+  U.gps_validacao_obrigatorio=novo;
+  // 3) Propaga para todas as lojas (em background, não bloqueia)
+  db.from('usuarios').update({gps_validacao_obrigatorio:novo}).eq('tipo','loja').then(()=>{}).catch(()=>{});
+  // 4) config_global table (se existir)
+  db.from('config_global').upsert({chave:'gps_validacao_obrigatorio',valor:novo?'true':'false',updated_at:new Date().toISOString()}).then(()=>{}).catch(()=>{});
 }
 async function carregarAdmGpsToggle(){
-  const{data}=await db.from('usuarios').select('gps_validacao_obrigatorio').eq('tipo','loja').limit(1).single();
-  admAtuToggleGps(data&&data.gps_validacao_obrigatorio||false);
+  // Estratégia tripla: localStorage (instantâneo) > banco admin > config_global
+  // Primeiro aplica localStorage para resposta imediata
+  const cached=localStorage.getItem('adm_gps_global');
+  if(cached!==null){admAtuToggleGps(cached==='1');}
+
+  // Depois verifica banco (mais confiável)
+  let ativo=cached!==null?cached==='1':false;
+  try{
+    const{data:cfg}=await db.from('config_global').select('valor').eq('chave','gps_validacao_obrigatorio').single();
+    if(cfg)ativo=cfg.valor==='true';
+  }catch(e){
+    try{
+      const{data:admData}=await db.from('usuarios').select('gps_validacao_obrigatorio').eq('id',U.id).single();
+      if(admData&&admData.gps_validacao_obrigatorio!==null)ativo=admData.gps_validacao_obrigatorio;
+    }catch(e2){}
+  }
+  // Garante que localStorage fica sincronizado com banco
+  localStorage.setItem('adm_gps_global',ativo?'1':'0');
+  admAtuToggleGps(ativo);
 }
 
 // ============ SUPABASE REALTIME GPS ============
@@ -2390,6 +2694,20 @@ async function initEnt(){
       localStorage.setItem('u',JSON.stringify(U));
     }
   }catch(e){console.warn('[initEnt fetch]',e);}
+  // RESTAURA vínculo de loja da chave dedicada (SEMPRE sobrescreve — mais confiável)
+  // Esta chave nunca é apagada pelo banco e persiste entre logins
+  const _lojaKey='loja_vinc_'+U.id;
+  const _lojaSalva=localStorage.getItem(_lojaKey);
+  if(_lojaSalva){
+    try{
+      const _lj=JSON.parse(_lojaSalva);
+      // Usa chave dedicada sempre — ela é atualizada em conectarCodigo, carregarLojaAtiva e sair
+      if(_lj.loja_ativa_id)U.loja_ativa_id=_lj.loja_ativa_id;
+      if(_lj._loja_ativa_nome)U._loja_ativa_nome=_lj._loja_ativa_nome;
+      if(_lj._loja_ativa_codigo)U._loja_ativa_codigo=_lj._loja_ativa_codigo;
+      localStorage.setItem('u',JSON.stringify(U));
+    }catch(e){}
+  }
   $('ent-nome').textContent=U.nome;
   $('ent-st').textContent=U.online?'&#128994; Online':'&#9899; Offline';
   atuBtnOn(U.online);
@@ -2471,6 +2789,12 @@ async function carregarLojaAtiva(){
     U._loja_ativa_nome=nomeLoja;
     U._loja_ativa_codigo=lj.codigo_loja||'';
     localStorage.setItem('u',JSON.stringify(U));
+    // Salva também na chave dedicada (sobrevive a logout e recarregamentos)
+    localStorage.setItem('loja_vinc_'+U.id,JSON.stringify({
+      loja_ativa_id:U.loja_ativa_id,
+      _loja_ativa_nome:U._loja_ativa_nome,
+      _loja_ativa_codigo:U._loja_ativa_codigo
+    }));
     selBox.classList.add('hidden');
     // Botão trocar se tem múltiplas
     if(assoc.length>1){
@@ -2650,6 +2974,12 @@ async function conectarCodigo(){
   U._loja_ativa_nome=nomeLoja;
   U._loja_ativa_codigo=loja.codigo_loja;
   localStorage.setItem('u',JSON.stringify(U));
+  // Salva em chave permanente — persiste mesmo após logout/fechar app
+  localStorage.setItem('loja_vinc_'+U.id,JSON.stringify({
+    loja_ativa_id:loja.id,
+    _loja_ativa_nome:nomeLoja,
+    _loja_ativa_codigo:loja.codigo_loja||''
+  }));
   $('cod-loja-inp').value='';
   // Mostra card de confirmação imediatamente
   const infoBox=$('ent-loja-ativa-info');
@@ -2782,17 +3112,16 @@ async function confirmarEntregaComCodigo(pedId,numPedido,refLat,refLng){
   _ifoodPedId=pedId;_ifoodRefLat=refLat;_ifoodRefLng=refLng;
   $('ifood-conf-num').textContent=numPedido?'#'+numPedido:'';
   $('ifood-conf-link').href=`${IFOOD_URL}${numPedido||''}`;
-  $('ifood-cod-input').value='';
   clearM('ifood-conf-msg');
   openM('ifood-conf');
-  setTimeout(()=>{try{$('ifood-cod-input').focus();}catch(e){}},300);
 }
 
 async function finalizarComCodigoIfood(){
-  const cod=($('ifood-cod-input').value||'').trim();
-  if(!cod||cod.length<3){showM('ifood-conf-msg','⚠️ Digite o código fornecido pelo cliente.',false);return;}
+  // Mantido para compatibilidade — redireciona para versão sem código
+  await finalizarSemCodigoIfood();
+}
+async function finalizarSemCodigoIfood(){
   showM('ifood-conf-msg','Finalizando...', true);
-  await db.from('entregas').update({codigo_confirmacao_cliente:cod}).eq('id',_ifoodPedId);
   closeM('ifood-conf');
   await entStatus(_ifoodPedId,'entregue',_ifoodRefLat,_ifoodRefLng);
 }
@@ -2983,12 +3312,12 @@ function periodoRange(per,mesOffset){
     fim=new Date(inicio);fim.setDate(fim.getDate()+6);fim.setHours(23,59,59,999);
   }
   else{ // mes — suporta offset para meses anteriores
+    // JavaScript Date handles month underflow correctly (e.g. month -1 = December of prev year)
     const ano=agora.getFullYear();
-    const mes=agora.getMonth()+off; // off negativo = meses anteriores
+    const mes=agora.getMonth()+off; // off negativo = meses anteriores, JS normaliza automaticamente
     inicio=new Date(ano,mes,1,0,0,0,0);
+    // Último dia do mês alvo
     fim=new Date(ano,mes+1,0,23,59,59,999);
-    // Se o mês alvo for futuro (off>0), limita ao dia atual
-    if(off===0)fim=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
   }
   return{inicio:inicio.toISOString(),fim:fim.toISOString()};
 }
@@ -3044,10 +3373,20 @@ async function carregarGanhos(){
   const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
   if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';return;}
   const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-  const labels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',mes:'Este Mês'};
+  // Label dinâmico para meses passados
+  let labelPer='';
+  if(per==='mes'&&_gnhMesOffset<0){
+    const agora=new Date();
+    const alvo=new Date(agora.getFullYear(),agora.getMonth()+_gnhMesOffset,1);
+    labelPer=alvo.toLocaleString('pt-BR',{month:'long',year:'numeric'});
+    labelPer=labelPer.charAt(0).toUpperCase()+labelPer.slice(1);
+  }else{
+    const labels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',mes:'Este Mês'};
+    labelPer=labels[per]||per;
+  }
   el.innerHTML=`
     <div style="background:#e8f5e9;padding:12px;border-radius:11px;text-align:center;margin-bottom:12px;border:2px solid #00C9A7;">
-      <p style="font-size:11px;color:#666;">${labels[per]} — ${data.length} entrega(s)</p>
+      <p style="font-size:11px;color:#666;">${labelPer} — ${data.length} entrega(s)</p>
       <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(tot)}</p>
     </div>
     <p style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">📋 Detalhes das corridas:</p>
