@@ -605,6 +605,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
 <script>
 const GOOGLE_KEY_DEFAULT='AIzaSyB3cRabRR5vQgwtudkGKXMwBI35c1iNGrs';
+// Limpa chave antiga inválida do localStorage para usar a nova padrão
+(function(){
+  const stored=localStorage.getItem('google_vision_key')||'';
+  if(stored&&stored!==GOOGLE_KEY_DEFAULT&&!stored.startsWith('AIzaSyB3cRab')){
+    localStorage.removeItem('google_vision_key');
+  }
+})();
 function getGoogleKey(){
   const stored=localStorage.getItem('google_vision_key')||'';
   // Valida: chave Google válida começa com AIzaSy e tem 39 chars
@@ -2370,19 +2377,19 @@ async function salvarCfgLj(){
 
 // ============ ENTREGADOR ============
 async function initEnt(){
-  // Salva dados de loja ANTES de buscar banco (colunas podem não existir no DB)
-  const _lojaId=U.loja_ativa_id||null;
-  const _lojaNome=U._loja_ativa_nome||null;
-  const _lojaCod=U._loja_ativa_codigo||null;
-  const{data}=await db.from('usuarios').select('*').eq('id',U.id).single();
-  if(data){
-    U={...U,...data};
-    // Restaura dados de loja que o banco pode ter sobrescrito com null
-    if(!U.loja_ativa_id&&_lojaId)U.loja_ativa_id=_lojaId;
-    if(!U._loja_ativa_nome&&_lojaNome)U._loja_ativa_nome=_lojaNome;
-    if(!U._loja_ativa_codigo&&_lojaCod)U._loja_ativa_codigo=_lojaCod;
-    localStorage.setItem('u',JSON.stringify(U));
-  }
+  // IMPORTANTE: NÃO busca loja_ativa_id do banco — usa SEMPRE o localStorage
+  // Isso evita que um null no banco apague o vínculo salvo localmente
+  try{
+    const{data}=await db.from('usuarios').select(
+      'nome,foto_url,online,taxa_tipo,taxa_entrega,taxa_km_limite,taxa_km_excedente,taxa_fixo_base,observacoes'
+    ).eq('id',U.id).single();
+    if(data){
+      // Merge SOMENTE campos seguros — NUNCA sobrescreve dados de loja
+      const camposSeguros=['nome','foto_url','online','taxa_tipo','taxa_entrega','taxa_km_limite','taxa_km_excedente','taxa_fixo_base','observacoes'];
+      camposSeguros.forEach(k=>{if(data[k]!==undefined&&data[k]!==null)U[k]=data[k];});
+      localStorage.setItem('u',JSON.stringify(U));
+    }
+  }catch(e){console.warn('[initEnt fetch]',e);}
   $('ent-nome').textContent=U.nome;
   $('ent-st').textContent=U.online?'&#128994; Online':'&#9899; Offline';
   atuBtnOn(U.online);
@@ -2405,99 +2412,80 @@ async function initEnt(){
 }
 
 async function carregarLojaAtiva(){
-  // Tenta buscar loja_ativa_id do banco — mas não bloqueia se a coluna não existir
-  try{
-    const{data:userData}=await db.from('usuarios').select('loja_ativa_id').eq('id',U.id).single();
-    if(userData&&userData.loja_ativa_id){
-      // DB tem valor — sincroniza
-      U.loja_ativa_id=userData.loja_ativa_id;
-      localStorage.setItem('u',JSON.stringify(U));
-    }
-    // Se DB retornou null MAS localStorage tem valor, mantém o localStorage e atualiza o banco
-    else if(U.loja_ativa_id){
-      try{await db.from('usuarios').update({loja_ativa_id:U.loja_ativa_id}).eq('id',U.id);}catch(e){}
-    }
-  }catch(e){console.warn('[loja_ativa_id coluna nao existe]',e);}
+  const infoBox=$('ent-loja-ativa-info');
+  const selBox=$('ent-selecionar-loja-box');
 
-  // Se tem dados no localStorage, usa imediatamente para resposta rápida
-  if(!U.loja_ativa_id&&U._loja_ativa_nome){
-    const infoBox=$('ent-loja-ativa-info');
-    const selBox=$('ent-selecionar-loja-box');
-    infoBox.innerHTML=`<div style="background:${U.online?'#e8f5e9':'#f0f4ff'};border-radius:10px;padding:11px;border:2px solid ${U.online?'#00C9A7':'#004E89'};">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-        <span style="font-size:18px;">🏪</span>
-        <strong style="font-size:15px;color:${U.online?'#1b5e20':'#004E89'};">${U._loja_ativa_nome}</strong>
+  // PASSO 1: Mostra imediatamente o que está no localStorage (resposta instantânea)
+  function renderCard(nome,codigo,ativa){
+    const cor=ativa?'#e8f5e9':'#f0f4ff';
+    const borda=ativa?'#00C9A7':'#004E89';
+    const corText=ativa?'#1b5e20':'#004E89';
+    const status=ativa?'✅ Online — trabalhando agora':'⏸️ Conectado — clique em Ficar Online';
+    const corStatus=ativa?'#2e7d32':'#e65100';
+    return `<div style="background:${cor};border-radius:10px;padding:11px;border:2px solid ${borda};">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <span style="font-size:20px;">🏪</span>
+        <strong style="font-size:16px;color:${corText};">${nome}</strong>
       </div>
-      ${U._loja_ativa_codigo?`<p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${U._loja_ativa_codigo}</strong></p>`:''}
-      <p style="font-size:12px;margin:4px 0;color:${U.online?'#2e7d32':'#e65100'};font-weight:700;">${U.online?'✅ Conectado e Online':'⏸️ Conectado — clique em Ficar Online'}</p>
+      ${codigo?`<p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${codigo}</strong></p>`:''}
+      <p style="font-size:12px;margin:4px 0;color:${corStatus};font-weight:700;">${status}</p>
     </div>`;
+  }
+
+  if(U._loja_ativa_nome){
+    infoBox.innerHTML=renderCard(U._loja_ativa_nome,U._loja_ativa_codigo,U.online);
     selBox.classList.add('hidden');
   }
 
-  const{data:assoc,error:assocErr}=await db.from('loja_entregadores').select('loja_id,l:loja_id(id,nome_loja,nome,logo_url,codigo_loja)').eq('entregador_id',U.id);
-  const selBox=$('ent-selecionar-loja-box'),infoBox=$('ent-loja-ativa-info');
-
-  const renderLojaCard=(lj,ativa)=>{
-    const nomeLoja=lj.nome_loja||lj.nome;
-    const isOnline=U.online&&ativa;
-    return `<div style="background:${isOnline?'#e8f5e9':'#f0f4ff'};border-radius:10px;padding:11px;border:2px solid ${isOnline?'#00C9A7':'#004E89'};">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-        <span style="font-size:18px;">🏪</span>
-        <strong style="font-size:15px;color:${isOnline?'#1b5e20':'#004E89'};">${nomeLoja}</strong>
-      </div>
-      <p style="font-size:11px;color:#666;margin:2px 0;">🔑 Código: <strong>${lj.codigo_loja||'---'}</strong></p>
-      <p style="font-size:12px;margin:4px 0;color:${isOnline?'#2e7d32':'#e65100'};font-weight:700;">${isOnline?'✅ Conectado e Online':'⏸️ Conectado — clique em Ficar Online'}</p>
-    </div>`;
-  };
-
-  const mostrarLogoLoja=(lj)=>{
-    const hdr=$('ent-loja-logo');
-    if(hdr&&lj&&lj.logo_url)hdr.innerHTML=`<img src="${lj.logo_url}" style="max-height:45px;max-width:150px;object-fit:contain;display:block;margin:0 auto 4px;">`;
-    else if(hdr)hdr.innerHTML='';
-  };
+  // PASSO 2: Busca associações reais no banco para validar e atualizar
+  const{data:assoc}=await db.from('loja_entregadores')
+    .select('loja_id,l:loja_id(id,nome_loja,nome,logo_url,codigo_loja)')
+    .eq('entregador_id',U.id);
 
   if(!assoc||!assoc.length){
-    // Só mostra "sem loja" se também não tem no localStorage
     if(!U._loja_ativa_nome){
-      infoBox.innerHTML='<p style="font-size:12px;color:#999;">Sem loja vinculada. Digite o código abaixo.</p>';
+      infoBox.innerHTML='<p style="font-size:12px;color:#999;margin:4px 0;">Sem loja vinculada. Digite o código abaixo.</p>';
     }
-    selBox.classList.add('hidden');return;
-  }
-
-  // Tenta encontrar loja ativa
-  let lojaAtiva=null;
-  if(U.loja_ativa_id){
-    lojaAtiva=assoc.find(a=>a.loja_id===U.loja_ativa_id);
-  }
-  // Se não encontrou por ID, tenta pelo nome salvo no localStorage
-  if(!lojaAtiva&&U._loja_ativa_nome){
-    lojaAtiva=assoc.find(a=>a.l&&(a.l.nome_loja||a.l.nome)===U._loja_ativa_nome);
-  }
-  // Se só tem 1 loja, usa ela automaticamente
-  if(!lojaAtiva&&assoc.length===1){
-    lojaAtiva=assoc[0];
-    try{await db.from('usuarios').update({loja_ativa_id:lojaAtiva.loja_id}).eq('id',U.id);}catch(e){}
-    U.loja_ativa_id=lojaAtiva.loja_id;
-    if(lojaAtiva.l){U._loja_ativa_nome=lojaAtiva.l.nome_loja||lojaAtiva.l.nome;U._loja_ativa_codigo=lojaAtiva.l.codigo_loja;}
-    localStorage.setItem('u',JSON.stringify(U));
-  }
-
-  if(lojaAtiva&&lojaAtiva.l){
-    infoBox.innerHTML=renderLojaCard(lojaAtiva.l,true);
-    mostrarLogoLoja(lojaAtiva.l);
-    // Salva no localStorage para acesso offline
-    U._loja_ativa_nome=lojaAtiva.l.nome_loja||lojaAtiva.l.nome;
-    U._loja_ativa_codigo=lojaAtiva.l.codigo_loja;
-    localStorage.setItem('u',JSON.stringify(U));
     selBox.classList.add('hidden');
-    if(assoc.length>1){
-      infoBox.innerHTML+=`<p style="font-size:11px;color:#888;margin-top:7px;">Você tem ${assoc.length} lojas. <button onclick="trocarLoja()" style="background:none;border:none;color:#004E89;font-weight:700;cursor:pointer;font-size:11px;padding:0;">Trocar loja</button></p>`;
-    }
     return;
   }
 
-  // Múltiplas lojas sem ativa definida — mostrar seletor
-  infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;">⚠️ Selecione com qual loja vai trabalhar hoje:</p>`;
+  // Encontra a loja ativa: por ID > por nome > única loja
+  let lojaAtiva=null;
+  if(U.loja_ativa_id){lojaAtiva=assoc.find(a=>a.loja_id===U.loja_ativa_id);}
+  if(!lojaAtiva&&U._loja_ativa_nome){
+    lojaAtiva=assoc.find(a=>a.l&&(a.l.nome_loja||a.l.nome)===U._loja_ativa_nome);
+  }
+  if(!lojaAtiva&&assoc.length===1){lojaAtiva=assoc[0];}
+
+  if(lojaAtiva&&lojaAtiva.l){
+    const lj=lojaAtiva.l;
+    const nomeLoja=lj.nome_loja||lj.nome;
+    // Atualiza UI com dados reais do banco
+    infoBox.innerHTML=renderCard(nomeLoja,lj.codigo_loja,U.online);
+    // Logo da loja
+    const hdr=$('ent-loja-logo');
+    if(hdr)hdr.innerHTML=lj.logo_url?`<img src="${lj.logo_url}" style="max-height:45px;max-width:150px;object-fit:contain;display:block;margin:0 auto 4px;">`:'' ;
+    // Salva no localStorage
+    U.loja_ativa_id=lojaAtiva.loja_id;
+    U._loja_ativa_nome=nomeLoja;
+    U._loja_ativa_codigo=lj.codigo_loja||'';
+    localStorage.setItem('u',JSON.stringify(U));
+    selBox.classList.add('hidden');
+    // Botão trocar se tem múltiplas
+    if(assoc.length>1){
+      infoBox.innerHTML+=`<p style="font-size:11px;color:#888;margin-top:6px;">
+        Você tem ${assoc.length} lojas. 
+        <button onclick="trocarLoja()" style="background:none;border:none;color:#004E89;font-weight:700;cursor:pointer;font-size:11px;padding:0;text-decoration:underline;">Trocar loja</button>
+      </p>`;
+    }
+    // Tenta salvar no banco (não bloqueia se coluna não existir)
+    db.from('usuarios').update({loja_ativa_id:lojaAtiva.loja_id}).eq('id',U.id).then(()=>{}).catch(()=>{});
+    return;
+  }
+
+  // Múltiplas lojas sem ativa definida — mostra seletor
+  infoBox.innerHTML=`<p style="font-size:12px;color:#e65100;margin-bottom:6px;">⚠️ Selecione com qual loja vai trabalhar hoje:</p>`;
   const sel=$('ent-sel-loja-ativa');sel.innerHTML='';
   assoc.forEach(a=>sel.innerHTML+=`<option value="${a.loja_id}">${a.l?a.l.nome_loja||a.l.nome:'Loja'}</option>`);
   selBox.classList.remove('hidden');
@@ -2551,13 +2539,15 @@ async function toggleOnline(){
       return;
     }
     // Se tem múltiplas lojas e não tem loja ativa selecionada, mostrar seletor
-    if(assoc.length>1&&!U.loja_ativa_id){
+    if(assoc.length>1&&!U.loja_ativa_id&&!U._loja_ativa_nome){
       $('ent-selecionar-loja-box').classList.remove('hidden');
       return;
     }
     // Se tem apenas uma loja, define ela automaticamente
     if(assoc.length===1&&!U.loja_ativa_id){
       U.loja_ativa_id=assoc[0].loja_id;
+      if(assoc[0].l){U._loja_ativa_nome=assoc[0].l.nome_loja||assoc[0].l.nome;}
+      localStorage.setItem('u',JSON.stringify(U));
     }
   }
   const novo=!U.online;
