@@ -2092,23 +2092,37 @@ async function gerarRotaComIA(){
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
 
   // ─────────────────────────────────────────────────────────────
-  // FUNÇÃO: normaliza endereço → extrai "rua + número" como chave
-  // Ex: "Av. Presidente Castelo Branco, 1865 - Apt 22" → "presidente castelo branco 1865"
+  // FUNÇÃO: normaliza endereço → chave "logradouro + número"
+  // Resistente a variações de prefixo (Av/Avenida/R/Rua), acentos,
+  // maiúsculas, complementos (Apt, Bloco, Torre, etc.)
+  // Ex1: "Av. Presidente Castelo Branco, 1865 - Castelo Branco"  → "presidente castelo branco 1865"
+  // Ex2: "AVENIDA PRESIDENTE CASTELO BRANCO, 1865 - Ribeirao Preto" → "presidente castelo branco 1865"
+  // Ex3: "Consumidor Eletronica - AVENIDA PRES. CASTELO BRANCO, 1865" → "castelo branco 1865"
   // ─────────────────────────────────────────────────────────────
   function chaveEnd(end){
     if(!end||!end.trim())return '_sem_end_'+Math.random();
-    const s=end.toLowerCase()
+    let s=end.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos
-      .replace(/\b(apto?|ap|bl|bloco|cond|condominio|torre|sala|kit|casa|loja|subsetor|setor|conjunto|c\.?j\.?|s\.?-?\d)\b.*/,'') // corta a partir do complemento
-      .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
-    // Extrai rua+numero: pega os últimos 3 tokens antes do número + o número
-    const m=s.match(/([a-z][a-z\s]{4,}?)\s*\b(\d{2,})\b/);
+      // Remove prefixos de logradouro
+      .replace(/\b(avenida|avenue|av\.?|rua|r\.?|alameda|al\.?|travessa|tv\.?|estrada|est\.?|praca|pca\.?|rodovia|rod\.?|viela|vila|v\.?)\b/g,' ')
+      // Remove complementos (tudo que vem depois)
+      .replace(/\b(apto?|apartamento|ap\.?|bloco|bl\.?|torre|t\.?|sala|sl\.?|casa|lote|lt\.?|cond|condominio|kit|subsetor|setor|s-\d+|s\d+|conjunto|cj\.?)\b.*/,'')
+      // Remove cidade/bairro depois do traço ou vírgula final
+      .replace(/[-,]\s*[a-z\s]{3,}$/,'')
+      .replace(/[^a-z0-9\s]/g,' ')
+      .replace(/\s+/g,' ').trim();
+    // Extrai: palavras significativas do logradouro + número
+    // Regex: captura "texto com pelo menos 3 chars" + "número com 2+ dígitos"
+    const m=s.match(/([a-z][a-z0-9\s]{2,}?)\s+(\d{2,5})\b/);
     if(m){
-      const palavras=m[1].trim().split(' ');
-      const nomeRua=palavras.slice(-4).join(' '); // últimas 4 palavras do logradouro
+      const palavras=m[1].trim().split(/\s+/);
+      // Pega as 3 palavras mais únicas (remove artigos/preposições curtas)
+      const filtradas=palavras.filter(p=>p.length>2);
+      const nomeRua=filtradas.slice(-3).join(' ');
       return (nomeRua+' '+m[2]).trim();
     }
-    return s.substring(0,50);
+    // Fallback: primeiros 40 chars normalizados
+    return s.substring(0,40);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -3474,17 +3488,17 @@ function filtroGanhos(per,btn){
   } else {
     navEl.style.display='none';
   }
+  carregarResumoGanhos();
   carregarGanhos();
 }
 
 function navMes(dir){
   const novoOffset=_gnhMesOffset+dir;
-  // Não permite ir para o futuro (além do mês atual = offset 0)
   if(novoOffset>0)return;
   _gnhMesOffset=novoOffset;
   atualizarLabelMes();
+  carregarResumoGanhos(); // atualiza resumo pro mês navegado
   carregarGanhos();
-  // Desabilita botão próximo se já está no mês atual
   const proxBtn=$('gnh-nav-prox');
   if(proxBtn)proxBtn.style.opacity=_gnhMesOffset===0?'0.3':'1';
 }
@@ -3526,48 +3540,89 @@ function periodoRange(per,mesOffset){
   return{inicio:inicio.toISOString(),fim:fim.toISOString()};
 }
 
+// Resumo dinâmico — sempre reflete o período selecionado
 async function carregarResumoGanhos(){
-  const el=$('gnh-resumo');el.innerHTML='';
-  // Busca hoje, semana, mês de uma vez
-  const hoje=new Date();
-  const inicioHoje=new Date(hoje);inicioHoje.setHours(0,0,0,0);
-  const inicioOntem=new Date(hoje);inicioOntem.setDate(inicioOntem.getDate()-1);inicioOntem.setHours(0,0,0,0);
-  const fimOntem=new Date(hoje);fimOntem.setDate(fimOntem.getDate()-1);fimOntem.setHours(23,59,59,999);
-  const inicioSem=new Date(hoje);inicioSem.setDate(inicioSem.getDate()-((hoje.getDay()+6)%7));inicioSem.setHours(0,0,0,0);
-  const fimSem=new Date(inicioSem);fimSem.setDate(fimSem.getDate()+6);fimSem.setHours(23,59,59,999);
-  const inicioMes=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+  const el=$('gnh-resumo');
+  el.innerHTML='<p style="text-align:center;color:#aaa;font-size:12px;padding:8px 0;">Carregando resumo...</p>';
+  const per=_gnhFiltro||'hoje';
+  const agora=new Date();
 
-  const[rHoje,rOntem,rSem,rMes]=await Promise.all([
-    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()),
-    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString()),
-    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()).lte('created_at',fimSem.toISOString()),
-    db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()).lte('created_at',new Date().toISOString()),
-  ]);
-  const soma=arr=>(arr||[]).reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-  const dH=rHoje.data||[],dO=rOntem.data||[],dS=rSem.data||[],dM=rMes.data||[];
-  el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
-      <div style="background:#e8f5e9;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('hoje',$('gnhf-hoje'))">
-        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Hoje</p>
-        <p style="font-size:22px;font-weight:800;color:#2e7d32;">${fR(soma(dH))}</p>
-        <p style="font-size:11px;color:#555;">${dH.length} corridas</p>
+  if(per==='mes'){
+    // Mês selecionado (pode ser passado)
+    const {inicio,fim}=periodoRange('mes',_gnhMesOffset);
+    const alvoDate=new Date(agora.getFullYear(),agora.getMonth()+_gnhMesOffset,1);
+    const nomeMes=alvoDate.toLocaleString('pt-BR',{month:'long',year:'numeric'});
+    const nomeMesFmt=nomeMes.charAt(0).toUpperCase()+nomeMes.slice(1);
+
+    // Busca o mês inteiro + semanas dentro do mês (para breakdown semanal)
+    const [rMes]=await Promise.all([
+      db.from('entregas').select('valor_corrida,valor_entregador,created_at').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim)
+    ]);
+    const dados=rMes.data||[];
+    const totalMes=dados.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+
+    // Divide por semana do mês (S1=dias 1-7, S2=8-14, S3=15-21, S4=22-fim)
+    const semanas=[0,0,0,0];const cntSem=[0,0,0,0];
+    dados.forEach(e=>{
+      const dia=new Date(e.created_at).getDate();
+      const si=dia<=7?0:dia<=14?1:dia<=21?2:3;
+      semanas[si]+=parseFloat(e.valor_corrida||e.valor_entregador||0);
+      cntSem[si]++;
+    });
+    const semLabels=['1ª sem','2ª sem','3ª sem','4ª sem'];
+    el.innerHTML=`
+      <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:12px;padding:14px;text-align:center;margin-bottom:8px;color:white;">
+        <p style="font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${nomeMesFmt}</p>
+        <p style="font-size:32px;font-weight:900;margin:4px 0;">${fR(totalMes)}</p>
+        <p style="font-size:12px;opacity:.85;">${dados.length} corrida${dados.length!==1?'s':''}</p>
       </div>
-      <div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('ontem',$('gnhf-ontem'))">
-        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Ontem</p>
-        <p style="font-size:22px;font-weight:800;color:#e65100;">${fR(soma(dO))}</p>
-        <p style="font-size:11px;color:#555;">${dO.length} corridas</p>
-      </div>
-      <div style="background:#e3f2fd;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('semana',$('gnhf-semana'))">
-        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Esta Semana</p>
-        <p style="font-size:22px;font-weight:800;color:#1565C0;">${fR(soma(dS))}</p>
-        <p style="font-size:11px;color:#555;">${dS.length} corridas</p>
-      </div>
-      <div style="background:#f3e5f5;border-radius:10px;padding:12px;text-align:center;cursor:pointer;" onclick="filtroGanhos('mes',$('gnhf-mes'))">
-        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">Este Mês</p>
-        <p style="font-size:22px;font-weight:800;color:#6a1b9a;">${fR(soma(dM))}</p>
-        <p style="font-size:11px;color:#555;">${dM.length} corridas</p>
-      </div>
+      ${totalMes>0?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px;">
+        ${semanas.map((v,i)=>v>0||cntSem[i]>0?`<div style="background:#f5f5f5;border-radius:8px;padding:7px 4px;text-align:center;">
+          <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">${semLabels[i]}</p>
+          <p style="font-size:13px;font-weight:800;color:#2e7d32;">${fR(v)}</p>
+          <p style="font-size:10px;color:#777;">${cntSem[i]}x</p>
+        </div>`:`<div style="background:#f9f9f9;border-radius:8px;padding:7px 4px;text-align:center;opacity:.4;">
+          <p style="font-size:9px;color:#bbb;font-weight:700;">${semLabels[i]}</p>
+          <p style="font-size:12px;color:#ccc;">—</p>
+        </div>`).join('')}
+      </div>`:''}`;
+
+  } else {
+    // Para hoje/ontem/semana: mostra o período selecionado + comparativo
+    const {inicio,fim}=periodoRange(per,0);
+
+    // Sempre busca todos os 4 para os cards de contexto (período atual)
+    const inicioHoje=new Date(agora);inicioHoje.setHours(0,0,0,0);
+    const inicioOntem=new Date(agora);inicioOntem.setDate(inicioOntem.getDate()-1);inicioOntem.setHours(0,0,0,0);
+    const fimOntem=new Date(agora);fimOntem.setDate(fimOntem.getDate()-1);fimOntem.setHours(23,59,59,999);
+    const inicioSem=new Date(agora);inicioSem.setDate(inicioSem.getDate()-((agora.getDay()+6)%7));inicioSem.setHours(0,0,0,0);
+    const fimSem=new Date(inicioSem);fimSem.setDate(fimSem.getDate()+6);fimSem.setHours(23,59,59,999);
+    const inicioMes=new Date(agora.getFullYear(),agora.getMonth(),1);
+    const fimMes=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
+
+    const[rH,rO,rS,rM]=await Promise.all([
+      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()).lte('created_at',new Date().toISOString()),
+      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString()),
+      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()).lte('created_at',fimSem.toISOString()),
+      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()),
+    ]);
+    const soma=arr=>(arr||[]).reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+    const dH=rH.data||[],dO=rO.data||[],dS=rS.data||[],dM=rM.data||[];
+
+    const cards=[
+      {label:'Hoje',val:soma(dH),cnt:dH.length,bg:'#e8f5e9',cor:'#2e7d32',per:'hoje',id:'gnhf-hoje'},
+      {label:'Ontem',val:soma(dO),cnt:dO.length,bg:'#fff3e0',cor:'#e65100',per:'ontem',id:'gnhf-ontem'},
+      {label:'Esta Semana',val:soma(dS),cnt:dS.length,bg:'#e3f2fd',cor:'#1565C0',per:'semana',id:'gnhf-semana'},
+      {label:'Este Mês',val:soma(dM),cnt:dM.length,bg:'#f3e5f5',cor:'#6a1b9a',per:'mes',id:'gnhf-mes'},
+    ];
+    el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
+      ${cards.map(c=>`<div style="background:${c.bg};border-radius:10px;padding:12px;text-align:center;cursor:pointer;${per===c.per?'border:2px solid '+c.cor+';':''}" onclick="filtroGanhos('${c.per}',$('${c.id}'))">
+        <p style="font-size:10px;color:#666;font-weight:700;text-transform:uppercase;">${c.label}</p>
+        <p style="font-size:22px;font-weight:800;color:${c.cor};">${fR(c.val)}</p>
+        <p style="font-size:11px;color:#555;">${c.cnt} corrida${c.cnt!==1?'s':''}</p>
+      </div>`).join('')}
     </div>`;
+  }
 }
 
 async function carregarGanhos(){
