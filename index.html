@@ -527,11 +527,18 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <div id="m-ganhos" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('ganhos')">&times;</button>
   <h2 style="margin-bottom:9px;">💰 Meus Ganhos</h2>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+  <!-- Filtros rápidos -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
     <button onclick="filtroGanhos('hoje',this)" class="btn-sm green" id="gnhf-hoje">Hoje</button>
     <button onclick="filtroGanhos('ontem',this)" class="btn-sm gray" id="gnhf-ontem">Ontem</button>
     <button onclick="filtroGanhos('semana',this)" class="btn-sm gray" id="gnhf-semana">Esta Semana</button>
     <button onclick="filtroGanhos('mes',this)" class="btn-sm gray" id="gnhf-mes">Este Mês</button>
+  </div>
+  <!-- Navegação de meses -->
+  <div id="gnh-nav-mes" style="display:none;align-items:center;justify-content:space-between;background:#f0f4ff;border-radius:10px;padding:8px 12px;margin-bottom:8px;">
+    <button onclick="navMes(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;color:#004E89;padding:0 8px;">‹</button>
+    <span id="gnh-mes-label" style="font-weight:700;font-size:13px;color:#004E89;text-transform:capitalize;"></span>
+    <button onclick="navMes(1)" id="gnh-nav-prox" style="background:none;border:none;font-size:20px;cursor:pointer;color:#004E89;padding:0 8px;">›</button>
   </div>
   <div id="gnh-resumo" style="margin-bottom:12px;"></div>
   <div id="gnh-dados"></div>
@@ -729,7 +736,7 @@ const $=id=>document.getElementById(id);
 const v=id=>{const e=$(id);return e?e.value.trim():'';}
 const fR=val=>'R$ '+parseFloat(val||0).toFixed(2).replace('.',',');
 const fEnd=(r,n,b,c,cp)=>{let s=[r,n].filter(Boolean).join(', ');if(b)s+=', '+b;if(c)s+=' - '+c;if(cp)s+=' ('+cp+')';return s;};
-function showM(id,msg,ok){const e=$(id);if(!e)return;e.className=ok?'msg-ok':'msg-error';e.textContent=msg;}
+function showM(id,msg,ok){const e=$(id);if(!e)return;e.className=ok?'msg-ok':'msg-error';e.innerHTML=msg;}
 function clearM(id){const e=$(id);if(e){e.className='';e.textContent='';}}
 function iDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
 function fDia(){const d=new Date();d.setHours(23,59,59,999);return d.toISOString();}
@@ -1623,8 +1630,10 @@ async function lerComanda(event){
       console.error('[OCR Google]',errCode,errMsg,errDetails);
       // Mostra mensagem técnica completa para diagnóstico
       let errTip='';
-      if(errCode===400||errMsg.toLowerCase().includes('not valid')||errMsg.toLowerCase().includes('api key')){
-        errTip='<br><small style="color:#888;">⚙️ Solução: Google Cloud Console → Credenciais → Editar chave → Restrições de aplicativos → Selecionar "Nenhuma" → Salvar</small>';
+      if(errCode===400&&errMsg.toLowerCase().includes('not valid')){
+        errTip='<br><small style="color:#555;line-height:1.6;">⚙️ Causa: <strong>Cloud Vision API não está ativada</strong> no projeto.<br>Solução: <a href="https://console.cloud.google.com/apis/library/vision.googleapis.com" target="_blank" style="color:#004E89;">Clique aqui para ativar a API</a> ou acesse:<br>console.cloud.google.com → Biblioteca → Cloud Vision API → Ativar</small>';
+      }else if(errCode===403){
+        errTip='<br><small style="color:#555;">⚙️ Permissão negada. Verifique se a Cloud Vision API está ativada.</small>';
       }
       showM('ped-msg','❌ Google Vision ('+errCode+'): '+errMsg+errTip,false);
       return;
@@ -2361,8 +2370,19 @@ async function salvarCfgLj(){
 
 // ============ ENTREGADOR ============
 async function initEnt(){
+  // Salva dados de loja ANTES de buscar banco (colunas podem não existir no DB)
+  const _lojaId=U.loja_ativa_id||null;
+  const _lojaNome=U._loja_ativa_nome||null;
+  const _lojaCod=U._loja_ativa_codigo||null;
   const{data}=await db.from('usuarios').select('*').eq('id',U.id).single();
-  if(data){U={...U,...data};localStorage.setItem('u',JSON.stringify(U));}
+  if(data){
+    U={...U,...data};
+    // Restaura dados de loja que o banco pode ter sobrescrito com null
+    if(!U.loja_ativa_id&&_lojaId)U.loja_ativa_id=_lojaId;
+    if(!U._loja_ativa_nome&&_lojaNome)U._loja_ativa_nome=_lojaNome;
+    if(!U._loja_ativa_codigo&&_lojaCod)U._loja_ativa_codigo=_lojaCod;
+    localStorage.setItem('u',JSON.stringify(U));
+  }
   $('ent-nome').textContent=U.nome;
   $('ent-st').textContent=U.online?'&#128994; Online':'&#9899; Offline';
   atuBtnOn(U.online);
@@ -2847,6 +2867,7 @@ function focarEntregadorMapa(entId){
   }
 }
 let _gnhFiltro='hoje';
+let _gnhMesOffset=0; // 0 = mês atual, -1 = mês passado, -2 = 2 meses atrás, etc.
 
 // Verifica virada de mês e arquiva ganhos do mês anterior no banco
 async function verificarArquivoMensal(){
@@ -2880,12 +2901,15 @@ async function verificarArquivoMensal(){
 async function abrirGanhosEnt(){
   openM('ganhos');
   _gnhFiltro='hoje';
+  _gnhMesOffset=0;
   // Verificar e arquivar ganhos do mês passado se necessário
   verificarArquivoMensal().catch(e=>console.warn('[arquivo mensal]',e));
   // Highlight botão ativo
   ['hoje','ontem','semana','mes'].forEach(f=>{
     const b=$('gnhf-'+f);if(b){b.style.background=f==='hoje'?'#00C9A7':'#888';b.style.opacity='1';}
   });
+  // Oculta nav de mes ao abrir (filtro padrão é hoje)
+  const navEl=$('gnh-nav-mes');if(navEl)navEl.style.display='none';
   await carregarResumoGanhos();
   await carregarGanhos();
   // Mostrar histórico mensal se houver
@@ -2915,14 +2939,45 @@ function mostrarHistoricoMensal(){
 
 function filtroGanhos(per,btn){
   _gnhFiltro=per;
+  _gnhMesOffset=0; // reset ao trocar filtro
   ['hoje','ontem','semana','mes'].forEach(f=>{
     const b=$('gnhf-'+f);if(b){b.style.background=f===per?'#00C9A7':'#888';}
   });
+  // Mostrar/ocultar navegação de meses
+  const navEl=$('gnh-nav-mes');
+  if(per==='mes'){
+    navEl.style.display='flex';
+    atualizarLabelMes();
+  } else {
+    navEl.style.display='none';
+  }
   carregarGanhos();
 }
 
-function periodoRange(per){
+function navMes(dir){
+  const novoOffset=_gnhMesOffset+dir;
+  // Não permite ir para o futuro (além do mês atual = offset 0)
+  if(novoOffset>0)return;
+  _gnhMesOffset=novoOffset;
+  atualizarLabelMes();
+  carregarGanhos();
+  // Desabilita botão próximo se já está no mês atual
+  const proxBtn=$('gnh-nav-prox');
+  if(proxBtn)proxBtn.style.opacity=_gnhMesOffset===0?'0.3':'1';
+}
+
+function atualizarLabelMes(){
   const agora=new Date();
+  const alvo=new Date(agora.getFullYear(),agora.getMonth()+_gnhMesOffset,1);
+  const label=alvo.toLocaleString('pt-BR',{month:'long',year:'numeric'});
+  const el=$('gnh-mes-label');if(el)el.textContent=label.charAt(0).toUpperCase()+label.slice(1);
+  const proxBtn=$('gnh-nav-prox');
+  if(proxBtn)proxBtn.style.opacity=_gnhMesOffset===0?'0.3':'1';
+}
+
+function periodoRange(per,mesOffset){
+  const agora=new Date();
+  const off=mesOffset||0;
   let inicio,fim=new Date(agora);
   fim.setHours(23,59,59,999);
   if(per==='hoje'){inicio=new Date(agora);inicio.setHours(0,0,0,0);}
@@ -2937,9 +2992,13 @@ function periodoRange(per){
     inicio.setHours(0,0,0,0);
     fim=new Date(inicio);fim.setDate(fim.getDate()+6);fim.setHours(23,59,59,999);
   }
-  else{ // mes
-    inicio=new Date(agora.getFullYear(),agora.getMonth(),1,0,0,0,0);
-    fim=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
+  else{ // mes — suporta offset para meses anteriores
+    const ano=agora.getFullYear();
+    const mes=agora.getMonth()+off; // off negativo = meses anteriores
+    inicio=new Date(ano,mes,1,0,0,0,0);
+    fim=new Date(ano,mes+1,0,23,59,59,999);
+    // Se o mês alvo for futuro (off>0), limita ao dia atual
+    if(off===0)fim=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
   }
   return{inicio:inicio.toISOString(),fim:fim.toISOString()};
 }
@@ -2991,7 +3050,7 @@ async function carregarResumoGanhos(){
 async function carregarGanhos(){
   const per=_gnhFiltro||'hoje';
   const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
-  const{inicio,fim}=periodoRange(per);
+  const{inicio,fim}=periodoRange(per,per==='mes'?_gnhMesOffset:0);
   const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
   if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';return;}
   const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
