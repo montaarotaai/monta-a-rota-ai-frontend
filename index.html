@@ -771,7 +771,14 @@ const fR=val=>'R$ '+parseFloat(val||0).toFixed(2).replace('.',',');
 const fEnd=(r,n,b,c,cp)=>{let s=[r,n].filter(Boolean).join(', ');if(b)s+=', '+b;if(c)s+=' - '+c;if(cp)s+=' ('+cp+')';return s;};
 function showM(id,msg,ok){const e=$(id);if(!e)return;e.className=ok?'msg-ok':'msg-error';e.innerHTML=msg;}
 function clearM(id){const e=$(id);if(e){e.className='';e.textContent='';}}
-function iDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
+// Salva U no localStorage SEM logo_url/foto_url (base64 enorme estoura quota)
+function salvarU(u){
+  try{
+    const s=u||U;
+    const copia={...s};delete copia.logo_url;delete copia.foto_url;
+    localStorage.setItem('u',JSON.stringify(copia));
+  }catch(e){console.warn('salvarU falhou:',e);}
+}function iDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
 function fDia(){const d=new Date();d.setHours(23,59,59,999);return d.toISOString();}
 function iPer(p){
   const n=new Date();
@@ -853,7 +860,7 @@ async function fazerLogin(){
     if(!u){showM('login-msg','Usuario nao encontrado');return;}
     if(u.status==='bloqueado'){showM('login-msg','Acesso bloqueado.');return;}
     if(senha!==u.senha_hash){showM('login-msg','Senha incorreta');return;}
-    U=u;localStorage.setItem('u',JSON.stringify(u));showPg(u.tipo);
+    U=u;salvarU(u);showPg(u.tipo);
   }catch(e){showM('login-msg','Erro: '+e.message);}
   finally{btn.disabled=false;btn.textContent='Entrar';}
 }
@@ -1495,19 +1502,19 @@ async function initLoja(){
     if(!U.loja_ativa_id&&lojaAtivaLocal)U.loja_ativa_id=lojaAtivaLocal;
     if(!U._loja_ativa_nome&&lojaNomeLocal)U._loja_ativa_nome=lojaNomeLocal;
     if(!U._loja_ativa_codigo&&lojaCodLocal)U._loja_ativa_codigo=lojaCodLocal;
-    localStorage.setItem('u',JSON.stringify(U));
+    salvarU();
   }
   $('loja-nome').textContent=U.nome_loja||U.nome;
   $('loja-cod').textContent=U.codigo_loja||'------';
   $('lj-ts').textContent=fR(U.taxa_sistema);
   // App logo
   const ljLogo=$('lj-app-logo');if(ljLogo)ljLogo.src=LOGO_URL;
-  // Logo da loja — sempre busca do banco para garantir persistência
+  // Logo da loja — busca do banco (nunca salva no localStorage, é grande demais)
   if(U.logo_url)mostrarLogo(U.logo_url,'loja-logo-box');
   db.from('usuarios').select('logo_url').eq('id',U.id).single().then(({data:ld})=>{
     if(ld&&ld.logo_url){
+      U.logo_url=ld.logo_url; // mantém na memória, mas NÃO salva no localStorage
       mostrarLogo(ld.logo_url,'loja-logo-box');
-      if(U.logo_url!==ld.logo_url){U.logo_url=ld.logo_url;try{localStorage.setItem('u',JSON.stringify(U));}catch(e){}}
     }
   });
   // GPS toggle
@@ -1586,7 +1593,7 @@ async function salvarTaxaLj(){
     return;
   }
   U.taxa_entrega=base;U.taxa_tipo=tipo;U.taxa_km_limite=kmLim;U.taxa_km_excedente=kmExc;U.taxa_fixo_base=fixoBase;
-  localStorage.setItem('u',JSON.stringify(U));
+  salvarU();
   $('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='✅ Configuracao salva!';
   setTimeout(()=>{$('taxa-msg').textContent='';},2000);
 }
@@ -2452,7 +2459,7 @@ async function toggleGpsValidacao(){
   const novo=!gpsValidacaoAtiva;
   await db.from('usuarios').update({gps_validacao_obrigatorio:novo}).eq('id',U.id);
   U.gps_validacao_obrigatorio=novo;
-  localStorage.setItem('u',JSON.stringify(U));
+  salvarU();
   atuToggleGps(novo);
 }
 
@@ -2479,13 +2486,10 @@ async function uploadLogoLoja(event){
   const reader=new FileReader();
   reader.onload=async(e)=>{
     const b64=e.target.result;
-    // Salva no banco (fonte de verdade)
+    // Salva no banco (fonte de verdade) — não salva logo no localStorage (estoura quota)
     await db.from('usuarios').update({logo_url:b64}).eq('id',U.id);
     U.logo_url=b64;
-    // Tenta salvar no localStorage (pode falhar se imagem for muito grande)
-    try{localStorage.setItem('u',JSON.stringify(U));}catch(ex){}
-    // Salva logo em chave dedicada (mais chance de caber)
-    try{localStorage.setItem('loja_logo_'+U.id,b64);}catch(ex){}
+    salvarU(); // salva U sem logo_url
     mostrarLogo(b64,'loja-logo-box');
     const prev=$('cfg-logo-prev');
     if(prev)prev.innerHTML=`<img src="${b64}" style="max-height:70px;max-width:200px;object-fit:contain;border-radius:6px;display:block;margin:0 auto;">`;
@@ -2827,7 +2831,7 @@ async function salvarCfgLj(){
   const ns=v('cfg-senha');if(ns.length>=6)d.senha_hash=ns;
   const{error}=await db.from('usuarios').update(d).eq('id',U.id);
   if(error){showM('cfg-lj-msg','Erro: '+error.message);return;}
-  U={...U,...d};localStorage.setItem('u',JSON.stringify(U));
+  U={...U,...d};salvarU();
   $('loja-nome').textContent=d.nome_loja||U.nome;showM('cfg-lj-msg','Salvo!',true);setTimeout(()=>closeM('cfg-lj'),1500);
 }
 
@@ -2843,7 +2847,7 @@ async function initEnt(){
       // Merge SOMENTE campos seguros — NUNCA sobrescreve dados de loja
       const camposSeguros=['nome','foto_url','online','taxa_tipo','taxa_entrega','taxa_km_limite','taxa_km_excedente','taxa_fixo_base','observacoes'];
       camposSeguros.forEach(k=>{if(data[k]!==undefined&&data[k]!==null)U[k]=data[k];});
-      localStorage.setItem('u',JSON.stringify(U));
+      salvarU();
     }
   }catch(e){console.warn('[initEnt fetch]',e);}
   // RESTAURA vínculo de loja da chave dedicada (SEMPRE sobrescreve — mais confiável)
@@ -2857,7 +2861,7 @@ async function initEnt(){
       if(_lj.loja_ativa_id)U.loja_ativa_id=_lj.loja_ativa_id;
       if(_lj._loja_ativa_nome)U._loja_ativa_nome=_lj._loja_ativa_nome;
       if(_lj._loja_ativa_codigo)U._loja_ativa_codigo=_lj._loja_ativa_codigo;
-      localStorage.setItem('u',JSON.stringify(U));
+      salvarU();
     }catch(e){}
   }
   $('ent-nome').textContent=U.nome;
@@ -2942,7 +2946,7 @@ async function carregarLojaAtiva(){
     U.loja_ativa_id=lojaAtiva.loja_id;
     U._loja_ativa_nome=nomeLoja;
     U._loja_ativa_codigo=lj.codigo_loja||'';
-    localStorage.setItem('u',JSON.stringify(U));
+    salvarU();
     // Salva também na chave dedicada (sobrevive a logout e recarregamentos)
     localStorage.setItem('loja_vinc_'+U.id,JSON.stringify({
       loja_ativa_id:U.loja_ativa_id,
@@ -2970,14 +2974,14 @@ async function carregarLojaAtiva(){
 }
 
 function trocarLoja(){
-  U.loja_ativa_id=null;localStorage.setItem('u',JSON.stringify(U));
+  U.loja_ativa_id=null;salvarU();
   carregarLojaAtiva();
 }
 
 async function confirmarLojaAtiva(){
   const lid=v('ent-sel-loja-ativa');if(!lid)return;
   await db.from('usuarios').update({loja_ativa_id:lid,online:true}).eq('id',U.id);
-  U.loja_ativa_id=lid;U.online=true;localStorage.setItem('u',JSON.stringify(U));
+  U.loja_ativa_id=lid;U.online=true;salvarU();
   atuBtnOn(true);inicRast();await carregarLojaAtiva();
 }
 
@@ -3025,7 +3029,7 @@ async function toggleOnline(){
     if(assoc.length===1&&!U.loja_ativa_id){
       U.loja_ativa_id=assoc[0].loja_id;
       if(assoc[0].l){U._loja_ativa_nome=assoc[0].l.nome_loja||assoc[0].l.nome;}
-      localStorage.setItem('u',JSON.stringify(U));
+      salvarU();
     }
   }
   const novo=!U.online;
@@ -3033,7 +3037,7 @@ async function toggleOnline(){
   await db.from('usuarios').update({online:novo}).eq('id',U.id);
   U.online=novo;
   // Nao zera loja_ativa_id ao ficar offline
-  localStorage.setItem('u',JSON.stringify(U));
+  salvarU();
   atuBtnOn(novo);
   if(novo){
     inicRast();
@@ -3104,7 +3108,7 @@ async function uploadFoto(event){
   reader.onload=async function(e){
     const b=e.target.result;
     await db.from('usuarios').update({foto_url:b}).eq('id',U.id);
-    U.foto_url=b;localStorage.setItem('u',JSON.stringify(U));
+    U.foto_url=b;salvarU();
     $('foto-img').src=b;$('foto-img').classList.remove('hidden');$('foto-ph').classList.add('hidden');
   };
   reader.readAsDataURL(file);
@@ -3115,7 +3119,7 @@ async function desvinculardaLoja(lojaId,lojaIdConfirm){
   await db.from('loja_entregadores').delete().eq('entregador_id',U.id).eq('loja_id',lojaId);
   await db.from('usuarios').update({online:false}).eq('id',U.id);
   U.online=false;U.loja_ativa_id=null;U._loja_ativa_nome=null;U._loja_ativa_codigo=null;
-  localStorage.setItem('u',JSON.stringify(U));
+  salvarU();
   localStorage.removeItem('loja_vinc_'+U.id);
   atuBtnOn(false);
   carregarLojaAtiva();
@@ -3147,7 +3151,7 @@ async function conectarCodigo(){
   U.loja_ativa_id=loja.id;
   U._loja_ativa_nome=nomeLoja;
   U._loja_ativa_codigo=loja.codigo_loja;
-  localStorage.setItem('u',JSON.stringify(U));
+  salvarU();
   // Salva em chave permanente — persiste mesmo após logout/fechar app
   localStorage.setItem('loja_vinc_'+U.id,JSON.stringify({
     loja_ativa_id:loja.id,
@@ -3618,7 +3622,7 @@ async function salvarCfgEnt(){
   const ns=v('ent-sen');if(ns.length>=6)d.senha_hash=ns;
   const{error}=await db.from('usuarios').update(d).eq('id',U.id);
   if(error){showM('ent-cfg-msg','Erro: '+error.message);return;}
-  U={...U,...d};localStorage.setItem('u',JSON.stringify(U));$('ent-nome').textContent=d.nome;showM('ent-cfg-msg','Salvo!',true);setTimeout(()=>closeM('cfg-ent'),1500);
+  U={...U,...d};salvarU();$('ent-nome').textContent=d.nome;showM('ent-cfg-msg','Salvo!',true);setTimeout(()=>closeM('cfg-ent'),1500);
 }
 </script>
 </body>
