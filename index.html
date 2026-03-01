@@ -259,8 +259,9 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <div id="pg-loja" class="hidden">
   <div class="header">
     <button class="btn-logout" onclick="sair()">Sair</button>
-    <div style="text-align:center;margin-bottom:4px;"><img src="" id="lj-app-logo" style="height:70px;object-fit:contain;"></div>
-    <div id="loja-logo-box" style="margin-bottom:6px;"></div>
+    <!-- Logo da loja própria aparece grande; app logo fica oculto quando loja tem logo -->
+    <div id="loja-logo-box" style="text-align:center;margin-bottom:4px;"></div>
+    <div id="lj-app-logo-wrap" style="text-align:center;margin-bottom:4px;"><img src="" id="lj-app-logo" style="height:70px;object-fit:contain;"></div>
     <h1 id="loja-nome">Minha Loja</h1><p>Painel da Loja</p>
     <div class="codigo-box">
       <div class="codigo-label">Codigo para Entregadores</div>
@@ -2083,136 +2084,175 @@ async function gerarRotaComIA(){
 
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
 
-  // PASSO 1: Geocode todos os pedidos
-  const pedsGeo=[];
-  for(const p of peds){
-    let lat=parseFloat(p.lat_entrega||0),lng=parseFloat(p.lng_entrega||0);
-    let geocodeFailed=false;
-    if(!lat||!lng){
-      const g=await geocode(p.endereco_entrega);
-      if(g){lat=g.lat;lng=g.lng;await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);}
-      else{geocodeFailed=true;lat=0;lng=0;} // NÃO usa coordenadas da loja como fallback
+  // ─────────────────────────────────────────────────────────────
+  // FUNÇÃO: normaliza endereço → extrai "rua + número" como chave
+  // Ex: "Av. Presidente Castelo Branco, 1865 - Apt 22" → "presidente castelo branco 1865"
+  // ─────────────────────────────────────────────────────────────
+  function chaveEnd(end){
+    if(!end||!end.trim())return '_sem_end_'+Math.random();
+    const s=end.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove acentos
+      .replace(/\b(apto?|ap|bl|bloco|cond|condominio|torre|sala|kit|casa|loja|subsetor|setor|conjunto|c\.?j\.?|s\.?-?\d)\b.*/,'') // corta a partir do complemento
+      .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+    // Extrai rua+numero: pega os últimos 3 tokens antes do número + o número
+    const m=s.match(/([a-z][a-z\s]{4,}?)\s*\b(\d{2,})\b/);
+    if(m){
+      const palavras=m[1].trim().split(' ');
+      const nomeRua=palavras.slice(-4).join(' '); // últimas 4 palavras do logradouro
+      return (nomeRua+' '+m[2]).trim();
     }
-    const dist=geocodeFailed?999:distKm(lojaLat,lojaLng,lat,lng);
-    const ang=geocodeFailed?0:((angleDeg(lojaLat,lojaLng,lat,lng)%360)+360)%360;
-    pedsGeo.push({id:p.id,num:p.numero_pedido||'',nome:p.cliente_nome||'Cliente',end:p.endereco_entrega||'',lat,lng,dist,ang,geocodeFailed});
+    return s.substring(0,50);
   }
 
-  // PASSO 2: Mesclar pedidos do MESMO endereço (distância < 80m = mesmo local)
-  // ATENÇÃO: só agrupa pedidos com coordenadas válidas — evita agrupar pedidos sem GPS
-  const grupos_end=[];
-  const usados=new Set();
-  pedsGeo.forEach((p,i)=>{
-    if(usados.has(i))return;
-    const grupo=[p];
-    usados.add(i);
-    // Só agrupa se AMBOS têm coordenadas válidas E estão muito próximos
-    if(!p.geocodeFailed){
-      pedsGeo.forEach((q,j)=>{
-        if(i===j||usados.has(j)||q.geocodeFailed)return;
-        if(distKm(p.lat,p.lng,q.lat,q.lng)*1000<80){grupo.push(q);usados.add(j);}
-      });
-    }
-    grupos_end.push(grupo);
+  // ─────────────────────────────────────────────────────────────
+  // PASSO 1: PRÉ-AGRUPAR por endereço (ANTES do geocode)
+  // Pedidos com mesmo endereço normalizado = mesma parada
+  // ─────────────────────────────────────────────────────────────
+  const mapaEnds={};
+  peds.forEach(p=>{
+    const k=chaveEnd(p.endereco_entrega);
+    if(!mapaEnds[k])mapaEnds[k]=[];
+    mapaEnds[k].push(p);
   });
-  // Cada "item de entrega" agora é um grupo de pedidos no mesmo endereço
-  const itens=grupos_end.map(g=>({
-    ids:g.map(x=>x.id),
-    labels:g.map(x=>x.num?'#'+x.num:x.nome),
-    end:g[0].end,lat:g[0].lat,lng:g[0].lng,dist:g[0].dist,ang:g[0].ang
-  })).sort((a,b)=>a.dist-b.dist); // Ordena: mais próximos primeiro
+  const paradaList=Object.values(mapaEnds); // array de arrays
 
-  // PASSO 3: Distribuir itens por ângulo entre entregadores
-  // Ordena entregadores por quantidade (maior primeiro = mais eficiente)
+  // ─────────────────────────────────────────────────────────────
+  // PASSO 2: Geocode — apenas UM representante por parada
+  // ─────────────────────────────────────────────────────────────
+  const paradasGeo=[];
+  for(const grupo of paradaList){
+    const rep=grupo[0]; // representante
+    let lat=parseFloat(rep.lat_entrega||0),lng=parseFloat(rep.lng_entrega||0);
+    let geocodeFailed=false;
+    if(!lat||!lng){
+      const g=await geocode(rep.endereco_entrega);
+      if(g){
+        lat=g.lat;lng=g.lng;
+        // Salva coords em todos os pedidos do grupo
+        for(const p of grupo){
+          await db.from('entregas').update({lat_entrega:lat,lng_entrega:lng}).eq('id',p.id);
+        }
+      } else {geocodeFailed=true;lat=0;lng=0;}
+    }
+    const dist=geocodeFailed?0:distKm(lojaLat,lojaLng,lat,lng);
+    const ang=geocodeFailed?0:((angleDeg(lojaLat,lojaLng,lat,lng)%360)+360)%360;
+    paradasGeo.push({
+      ids:grupo.map(p=>p.id),
+      labels:grupo.map(p=>p.numero_pedido?'#'+p.numero_pedido:p.cliente_nome||'Entrega'),
+      end:rep.endereco_entrega||'',
+      lat,lng,dist,ang,geocodeFailed,
+      qtdPeds:grupo.length // quantos pedidos nessa parada
+    });
+  }
+
+  // Ordena paradas: mais próximas da loja primeiro
+  paradasGeo.sort((a,b)=>a.dist-b.dist);
+
+  // ─────────────────────────────────────────────────────────────
+  // PASSO 3: Distribuir PARADAS entre entregadores
+  // Cada "parada" é tratada como 1 unidade para fins de limite
+  // (mesmo que tenha vários pedidos — são entregues juntos)
+  // ─────────────────────────────────────────────────────────────
   const entsOrdenados=distribuicao.sort((a,b)=>b[1].qtd-a[1].qtd);
-  const grupos_ent=entsOrdenados.map(([id,v])=>({entId:id,entNome:v.nome,limite:v.qtd,itens:[],totalPeds:0}));
-  
-  // Algoritmo: atribui item ao entregador que:
-  // 1. Ainda tem espaço (totalPeds < limite)
-  // 2. Cuja rota existente está na mesma direção (ângulo similar)
-  // 3. Se empate, escolhe o que tem menos pedidos
-  itens.forEach(item=>{
-    // Conta quantos pedidos individuais esse item representa
-    const qtdItem=item.ids.length;
-    
-    // Encontra melhor entregador para esse item
+  const grupos_ent=entsOrdenados.map(([id,v])=>({
+    entId:id,entNome:v.nome,
+    limite:_limiteGlobal, // limite = nº de PARADAS (não pedidos individuais)
+    paradas:[],totalParadas:0
+  }));
+
+  paradasGeo.forEach(parada=>{
     let melhor=null,melhorScore=Infinity;
     grupos_ent.forEach(g=>{
-      if(g.totalPeds+qtdItem>g.limite)return; // Sem espaço
+      if(g.totalParadas>=g.limite)return; // sem espaço
       let score=0;
-      if(g.itens.length===0){
-        // Entregador sem pedidos ainda — usa ângulo médio livre
-        score=50; // score neutro
+      if(g.paradas.length===0){
+        score=50;
       } else {
-        // Calcula ângulo médio dos itens já atribuídos
-        const angMedio=g.itens.reduce((s,it)=>s+it.ang,0)/g.itens.length;
-        const diff=Math.abs(((item.ang-angMedio+540)%360)-180);
-        score=diff; // menor diferença angular = melhor score
+        const angMedio=g.paradas.reduce((s,p)=>s+p.ang,0)/g.paradas.length;
+        const diff=Math.abs(((parada.ang-angMedio+540)%360)-180);
+        score=diff;
       }
-      // Desempate: prefere quem tem mais espaço proporcional
-      const espacoProporcional=(g.limite-g.totalPeds)/g.limite;
-      score-=espacoProporcional*10;
+      const espacoProp=(g.limite-g.totalParadas)/g.limite;
+      score-=espacoProp*10;
       if(score<melhorScore){melhorScore=score;melhor=g;}
     });
-    
     if(melhor){
-      melhor.itens.push(item);
-      melhor.totalPeds+=qtdItem;
+      melhor.paradas.push(parada);melhor.totalParadas++;
     } else {
-      // Item não cabe em nenhum — distribui para quem tem mais espaço disponível
-      const comEspaco=grupos_ent.filter(g=>g.totalPeds<g.limite)
-        .sort((a,b)=>(b.limite-b.totalPeds)-(a.limite-a.totalPeds));
-      if(comEspaco.length){comEspaco[0].itens.push(item);comEspaco[0].totalPeds+=qtdItem;}
-      else grupos_ent[0].itens.push(item); // força no primeiro
+      // Parada não coube — adiciona para quem tem mais espaço
+      const comEspaco=grupos_ent.filter(g=>g.totalParadas<g.limite).sort((a,b)=>(b.limite-b.totalParadas)-(a.limite-a.totalParadas));
+      if(comEspaco.length){comEspaco[0].paradas.push(parada);comEspaco[0].totalParadas++;}
+      else grupos_ent[0].paradas.push(parada);
     }
   });
 
-  // Remove entregadores sem pedidos
+  // Monta _rotaIAGrupos no formato esperado pelo confirmarRotaPlano
   _rotaIAGrupos=grupos_ent
-    .filter(g=>g.itens.length>0)
+    .filter(g=>g.paradas.length>0)
     .map(g=>{
-      // Reordena: mais próximos da loja primeiro
-      g.itens.sort((a,b)=>a.dist-b.dist);
-      const bairroTexto=g.itens.map(it=>it.end.split(',')[1]?.trim()||'').filter(Boolean);
-      const unicos=[...new Set(bairroTexto)].slice(0,2).join(' / ');
+      g.paradas.sort((a,b)=>a.dist-b.dist);
+      const bairros=[...new Set(g.paradas.map(p=>p.end.split(',')[1]?.trim()||'').filter(Boolean))].slice(0,2).join(' / ');
       return{
         entId:g.entId,entNome:g.entNome,
-        descricao:unicos?('📍 '+unicos):(''+g.itens.length+' parada'+( g.itens.length>1?'s':'')),
-        pedidos:g.itens.flatMap(it=>it.ids.map(id=>{
-          const orig=pedsGeo.find(p=>p.id===id);
-          return orig?{...orig,end:it.end,labels:it.labels}:null;
-        })).filter(Boolean)
+        descricao:bairros?('📍 '+bairros):(g.paradas.length+' parada'+(g.paradas.length>1?'s':'')),
+        // Expande paradas para lista flat de pedidos (para compatibilidade com confirmarRotaPlano)
+        pedidos:g.paradas.flatMap(parada=>
+          parada.ids.map(id=>({
+            id,
+            num:(parada.labels.find((_,i)=>parada.ids[i]===id)||'').replace(/^#/,''),
+            end:parada.end,
+            dist:parada.dist,
+            // extra: guarda todos os labels da parada para exibir juntos
+            _paradaLabels:parada.labels,
+            _paradaEnd:parada.end,
+            _paradaQtd:parada.qtdPeds,
+            _paradaIndex:parada.ids.indexOf(id)
+          }))
+        )
       };
     });
   _rotaPlanoGrupos=_rotaIAGrupos;
 
+  // ─────────────────────────────────────────────────────────────
   // Exibe resultado
+  // ─────────────────────────────────────────────────────────────
   const body=$('rota-plano-body');
   const coresEnt=['#004E89','#FF6B35','#00C9A7','#8e44ad','#e74c3c','#27ae60'];
-  const totalPeds=_rotaIAGrupos.reduce((s,g)=>s+g.pedidos.length,0);
-  const sobrou=itens.reduce((s,it)=>s+it.ids.length,0)-totalPeds;
+  const totalPeds=peds.length;
+  const totalParadas=paradasGeo.length;
+  const pedsDistribuidos=_rotaIAGrupos.reduce((s,g)=>s+g.pedidos.length,0);
 
   body.innerHTML=`<div style="background:#e8f5e9;border-radius:9px;padding:11px;margin-bottom:12px;font-size:13px;color:#2e7d32;font-weight:700;">
-    🤖 Rota otimizada: ${_rotaIAGrupos.length} entregador${_rotaIAGrupos.length>1?'es':''} • ${totalPeds} pedido${totalPeds>1?'s':''}${sobrou>0?` • <span style="color:#e65100;">${sobrou} sem entregador</span>`:''}
-  </div>`+_rotaIAGrupos.map((g,gi)=>`
-  <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid ${coresEnt[gi%coresEnt.length]};">
+    🤖 Rota otimizada: ${_rotaIAGrupos.length} entregador${_rotaIAGrupos.length>1?'es':''} • ${totalParadas} parada${totalParadas>1?'s':''} • ${totalPeds} pedido${totalPeds>1?'s':''}${pedsDistribuidos<totalPeds?` • <span style="color:#e65100;">${totalPeds-pedsDistribuidos} sem entregador</span>`:''}
+  </div>`+_rotaIAGrupos.map((g,gi)=>{
+    // Agrupa pedidos de volta por parada para exibição
+    const paradasMapa={};
+    g.pedidos.forEach(p=>{
+      const k=p._paradaEnd||p.end;
+      if(!paradasMapa[k])paradasMapa[k]={labels:p._paradaLabels||[('#'+p.num)],end:p.end,dist:p.dist,ids:[]};
+      paradasMapa[k].ids.push(p.id);
+    });
+    const paradasList=Object.values(paradasMapa);
+    return `<div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid ${coresEnt[gi%coresEnt.length]};">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
       <span style="font-size:16px;">🛵</span>
       <div>
         <div style="font-weight:700;font-size:14px;color:${coresEnt[gi%coresEnt.length]};">${g.entNome}</div>
         <div style="font-size:11px;color:#888;">${g.descricao}</div>
       </div>
-      <span style="margin-left:auto;background:${coresEnt[gi%coresEnt.length]};color:white;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;">${g.pedidos.length}x</span>
+      <span style="margin-left:auto;background:${coresEnt[gi%coresEnt.length]};color:white;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;">${paradasList.length} parada${paradasList.length>1?'s':''} • ${g.pedidos.length} ped.</span>
     </div>
-    ${g.pedidos.map((p,pi)=>`<div style="padding:5px 0;border-bottom:1px solid #eee;font-size:12px;display:flex;gap:6px;align-items:start;">
-      <span style="background:${coresEnt[gi%coresEnt.length]};color:white;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">${pi+1}</span>
-      <div>
-        <strong>${p.num?'#'+p.num:p.nome}</strong>
-        <br><span style="color:#555;font-size:11px;">📍 ${p.end}</span>
-        ${p.dist>0?`<span style="color:#888;font-size:10px;"> • ${p.dist.toFixed(1)}km</span>`:''}
-      </div>
-    </div>`).join('')}
-  </div>`).join('');
+    ${paradasList.map((parada,pi)=>`
+      <div style="padding:7px 0;border-bottom:1px solid #eee;font-size:12px;display:flex;gap:6px;align-items:start;">
+        <span style="background:${coresEnt[gi%coresEnt.length]};color:white;border-radius:50%;width:20px;height:20px;min-width:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${pi+1}</span>
+        <div>
+          <strong>${parada.labels.join(' + ')}</strong>
+          <br><span style="color:#555;font-size:11px;">📍 ${parada.end}</span>
+          ${parada.dist>0&&parada.dist<900?`<span style="color:#888;font-size:10px;"> • ${parada.dist.toFixed(1)}km</span>`:''}
+          ${parada.labels.length>1?`<span style="display:inline-block;margin-top:3px;background:#fff3e0;color:#e65100;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">📦 ${parada.labels.length} pedidos no mesmo endereço</span>`:''}
+        </div>
+      </div>`).join('')}
+  </div>`;}).join('');
 
   btn.textContent='🤖 Gerar Rota com IA';btn.disabled=false;
   $('qtd-msg').textContent='';
@@ -2420,8 +2460,19 @@ async function toggleGpsValidacao(){
 function mostrarLogo(url,containerId){
   const el=$(containerId);if(!el)return;
   if(url){
-    el.innerHTML=`<img src="${url}" style="max-height:60px;max-width:180px;object-fit:contain;border-radius:6px;margin:0 auto;display:block;">`;
-  }else{el.innerHTML='';}
+    el.innerHTML=`<img src="${url}" style="max-height:90px;max-width:220px;object-fit:contain;border-radius:8px;margin:0 auto;display:block;">`;
+    // Se for o logo da loja, esconde o logo do app (evita duplicar)
+    if(containerId==='loja-logo-box'){
+      const wrap=$('lj-app-logo-wrap');
+      if(wrap)wrap.style.display='none';
+    }
+  }else{
+    el.innerHTML='';
+    if(containerId==='loja-logo-box'){
+      const wrap=$('lj-app-logo-wrap');
+      if(wrap)wrap.style.display='block';
+    }
+  }
 }
 async function uploadLogoLoja(event){
   const file=event.target.files[0];if(!file)return;
