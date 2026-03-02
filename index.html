@@ -12,8 +12,9 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#333;}
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#FF6B35 0%,#004E89 100%);}
-.login-box{background:white;padding:28px;border-radius:16px;width:100%;max-width:390px;box-shadow:0 8px 30px rgba(0,0,0,.2);}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;}
+.login-bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;}
+.login-box{background:rgba(255,255,255,.95);backdrop-filter:blur(8px);padding:28px;border-radius:16px;width:100%;max-width:390px;box-shadow:0 8px 40px rgba(0,0,0,.35);position:relative;z-index:1;}
 .tabs{display:flex;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid #eee;}
 .tab{flex:1;padding:10px;text-align:center;cursor:pointer;background:#f5f5f5;color:#666;font-size:14px;border:none;}
 .tab.active{background:linear-gradient(135deg,#FF6B35,#004E89);color:white;font-weight:600;}
@@ -113,9 +114,10 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
 <!-- LOGIN -->
 <div id="pg-login" class="login-wrap">
+  <img id="login-bg-img" class="login-bg" src="" alt="">
   <div class="login-box">
     <div style="text-align:center;margin-bottom:18px;">
-      <img id="login-logo" src="" alt="Monta a Rota Ai" style="width:130px;height:130px;object-fit:contain;margin:0 auto;display:block;">
+      <img id="login-logo" src="" alt="Monta a Rota Ai" style="width:180px;height:auto;object-fit:contain;margin:0 auto;display:block;border-radius:8px;">
     </div>
     <div class="tabs">
       <button class="tab active" onclick="switchTab('login',this)">Entrar</button>
@@ -733,8 +735,9 @@ let geocodeCache={};
 
 // ============ INIT ============
 window.onload=()=>{
-  // Set logo on login screen immediately
+  // Set logo and wallpaper on login screen immediately
   const li=$('login-logo');if(li)li.src=LOGO_URL;
+  const bg=$('login-bg-img');if(bg)bg.src=HEADER_BG_URL;
   const s=localStorage.getItem('u');
   if(s){U=JSON.parse(s);showPg(U.tipo);}
 };
@@ -961,10 +964,10 @@ async function fazerCadastro(){
 function showPg(tipo){
   ['pg-login','pg-admin','pg-loja','pg-entregador'].forEach(id=>$(id).classList.add('hidden'));
   $('pg-'+tipo).classList.remove('hidden');
-  // Logo apenas na tela de login
+  // Logo na tela de login
   const li=$('login-logo');if(li)li.src=LOGO_URL;
-  // Injeta wallpaper nas tags <img> de cada header
-  ['adm-header-bg','lj-header-bg','ent-header-bg'].forEach(id=>{
+  // Wallpaper em todos os headers e no fundo do login
+  ['adm-header-bg','lj-header-bg','ent-header-bg','login-bg-img'].forEach(id=>{
     const el=$(id);if(el)el.src=HEADER_BG_URL;
   });
   pararIvs();
