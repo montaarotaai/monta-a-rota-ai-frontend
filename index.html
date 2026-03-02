@@ -108,6 +108,11 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 .adm-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
 .adm-tab{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#e0e0e0;color:#555;}
 .adm-tab.active{background:#004E89;color:white;}
+/* Desktop: limita altura do header para não ficar desproporcional em telas largas */
+@media (min-width: 700px){
+  .header-bg{max-height:220px;object-fit:cover;object-position:center top;}
+  #pg-admin, #pg-loja, #pg-entregador{max-width:520px;margin:0 auto;}
+}
 </style>
 </head>
 <body>
@@ -280,7 +285,16 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     </div>
     <!-- Nome da loja e código ABAIXO da imagem, sem sobreposição -->
     <div style="background:linear-gradient(135deg,#001a4d,#003580);padding:10px 16px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <h1 id="loja-nome" style="font-size:18px;font-weight:900;color:#FFD700;text-shadow:0 1px 4px rgba(0,0,0,.6);letter-spacing:.5px;margin:0;">Minha Loja</h1>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <!-- Foto de perfil da loja -->
+        <div style="position:relative;cursor:pointer;flex-shrink:0;" onclick="$('lj-input-foto').click()" title="Trocar foto da loja">
+          <div id="lj-foto-ph" class="foto-circle" style="width:44px;height:44px;font-size:20px;margin:0;">🏪</div>
+          <img id="lj-foto-img" class="foto-img hidden" src="" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid #FFD700;margin:0;display:block;">
+          <span style="position:absolute;bottom:-2px;right:-2px;background:#004E89;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;">📷</span>
+        </div>
+        <input type="file" id="lj-input-foto" accept="image/*" class="hidden" onchange="uploadFotoLoja(event)">
+        <h1 id="loja-nome" style="font-size:18px;font-weight:900;color:#FFD700;text-shadow:0 1px 4px rgba(0,0,0,.6);letter-spacing:.5px;margin:0;">Minha Loja</h1>
+      </div>
       <div class="codigo-box" style="background:rgba(0,0,0,0.35);margin:0;padding:6px 14px;">
         <div class="codigo-label" style="color:rgba(255,255,255,.8);font-size:9px;">CÓDIGO ENTREGADORES</div>
         <div class="codigo-num" id="loja-cod" style="font-size:18px;letter-spacing:4px;">------</div>
@@ -320,9 +334,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       </div>
       <!-- Novo tipo: fixo base + por km -->
       <div id="taxa-fixo-km-area" class="hidden">
-        <p style="font-size:11px;color:#888;margin-bottom:8px;">Ex: R$5 fixo + R$8 por entrega ate 7km, acima R$10</p>
+        <p style="font-size:11px;color:#888;margin-bottom:8px;">Ex: R$30 combustível por turno + R$8 por entrega ate 7km, acima R$10</p>
         <div class="g2b">
-          <div class="fg"><label>Fixo mensal/semanal (R$)</label><input type="number" id="lj-taxa-fixo-base" step="0.50" min="0" placeholder="0.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
+          <div class="fg">
+            <label>⛽ Combustível por Turno (R$)</label>
+            <input type="number" id="lj-taxa-fixo-base" step="0.50" min="0" placeholder="0.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;">
+            <p style="font-size:10px;color:#888;margin-top:3px;">Pago por turno trabalhado (almoço e/ou jantar)</p>
+          </div>
           <div class="fg"><label>Por entrega ate X km</label><input type="number" id="lj-taxa-por-ent" step="0.50" min="0" placeholder="8.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
         </div>
         <div class="g2b">
@@ -664,12 +682,38 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div style="background:#f8f9fa;border-radius:10px;padding:13px;margin-bottom:12px;">
     <div style="font-size:12px;font-weight:700;color:#004E89;margin-bottom:6px;">🖼️ Papel de Fundo</div>
     <p style="font-size:11px;color:#888;margin-bottom:10px;">Será aplicado como fundo para <strong>todas as lojas</strong> do sistema.</p>
-    <div id="adm-fundo-prev" style="height:80px;border-radius:8px;background:#e0e0e0;margin-bottom:10px;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;">Sem fundo definido</div>
-    <div style="display:flex;gap:8px;">
+
+    <!-- Pré-visualização real do header -->
+    <div style="margin-bottom:10px;">
+      <p style="font-size:10px;color:#888;margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Pré-visualização:</p>
+      <div style="border-radius:10px;overflow:hidden;border:2px solid #e0e0e0;position:relative;background:#001a4d;">
+        <div id="adm-fundo-prev-wrap" style="width:100%;height:120px;overflow:hidden;position:relative;">
+          <img id="adm-fundo-prev-img" src="" alt="" style="width:100%;height:auto;display:block;position:absolute;left:0;top:0;transition:top .1s;" onerror="this.style.display='none'">
+          <div id="adm-fundo-prev-empty" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;background:#e8eaf0;">Sem fundo definido</div>
+        </div>
+        <!-- Faixa inferior simulada -->
+        <div style="background:linear-gradient(135deg,#001a4d,#003580);padding:7px 12px;">
+          <span style="font-size:13px;font-weight:900;color:#FFD700;">NOME DA LOJA</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ajuste vertical (só aparece quando tem imagem) -->
+    <div id="adm-fundo-pos-area" style="display:none;margin-bottom:10px;">
+      <p style="font-size:10px;color:#555;font-weight:700;margin-bottom:5px;">Ajustar posição vertical da imagem:</p>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="ajustarFundoPos(-10)" style="background:#004E89;color:white;border:none;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;font-weight:700;">▲</button>
+        <button onclick="ajustarFundoPos(10)" style="background:#004E89;color:white;border:none;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;font-weight:700;">▼</button>
+        <span id="adm-fundo-pos-label" style="font-size:11px;color:#666;">Posição: 0px</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="$('adm-input-fundo').click()" class="btn btn-primary" style="width:auto;padding:8px 16px;font-size:13px;">📁 Escolher Imagem</button>
+      <button id="btn-salvar-fundo-adm" onclick="salvarAplicarFundoAdm()" class="btn btn-green" style="width:auto;padding:8px 16px;font-size:13px;display:none;">✅ Salvar e Aplicar</button>
       <button onclick="removerFundoAdm()" class="btn btn-gray" style="width:auto;padding:8px 14px;font-size:13px;">🗑️ Remover</button>
     </div>
-    <input type="file" id="adm-input-fundo" accept="image/*" class="hidden" onchange="uploadFundoAdm(event)">
+    <input type="file" id="adm-input-fundo" accept="image/*" class="hidden" onchange="escolherFundoAdm(event)">
   </div>
 
   <div id="cfg-adm-msg"></div>
@@ -853,7 +897,12 @@ function clearM(id){const e=$(id);if(e){e.className='';e.textContent='';}}
 function salvarU(u){
   try{
     const s=u||U;
-    const copia={...s};delete copia.logo_url;delete copia.foto_url;
+    // Remove campos grandes (base64) antes de salvar — evita estouro de quota do localStorage
+    // Esses campos são buscados do banco sempre que necessário
+    const copia={...s};
+    delete copia.logo_url;
+    delete copia.foto_url;
+    delete copia.fundo_url;
     localStorage.setItem('u',JSON.stringify(copia));
   }catch(e){console.warn('salvarU falhou:',e);}
 }function iDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
@@ -976,10 +1025,22 @@ function showPg(tipo){
   $('pg-'+tipo).classList.remove('hidden');
   // Logo na tela de login
   const li=$('login-logo');if(li)li.src=LOGO_URL;
-  // Wallpaper em todos os headers e no fundo do login
+  // Wallpaper padrão em todos os headers
   ['adm-header-bg','lj-header-bg','ent-header-bg','login-bg-img'].forEach(id=>{
     const el=$(id);if(el)el.src=HEADER_BG_URL;
   });
+  // Restaura wallpaper customizado do banco (admin pode ter definido fundo_url)
+  if(U&&U.id){
+    db.from('usuarios').select('fundo_url,fundo_pos').eq('tipo','admin').limit(1).then(({data:d})=>{
+      if(d&&d.length&&d[0].fundo_url){
+        const pos=d[0].fundo_pos||0;
+        ['adm-header-bg','lj-header-bg','ent-header-bg','login-bg-img'].forEach(id=>{
+          const el=$(id);
+          if(el){el.src=d[0].fundo_url;el.style.objectPosition='center '+pos+'px';}
+        });
+      }
+    }).catch(()=>{});
+  }
   pararIvs();
   if(tipo==='admin')initAdmin();
   else if(tipo==='loja')initLoja();
@@ -1100,27 +1161,105 @@ async function initAdmin(){
   });
 }
 
-function aplicarFundoAdmin(url){
+function aplicarFundoAdmin(url, pos){
   // Atualiza o wallpaper em todos os headers em tempo real
+  const p=pos||0;
   ['adm-header-bg','lj-header-bg','ent-header-bg','login-bg-img'].forEach(id=>{
-    const el=$(id);if(el)el.src=url||HEADER_BG_URL;
+    const el=$(id);
+    if(el){
+      el.src=url||HEADER_BG_URL;
+      el.style.objectPosition=url?'center '+p+'px':'center top';
+    }
   });
 }
 
 async function abrirCfgAdm(){
   openM('cfg-adm');
   clearM('cfg-adm-msg');
-  // Mostra foto atual no preview
+  // Foto no preview
   const prev=$('adm-cfg-foto-prev');
   if(U.foto_url) prev.innerHTML=`<img src="${U.foto_url}" style="width:100%;height:100%;object-fit:cover;">`;
-  // Mostra fundo atual no preview
-  const{data:d}=await db.from('usuarios').select('fundo_url').eq('id',U.id).single();
-  const fundoPrev=$('adm-fundo-prev');
+  else prev.innerHTML='👤';prev.style.fontSize='28px';
+  // Fundo no preview — busca do banco
+  const{data:d}=await db.from('usuarios').select('fundo_url,fundo_pos').eq('id',U.id).single();
+  const img=$('adm-fundo-prev-img');
+  const empty=$('adm-fundo-prev-empty');
+  const posArea=$('adm-fundo-pos-area');
+  const btnSalvar=$('btn-salvar-fundo-adm');
+  window._fundoAdmBase64=null;
+  window._fundoAdmPos=d&&d.fundo_pos!=null?parseInt(d.fundo_pos):0;
   if(d&&d.fundo_url){
-    fundoPrev.innerHTML=`<img src="${d.fundo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+    img.src=d.fundo_url;img.style.display='block';img.style.top=window._fundoAdmPos+'px';
+    if(empty)empty.style.display='none';
+    if(posArea)posArea.style.display='block';
+    if(btnSalvar)btnSalvar.style.display='inline-block';
+    const label=$('adm-fundo-pos-label');if(label)label.textContent='Posição: '+window._fundoAdmPos+'px';
   } else {
-    fundoPrev.innerHTML='';fundoPrev.textContent='Sem fundo definido';fundoPrev.style.backgroundImage='';
+    img.src='';img.style.display='none';
+    if(empty)empty.style.display='flex';
+    if(posArea)posArea.style.display='none';
+    if(btnSalvar)btnSalvar.style.display='none';
   }
+}
+
+// Usuário escolheu nova imagem — mostra preview mas NÃO salva ainda
+async function escolherFundoAdm(event){
+  const file=event.target.files[0];if(!file)return;
+  showM('cfg-adm-msg','⏳ Carregando preview...',true);
+  const comprimido=await new Promise(res=>{
+    const imgEl=new Image(),url=URL.createObjectURL(file);
+    imgEl.onload=()=>{
+      const max=900,s=Math.min(1,max/imgEl.width);
+      const c=document.createElement('canvas');
+      c.width=Math.round(imgEl.width*s);c.height=Math.round(imgEl.height*s);
+      c.getContext('2d').drawImage(imgEl,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.82));
+    };imgEl.src=url;
+  });
+  // Armazena em memória para salvar só quando clicar "Salvar e Aplicar"
+  window._fundoAdmBase64=comprimido;
+  window._fundoAdmPos=0;
+  // Mostra no preview
+  const img=$('adm-fundo-prev-img');
+  const empty=$('adm-fundo-prev-empty');
+  const posArea=$('adm-fundo-pos-area');
+  const btnSalvar=$('btn-salvar-fundo-adm');
+  img.src=comprimido;img.style.display='block';img.style.top='0px';
+  if(empty)empty.style.display='none';
+  if(posArea)posArea.style.display='block';
+  if(btnSalvar)btnSalvar.style.display='inline-block';
+  const label=$('adm-fundo-pos-label');if(label)label.textContent='Posição: 0px';
+  clearM('cfg-adm-msg');
+}
+
+// Ajuste de posição vertical na pré-visualização (só no preview, não salva ainda)
+function ajustarFundoPos(delta){
+  window._fundoAdmPos=(window._fundoAdmPos||0)+delta;
+  const img=$('adm-fundo-prev-img');
+  if(img)img.style.top=window._fundoAdmPos+'px';
+  const label=$('adm-fundo-pos-label');
+  if(label)label.textContent='Posição: '+window._fundoAdmPos+'px';
+}
+
+// Salva a imagem + posição no banco e aplica em todos os headers
+async function salvarAplicarFundoAdm(){
+  const urlParaSalvar=window._fundoAdmBase64||$('adm-fundo-prev-img').src;
+  if(!urlParaSalvar||urlParaSalvar===window.location.href){showM('cfg-adm-msg','Escolha uma imagem primeiro.',false);return;}
+  const pos=window._fundoAdmPos||0;
+  showM('cfg-adm-msg','⏳ Salvando...',true);
+  const{error}=await db.from('usuarios').update({fundo_url:urlParaSalvar,fundo_pos:pos}).eq('id',U.id);
+  if(error){showM('cfg-adm-msg','❌ Erro ao salvar: '+error.message,false);return;}
+  // Aplica em todos os headers com posição
+  ['adm-header-bg','lj-header-bg','ent-header-bg','login-bg-img'].forEach(id=>{
+    const el=$(id);
+    if(el){
+      el.src=urlParaSalvar;
+      el.style.objectPosition='center '+pos+'px';
+    }
+  });
+  window._fundoAdmBase64=null;
+  showM('cfg-adm-msg','✅ Fundo salvo e aplicado a todos os headers!',true);
+  setTimeout(()=>clearM('cfg-adm-msg'),3000);
 }
 
 async function uploadFotoAdm(event){
@@ -1146,33 +1285,21 @@ async function uploadFotoAdm(event){
   showM('cfg-adm-msg','✅ Foto salva!',true);setTimeout(()=>clearM('cfg-adm-msg'),2000);
 }
 
-async function uploadFundoAdm(event){
-  const file=event.target.files[0];if(!file)return;
-  showM('cfg-adm-msg','⏳ Comprimindo imagem...',true);
-  // Comprime wallpaper para max 900px antes de salvar
-  const comprimido=await new Promise(res=>{
-    const img=new Image(),url=URL.createObjectURL(file);
-    img.onload=()=>{
-      const max=900,s=Math.min(1,max/img.width);
-      const c=document.createElement('canvas');
-      c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.82));
-    };img.src=url;
-  });
-  await db.from('usuarios').update({fundo_url:comprimido}).eq('id',U.id);
-  aplicarFundoAdmin(comprimido);
-  const prev=$('adm-fundo-prev');
-  if(prev)prev.innerHTML=`<img src="${comprimido}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
-  showM('cfg-adm-msg','✅ Fundo salvo e aplicado a todos os headers!',true);
-  setTimeout(()=>clearM('cfg-adm-msg'),3000);
-}
+// uploadFundoAdm mantida para compatibilidade (não usada diretamente mais)
+async function uploadFundoAdm(event){escolherFundoAdm(event);}
 
 async function removerFundoAdm(){
-  await db.from('usuarios').update({fundo_url:null}).eq('id',U.id);
+  await db.from('usuarios').update({fundo_url:null,fundo_pos:0}).eq('id',U.id);
   aplicarFundoAdmin(null);
-  const prev=$('adm-fundo-prev');
-  if(prev){prev.style.backgroundImage='';prev.textContent='Sem fundo definido';}
+  const img=$('adm-fundo-prev-img');
+  const empty=$('adm-fundo-prev-empty');
+  const posArea=$('adm-fundo-pos-area');
+  const btnSalvar=$('btn-salvar-fundo-adm');
+  if(img){img.src='';img.style.display='none';}
+  if(empty){empty.style.display='flex';}
+  if(posArea)posArea.style.display='none';
+  if(btnSalvar)btnSalvar.style.display='none';
+  window._fundoAdmBase64=null;window._fundoAdmPos=0;
   showM('cfg-adm-msg','✅ Fundo removido.',true);setTimeout(()=>clearM('cfg-adm-msg'),2000);
 }
 
@@ -1726,7 +1853,16 @@ async function initLoja(){
   $('loja-nome').textContent=U.nome_loja||U.nome;
   $('loja-cod').textContent=U.codigo_loja||'------';
   $('lj-ts').textContent=fR(U.taxa_sistema);
-  // App logo removido — wallpaper é a identidade visual padrão
+  // Foto de perfil da loja
+  if(!U.foto_url){
+    const cachedFoto=localStorage.getItem('u_foto_'+U.id);
+    if(cachedFoto)U.foto_url=cachedFoto;
+  }
+  if(U.foto_url){
+    const fi=$('lj-foto-img'),fp=$('lj-foto-ph');
+    if(fi){fi.src=U.foto_url;fi.classList.remove('hidden');}
+    if(fp)fp.classList.add('hidden');
+  }
   // GPS toggle
   atuToggleGps(U.gps_validacao_obrigatorio||false);
   // Taxa tipo
@@ -2722,6 +2858,31 @@ async function uploadLogoLoja(event){
   reader.readAsDataURL(file);
 }
 
+// Foto de perfil da LOJA (aparece no header, persiste sempre)
+async function uploadFotoLoja(event){
+  const file=event.target.files[0];if(!file)return;
+  // Comprime para 300px para garantir salvamento no Supabase
+  const comprimido=await new Promise(res=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=300,s=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.85));
+    };img.src=url;
+  });
+  const{error}=await db.from('usuarios').update({foto_url:comprimido}).eq('id',U.id);
+  if(!error){
+    U.foto_url=comprimido;
+    try{localStorage.setItem('u_foto_'+U.id,comprimido);}catch(er){}
+    salvarU();
+  }
+  const fi=$('lj-foto-img'),fp=$('lj-foto-ph');
+  if(fi){fi.src=comprimido;fi.classList.remove('hidden');}
+  if(fp)fp.classList.add('hidden');
+}
+
 // ============ EDITAR PEDIDO ============
 function abrirEditarPedido(id,num,cli,tel,rua,nend,bairro,cidade,comp,obs){
   $('edit-id').value=id;
@@ -3091,7 +3252,16 @@ async function initEnt(){
   $('ent-nome').textContent=U.nome;
   $('ent-st').textContent=U.online?'&#128994; Online':'&#9899; Offline';
   atuBtnOn(U.online);
-  if(U.foto_url){$('foto-img').src=U.foto_url;$('foto-img').classList.remove('hidden');$('foto-ph').classList.add('hidden');}
+  // Foto: 1) banco (já buscado acima em camposSeguros) 2) chave própria localStorage
+  if(!U.foto_url){
+    const cachedFoto=localStorage.getItem('u_foto_'+U.id);
+    if(cachedFoto)U.foto_url=cachedFoto;
+  }
+  if(U.foto_url){
+    const fi=$('foto-img'),fp=$('foto-ph');
+    if(fi){fi.src=U.foto_url;fi.classList.remove('hidden');}
+    if(fp)fp.classList.add('hidden');
+  }
   // Inicia GPS silencioso assim que entregador abre o app
   iniciarGPS();
   // Entregas hoje
@@ -3326,14 +3496,25 @@ function inicRast(){
 function abrirFoto(){$('input-foto').click();}
 async function uploadFoto(event){
   const file=event.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=async function(e){
-    const b=e.target.result;
-    await db.from('usuarios').update({foto_url:b}).eq('id',U.id);
-    U.foto_url=b;salvarU();
-    $('foto-img').src=b;$('foto-img').classList.remove('hidden');$('foto-ph').classList.add('hidden');
-  };
-  reader.readAsDataURL(file);
+  // Comprime para 300px para garantir que salva no Supabase e no localStorage
+  const comprimido=await new Promise(res=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=300,s=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',0.85));
+    };img.src=url;
+  });
+  const{error}=await db.from('usuarios').update({foto_url:comprimido}).eq('id',U.id);
+  if(!error){
+    U.foto_url=comprimido;
+    // Salva em chave própria (não afeta quota do U principal)
+    try{localStorage.setItem('u_foto_'+U.id,comprimido);}catch(er){}
+    salvarU();
+  }
+  $('foto-img').src=comprimido;$('foto-img').classList.remove('hidden');$('foto-ph').classList.add('hidden');
 }
 
 async function desvinculardaLoja(lojaId,lojaIdConfirm){
@@ -3837,9 +4018,30 @@ async function carregarGanhos(){
   const per=_gnhFiltro||'hoje';
   const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
   const{inicio,fim}=periodoRange(per,per==='mes'?_gnhMesOffset:0);
-  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
+  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
   if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';return;}
   const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+
+  // ── Calcula Combustível por Turno ──
+  // Turno almoço: entregas entregues antes das 16h | Turno jantar: 16h ou depois
+  // Por dia, conta turnos distintos × valor combustível da loja (taxa_fixo_base)
+  let totalCombustivel=0;
+  const combustivelPorLoja={};
+  data.forEach(e=>{
+    if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
+    const lId=e.loja_id;
+    const combVal=parseFloat(e.l.taxa_fixo_base);
+    const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
+    const diaKey=dt.toISOString().split('T')[0];
+    const turno=dt.getHours()<16?'almoco':'jantar';
+    const chave=`${lId}_${diaKey}_${turno}`;
+    if(!combustivelPorLoja[chave]){
+      combustivelPorLoja[chave]=true;
+      totalCombustivel+=combVal;
+    }
+  });
+  const totGeral=tot+totalCombustivel;
+
   // Label dinâmico para meses passados
   let labelPer='';
   if(per==='mes'&&_gnhMesOffset<0){
@@ -3854,7 +4056,11 @@ async function carregarGanhos(){
   el.innerHTML=`
     <div style="background:#e8f5e9;padding:12px;border-radius:11px;text-align:center;margin-bottom:12px;border:2px solid #00C9A7;">
       <p style="font-size:11px;color:#666;">${labelPer} — ${data.length} entrega(s)</p>
-      <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(tot)}</p>
+      <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(totGeral)}</p>
+      ${totalCombustivel>0?`<div style="margin-top:6px;display:flex;justify-content:center;gap:14px;font-size:12px;color:#555;">
+        <span>🛵 Corridas: <strong>${fR(tot)}</strong></span>
+        <span>⛽ Combustível: <strong>${fR(totalCombustivel)}</strong></span>
+      </div>`:''}
     </div>
     <p style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">📋 Detalhes das corridas:</p>
     ${data.map((e,i)=>{
