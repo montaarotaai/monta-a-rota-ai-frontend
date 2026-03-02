@@ -1324,27 +1324,34 @@ async function abrirEditLojaAdm(id){
 async function salvarEditLojaAdm(){
   const id=$('adm-edit-loja-id').value;
   if(!id)return;
+  const rua=($('adm-edit-rua').value||'').trim();
+  const nend=($('adm-edit-nend').value||'').trim();
+  const bairro=($('adm-edit-bairro').value||'').trim();
+  const cidade=($('adm-edit-cidade').value||'').trim()||'Ribeirao Preto';
+  const comp=($('adm-edit-comp').value||'').trim();
+  const nomeLoja=($('adm-edit-nome-loja').value||'').trim().toUpperCase();
   const d={
-    nome_loja:$('adm-edit-nome-loja').value.trim(),
-    nome:$('adm-edit-nome-loja').value.trim(),
-    telefone:$('adm-edit-tel').value.trim(),
-    cnpj:$('adm-edit-cnpj').value.trim(),
-    rua:$('adm-edit-rua').value.trim(),
-    numero_endereco:$('adm-edit-nend').value.trim(),
-    bairro:$('adm-edit-bairro').value.trim(),
-    cidade:$('adm-edit-cidade').value.trim(),
-    complemento:$('adm-edit-comp').value.trim(),
+    nome_loja: nomeLoja,
+    nome:      nomeLoja,
+    telefone:  ($('adm-edit-tel').value||'').trim(),
+    cnpj:      ($('adm-edit-cnpj').value||'').trim(),
+    cidade,
+    endereco_rua:          rua,
+    endereco_numero:       nend,
+    endereco_bairro:       bairro,
+    endereco_cidade:       cidade,
+    endereco_complemento:  comp,
+    endereco: [rua,nend,bairro,cidade,comp].filter(Boolean).join(', '),
   };
-  // Endereço completo
-  d.endereco=[d.rua,d.numero_endereco,d.bairro,d.cidade].filter(Boolean).join(', ');
-  // Email (troca se preenchido)
-  const novoEmail=$('adm-edit-email').value.trim();
+  const novoEmail=($('adm-edit-email').value||'').trim();
   if(novoEmail)d.email=novoEmail;
-  // Senha (troca se preenchida)
-  const novaSenha=$('adm-edit-senha').value.trim();
+  const novaSenha=($('adm-edit-senha').value||'').trim();
   if(novaSenha.length>=6)d.senha_hash=novaSenha;
+  const btn=document.querySelector('#m-adm-edit-loja .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
   const{error}=await db.from('usuarios').update(d).eq('id',id);
-  if(error){showM('adm-edit-loja-msg','Erro: '+error.message,false);return;}
+  if(btn){btn.disabled=false;btn.textContent='✅ Salvar Alterações';}
+  if(error){showM('adm-edit-loja-msg','❌ Erro: '+error.message,false);return;}
   showM('adm-edit-loja-msg','✅ Loja atualizada com sucesso!',true);
   setTimeout(()=>{closeM('adm-edit-loja');carregarAdmLojas();},1500);
 }
