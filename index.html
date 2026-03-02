@@ -267,15 +267,17 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
 <!-- LOJA -->
 <div id="pg-loja" class="hidden">
-  <div class="header">
-    <button class="btn-logout" onclick="sair()">Sair</button>
-    <!-- Logo da loja própria aparece grande; app logo fica oculto quando loja tem logo -->
-    <div id="loja-logo-box" style="text-align:center;margin-bottom:4px;"></div>
-    <div id="lj-app-logo-wrap" style="text-align:center;margin-bottom:4px;"><img src="" id="lj-app-logo" style="height:70px;object-fit:contain;"></div>
-    <h1 id="loja-nome">Minha Loja</h1><p>Painel da Loja</p>
-    <div class="codigo-box">
-      <div class="codigo-label">Codigo para Entregadores</div>
-      <div class="codigo-num" id="loja-cod">------</div>
+  <div class="header" style="padding:0;overflow:hidden;">
+    <div style="position:relative;width:100%;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:16px 16px 14px;">
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,20,60,0.65) 100%);pointer-events:none;"></div>
+      <button class="btn-logout" onclick="sair()" style="position:absolute;top:13px;right:13px;z-index:2;">Sair</button>
+      <div style="position:relative;z-index:2;text-align:center;width:100%;">
+        <h1 id="loja-nome" style="font-size:22px;font-weight:900;color:#FFD700;text-shadow:0 2px 8px rgba(0,0,0,.8),0 0 20px rgba(255,215,0,.4);letter-spacing:1px;margin-bottom:6px;">Minha Loja</h1>
+        <div class="codigo-box" style="background:rgba(0,0,0,0.35);backdrop-filter:blur(4px);">
+          <div class="codigo-label" style="color:rgba(255,255,255,.8);">Codigo para Entregadores</div>
+          <div class="codigo-num" id="loja-cod">------</div>
+        </div>
+      </div>
     </div>
   </div>
   <div class="container">
@@ -347,14 +349,17 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
 <!-- ENTREGADOR -->
 <div id="pg-entregador" class="hidden">
-  <div class="header" style="cursor:pointer;" onclick="abrirFoto()">
-    <button class="btn-logout" onclick="event.stopPropagation();sair()">Sair</button>
-    <div style="text-align:center;margin-bottom:4px;"><img src="" id="ent-app-logo" style="height:60px;object-fit:contain;" onclick="event.stopPropagation()"></div>
-    <div id="ent-loja-logo" style="min-height:0;"></div>
-    <div id="foto-ph" class="foto-circle">&#128100;</div>
-    <img id="foto-img" class="foto-img hidden" src="" alt="">
-    <h1 id="ent-nome">Entregador</h1>
-    <p id="ent-st">&#9899; Offline</p>
+  <div class="header" style="cursor:pointer;padding:0;overflow:hidden;" onclick="abrirFoto()">
+    <div style="position:relative;width:100%;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:14px 16px 12px;">
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,20,60,0.65) 100%);pointer-events:none;"></div>
+      <button class="btn-logout" onclick="event.stopPropagation();sair()" style="position:absolute;top:13px;right:13px;z-index:2;">Sair</button>
+      <div style="position:relative;z-index:2;text-align:center;">
+        <div id="foto-ph" class="foto-circle" style="margin:0 auto 4px;">&#128100;</div>
+        <img id="foto-img" class="foto-img hidden" src="" alt="" style="margin:0 auto 4px;display:block;">
+        <h1 id="ent-nome" style="font-size:18px;font-weight:800;color:#FFD700;text-shadow:0 2px 8px rgba(0,0,0,.8);margin-bottom:2px;">Entregador</h1>
+        <p id="ent-st" style="font-size:12px;opacity:.9;color:white;text-shadow:0 1px 4px rgba(0,0,0,.7);">&#9899; Offline</p>
+      </div>
+    </div>
     <input type="file" id="input-foto" accept="image/*" class="hidden" onchange="uploadFoto(event)">
   </div>
   <div class="container">
@@ -956,9 +961,9 @@ async function fazerCadastro(){
 function showPg(tipo){
   ['pg-login','pg-admin','pg-loja','pg-entregador'].forEach(id=>$(id).classList.add('hidden'));
   $('pg-'+tipo).classList.remove('hidden');
-  // Inject app logo everywhere
-  ['login-logo','adm-logo-img','lj-app-logo','ent-app-logo'].forEach(id=>{const el=$(id);if(el)el.src=LOGO_URL;});
-  // Aplica imagem de fundo em todos os headers
+  // Logo apenas na tela de login
+  const li=$('login-logo');if(li)li.src=LOGO_URL;
+  // Aplica wallpaper em todos os headers
   document.querySelectorAll('.header').forEach(h=>{
     h.style.backgroundImage=`url('${HEADER_BG_URL}')`;
     h.style.backgroundSize='cover';
@@ -1701,23 +1706,7 @@ async function initLoja(){
   $('loja-nome').textContent=U.nome_loja||U.nome;
   $('loja-cod').textContent=U.codigo_loja||'------';
   $('lj-ts').textContent=fR(U.taxa_sistema);
-  // App logo
-  const ljLogo=$('lj-app-logo');if(ljLogo)ljLogo.src=LOGO_URL;
-  // Logo da loja — busca do banco (nunca salva no localStorage, é grande demais)
-  if(U.logo_url)mostrarLogo(U.logo_url,'loja-logo-box');
-  db.from('usuarios').select('logo_url').eq('id',U.id).single().then(({data:ld})=>{
-    if(ld&&ld.logo_url){
-      U.logo_url=ld.logo_url;
-      mostrarLogo(ld.logo_url,'loja-logo-box');
-    }
-  });
-  // Papel de fundo definido pelo admin — aplica no header da loja
-  db.from('usuarios').select('fundo_url').eq('tipo','admin').limit(1).then(({data:adm})=>{
-    if(adm&&adm.length&&adm[0].fundo_url){
-      const h=document.querySelector('#pg-loja .header');
-      if(h){h.style.backgroundImage=`url('${adm[0].fundo_url}')`;h.style.backgroundSize='cover';h.style.backgroundPosition='center';}
-    }
-  });
+  // App logo removido — wallpaper é a identidade visual padrão
   // GPS toggle
   atuToggleGps(U.gps_validacao_obrigatorio||false);
   // Taxa tipo
@@ -2680,21 +2669,8 @@ async function toggleGpsValidacao(){
 
 // ============ LOGO LOJA ============
 function mostrarLogo(url,containerId){
-  const el=$(containerId);if(!el)return;
-  if(url){
-    el.innerHTML=`<img src="${url}" style="max-height:90px;max-width:220px;object-fit:contain;border-radius:8px;margin:0 auto;display:block;">`;
-    // Se for o logo da loja, esconde o logo do app (evita duplicar)
-    if(containerId==='loja-logo-box'){
-      const wrap=$('lj-app-logo-wrap');
-      if(wrap)wrap.style.display='none';
-    }
-  }else{
-    el.innerHTML='';
-    if(containerId==='loja-logo-box'){
-      const wrap=$('lj-app-logo-wrap');
-      if(wrap)wrap.style.display='block';
-    }
-  }
+  // Logo da loja não é mais exibida no header — wallpaper é a identidade visual
+  // Função mantida para compatibilidade com configurações salvas no banco
 }
 async function uploadLogoLoja(event){
   const file=event.target.files[0];if(!file)return;
@@ -3154,9 +3130,7 @@ async function carregarLojaAtiva(){
     const nomeLoja=lj.nome_loja||lj.nome;
     // Atualiza UI com dados reais do banco
     infoBox.innerHTML=renderCard(nomeLoja,lj.codigo_loja,U.online,lojaAtiva.loja_id);
-    // Logo da loja
-    const hdr=$('ent-loja-logo');
-    if(hdr)hdr.innerHTML=lj.logo_url?`<img src="${lj.logo_url}" style="max-height:45px;max-width:150px;object-fit:contain;display:block;margin:0 auto 4px;">`:'' ;
+    // Logo da loja removida — wallpaper é a identidade visual
     // Salva no localStorage
     U.loja_ativa_id=lojaAtiva.loja_id;
     U._loja_ativa_nome=nomeLoja;
