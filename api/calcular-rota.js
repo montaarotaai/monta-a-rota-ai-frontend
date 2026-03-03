@@ -223,6 +223,16 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
 //  HANDLER HTTP — Entry point da Vercel Serverless Function
 // ══════════════════════════════════════════════════════════════════
 module.exports = async function handler(req, res) {
+  const origin = req.headers.origin || '';
+
+const allowedOrigins = [
+  'https://montarotai.vercel.app',
+  'https://monta-a-rota-ai-frontend.vercel.app'
+];
+
+if (!allowedOrigins.includes(origin)) {
+  return res.status(403).json({ error: 'Acesso não autorizado' });
+}
   // CORS — permite apenas o domínio do app
   const origin = req.headers.origin || '';
   const allowedOrigins = [
