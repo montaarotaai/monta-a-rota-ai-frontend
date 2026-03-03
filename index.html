@@ -3358,14 +3358,32 @@ async function carregarRel(){
 async function abrirGerEnt(){openM('ger');$('ger-cod').textContent=U.codigo_loja||'------';carregarGer();}
 async function carregarGer(){
   $('ger-lst').innerHTML='<p>Carregando...</p>';
-  const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(id,nome,telefone,placa_moto,online)').eq('loja_id',U.id);
+  const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(id,nome,telefone,placa_moto,chave_pix,online)').eq('loja_id',U.id);
   if(!assoc||!assoc.length){$('ger-lst').innerHTML='<p style="color:#999;margin-top:9px">Nenhum entregador vinculado ainda.</p>';return;}
-  $('ger-lst').innerHTML=assoc.map(a=>`
-    <div class="litem">
-      <div style="flex:1"><strong>${a.e?a.e.nome:'Removido'}</strong> <span class="badge ${a.e&&a.e.online?'b-online':'b-offline'}">${a.e&&a.e.online?'Online':'Offline'}</span><br>
-      <small style="color:#888">Tel:${a.e?a.e.telefone||'-':'-'} | Placa:${a.e?a.e.placa_moto||'-':'-'}</small></div>
-      <button class="btn-sm red" onclick="remEnt('${a.id}')">Remover</button>
-    </div>`).join('');
+  $('ger-lst').innerHTML=assoc.map(a=>{
+    const e=a.e;
+    const pix=e?e.chave_pix||null:null;
+    return `
+    <div class="litem" style="flex-direction:column;align-items:stretch;gap:6px;padding:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <strong>${e?e.nome:'Removido'}</strong>
+          <span class="badge ${e&&e.online?'b-online':'b-offline'}" style="margin-left:5px;">${e&&e.online?'Online':'Offline'}</span>
+        </div>
+        <button class="btn-sm red" onclick="remEnt('${a.id}')">Remover</button>
+      </div>
+      <small style="color:#555;line-height:1.8;">
+        📞 ${e?e.telefone||'-':'-'} &nbsp;|&nbsp; 🏍️ Placa: ${e?e.placa_moto||'-':'-'}
+      </small>
+      <div style="background:${pix?'#e8f5e9':'#fff3e0'};border:1.5px solid ${pix?'#81c784':'#ffcc02'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div>
+          <span style="font-size:10px;font-weight:700;color:${pix?'#2e7d32':'#e65100'};">💰 CHAVE PIX</span><br>
+          <span style="font-size:13px;font-weight:700;color:${pix?'#1b5e20':'#bf360c'};">${pix||'⚠️ Não cadastrada'}</span>
+        </div>
+        ${pix?`<button onclick="navigator.clipboard.writeText('${pix}').then(()=>alert('Pix copiado!'))" style="background:#27ae60;color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">📋 Copiar</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
 }
 async function remEnt(id){if(!confirm('Remover?'))return;await db.from('loja_entregadores').delete().eq('id',id);carregarGer();}
 
