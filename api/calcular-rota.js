@@ -208,7 +208,7 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
   }
 
 
-  // ───────── CLUSTERIZAÇÃO ANGULAR ─────────
+  // CLUSTERIZAÇÃO ANGULAR
 
   paradasGeo.sort((a, b) => a.ang - b.ang);
 
@@ -223,9 +223,7 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
   const clusters = [];
 
   for (let i = 0; i < paradasGeo.length; i += clusterSize) {
-
     clusters.push(paradasGeo.slice(i, i + clusterSize));
-
   }
 
   clusters.forEach((cluster, i) => {
@@ -237,7 +235,7 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
   });
 
 
-  // ───────── NEAREST DENTRO DO CLUSTER ─────────
+  // NEAREST DENTRO DO CLUSTER
 
   grupos_ent.forEach(g => {
 
@@ -333,6 +331,10 @@ module.exports = async function handler(req, res) {
   try {
 
     const { lojaId, limiteGlobal, distribuicao } = req.body;
+
+    if (!lojaId) {
+      return res.status(400).json({ error: 'lojaId obrigatório' });
+    }
 
     const db = createClient(SB_URL, SB_KEY);
 
