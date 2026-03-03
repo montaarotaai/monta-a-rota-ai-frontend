@@ -3147,7 +3147,7 @@ async function carregarRel(){
     return{ini:ini.toISOString(),fim:fim.toISOString()};
   }
   const{ini:dtIni,fim:dtFim}=getRelPeriodo(p);
-  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',U.id).gte('created_at',dtIni).lte('created_at',dtFim);
+  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome,telefone,chave_pix,placa_moto)').eq('loja_id',U.id).gte('created_at',dtIni).lte('created_at',dtFim);
   if(!ents||!ents.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no período.</p>';return;}
 
   const tS=ents.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
@@ -3160,7 +3160,15 @@ async function carregarRel(){
   ents.forEach(e=>{
     const k=e.entregador_id||'sem';
     const nome=e.entregador?.nome||'Sem entregador';
-    if(!pE[k])pE[k]={nome,lista:[],total:0,entregues:0,kmTotal:0};
+    if(!pE[k]){
+      pE[k]={
+        nome,
+        telefone:e.entregador?.telefone||null,
+        chave_pix:e.entregador?.chave_pix||null,
+        placa_moto:e.entregador?.placa_moto||null,
+        lista:[],total:0,entregues:0,kmTotal:0
+      };
+    }
     const v=parseFloat(e.valor_corrida||e.valor_entregador||0);
     pE[k].lista.push(e);
     pE[k].total+=v;
@@ -3250,7 +3258,7 @@ async function carregarRel(){
   <div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
     <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">💰 Custo Detalhado por Entregador</div>
     ${entArr.map((ent,i)=>`
-    <div style="padding:8px 0;border-bottom:1px solid #f5f5f5;">
+    <div style="padding:10px 0;border-bottom:1px solid #f5f5f5;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div style="display:flex;align-items:center;gap:7px;">
           <div style="width:10px;height:10px;border-radius:50%;background:${cores[i%cores.length]};"></div>
@@ -3258,14 +3266,23 @@ async function carregarRel(){
         </div>
         <span style="font-weight:700;color:#004E89;font-size:13px;">${fR(ent.total)}</span>
       </div>
-      <div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:#666;">
+      <div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:#666;flex-wrap:wrap;">
         <span>🚀 ${ent.lista.length} corridas</span>
         <span>✅ ${ent.entregues} entregues</span>
         <span>📏 ${ent.kmTotal.toFixed(1)}km total</span>
         <span>📊 Média: ${fR(ent.lista.length>0?ent.total/ent.lista.length:0)}/corrida</span>
       </div>
+      <!-- Chave Pix do entregador -->
+      <div style="margin-top:7px;background:${ent.chave_pix?'#e8f5e9':'#fff3e0'};border:1px solid ${ent.chave_pix?'#a5d6a7':'#ffcc02'};border-radius:7px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div>
+          <span style="font-size:10px;font-weight:700;color:${ent.chave_pix?'#2e7d32':'#e65100'};">💰 PIX PAGAMENTO</span><br>
+          <span style="font-size:12px;font-weight:700;color:${ent.chave_pix?'#1b5e20':'#bf360c'};">${ent.chave_pix||'⚠️ Chave Pix não cadastrada'}</span>
+          ${ent.telefone?`<span style="font-size:10px;color:#888;display:block;margin-top:2px;">📞 ${ent.telefone}</span>`:''}
+        </div>
+        ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋 Copiar',2000)})" style="background:#27ae60;color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
+      </div>
       <!-- Barra de taxa de conclusão -->
-      <div style="margin-top:5px;">
+      <div style="margin-top:6px;">
         <div style="font-size:10px;color:#888;margin-bottom:2px;">Taxa de conclusão: ${ent.lista.length>0?Math.round(ent.entregues/ent.lista.length*100):0}%</div>
         <div style="background:#f0f0f0;border-radius:20px;height:6px;overflow:hidden;">
           <div style="background:${ent.lista.length>0&&ent.entregues/ent.lista.length>=0.8?'#27ae60':'#e74c3c'};height:100%;width:${ent.lista.length>0?Math.round(ent.entregues/ent.lista.length*100):0}%;border-radius:20px;transition:width .5s;"></div>
