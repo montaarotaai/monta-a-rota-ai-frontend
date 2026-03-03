@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -163,6 +164,18 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <div class="fg"><label>Placa</label><input type="text" id="r-placa" placeholder="ABC-1234"></div>
         <div class="fg"><label>Chave Pix</label><input type="text" id="r-pix"></div>
       </div>
+      <!-- Termos de uso obrigatório -->
+      <div style="background:#fff8e1;border:1.5px solid #FFD700;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+          <input type="checkbox" id="r-aceite-termos" style="width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:#FF6B35;">
+          <span style="font-size:13px;color:#333;line-height:1.5;">
+            Li e aceito os
+            <strong style="color:#FF6B35;cursor:pointer;text-decoration:underline;" onclick="abrirTermos()">Termos de Uso e Consentimento de Rastreamento</strong>
+            do aplicativo MONTA ROTAÍ. Estou ciente do rastreamento de localização durante o uso.
+          </span>
+        </label>
+        <p style="font-size:10px;color:#888;margin-top:6px;margin-left:30px;">⚠️ Obrigatório para concluir o cadastro</p>
+      </div>
       <button class="btn btn-primary" onclick="fazerCadastro()" id="btn-cad">Cadastrar</button>
     </div>
   </div>
@@ -194,6 +207,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <button class="adm-tab" onclick="admTab('entregadores',this)">&#128757; Entregadores</button>
       <button class="adm-tab" onclick="admTab('financeiro',this)">&#128176; Financeiro</button>
       <button class="adm-tab" onclick="admTab('impersonar',this)">&#128065; Ver Painel</button>
+      <button class="adm-tab" onclick="admTab('termos',this)">📋 Termos</button>
     </div>
     <!-- Painel -->
     <div id="adm-painel">
@@ -272,6 +286,15 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
           <option value="">Selecione um entregador...</option>
         </select>
         <div id="adm-ent-view"></div>
+      </div>
+    </div>
+    <!-- Termos Aceitos -->
+    <div id="adm-termos" class="hidden">
+      <div class="secao">
+        <div class="s-title">📋 Termos Aceitos — Registros Legais</div>
+        <p style="font-size:12px;color:#888;margin-bottom:10px;">Cada aceite gera um PDF com validade jurídica. Somente o administrador tem acesso.</p>
+        <button onclick="carregarTermosAdm()" class="btn btn-blue" style="margin-bottom:12px;width:auto;padding:8px 18px;">🔄 Atualizar Lista</button>
+        <div id="adm-termos-lst"><p style="color:#aaa;text-align:center;padding:20px;">Carregando...</p></div>
       </div>
     </div>
   </div>
@@ -768,6 +791,44 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="btn btn-primary" onclick="salvarCfgEnt()">Salvar</button>
 </div></div>
 
+<!-- ========== MODAL TERMOS DE USO ========== -->
+<div id="m-termos" class="modal"><div class="modal-box" style="max-height:90vh;overflow-y:auto;padding:20px;">
+  <button class="modal-close" onclick="closeM('termos')">&times;</button>
+  <div style="text-align:center;margin-bottom:16px;">
+    <div style="font-size:28px;">📋</div>
+    <h2 style="font-size:17px;font-weight:900;color:#004E89;margin-bottom:4px;">TERMO DE USO E CONSENTIMENTO DE RASTREAMENTO</h2>
+    <p style="font-size:12px;color:#888;font-weight:600;">Aplicativo MONTA ROTAÍ — Versão 1.0</p>
+    <p style="font-size:11px;color:#aaa;">Última atualização: 01/07/2025</p>
+  </div>
+  <div id="termos-texto" style="font-size:12px;color:#333;line-height:1.7;text-align:justify;">
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">1. ACEITE ELETRÔNICO</p>
+    <p>Ao marcar a opção "LI E ACEITO OS TERMOS DE USO" durante o cadastro ou acesso ao aplicativo, o usuário concorda de forma livre, informada e inequívoca com todas as regras estabelecidas neste documento, possuindo este aceite validade jurídica equivalente a uma assinatura eletrônica, conforme legislação brasileira aplicável.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">2. OBJETIVO DO APLICATIVO</p>
+    <p>O MONTA ROTAÍ é uma plataforma tecnológica destinada a: organização e agrupamento de rotas de entrega; monitoramento em tempo real de entregadores; controle logístico de entregas; gestão operacional e financeira de pedidos; análise de desempenho e dados operacionais. O aplicativo atua exclusivamente como ferramenta de gestão logística, não sendo responsável por vínculos trabalhistas, contratações ou relações comerciais entre empresas e entregadores.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">3. AUTORIZAÇÃO DE RASTREAMENTO</p>
+    <p>Ao utilizar o aplicativo, o usuário autoriza expressamente a coleta e utilização de dados de localização em tempo real durante o uso da plataforma. Essa coleta pode ocorrer para fins de: monitoramento das entregas; otimização de rotas; registro de deslocamento; segurança operacional; auditoria e controle logístico. O usuário declara estar ciente de que sua localização poderá ser registrada e armazenada, os dados poderão ser visualizados por administradores do sistema e empresas vinculadas, e o rastreamento poderá ocorrer enquanto o aplicativo estiver em uso ou com permissões ativas.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">4. RESPONSABILIDADES DO USUÁRIO</p>
+    <p>O usuário se compromete a: utilizar o aplicativo de forma ética e legal; fornecer informações verdadeiras no cadastro; não tentar violar, copiar ou manipular o sistema; não compartilhar acesso com terceiros não autorizados; respeitar as regras operacionais definidas pela plataforma. Qualquer tentativa de fraude, manipulação de rotas, falsificação de localização ou uso indevido do sistema poderá resultar em suspensão ou bloqueio da conta.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">5. PROPRIEDADE INTELECTUAL</p>
+    <p>Todo o sistema MONTA ROTAÍ, incluindo código-fonte, design, funcionalidades, algoritmos de roteirização, estrutura de banco de dados e identidade visual, é de propriedade exclusiva da plataforma, sendo proibida qualquer forma de cópia, engenharia reversa, reprodução, comercialização ou distribuição sem autorização formal.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">6. LIMITAÇÃO DE RESPONSABILIDADE</p>
+    <p>O aplicativo atua como ferramenta tecnológica de gestão logística, não sendo responsável por: atrasos de entrega; conduta de entregadores; problemas operacionais das empresas; perdas ou danos decorrentes de uso indevido do sistema.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">7. PRIVACIDADE E DADOS</p>
+    <p>Os dados coletados pelo sistema poderão incluir: nome, telefone, e-mail, localização, histórico de rotas e registros operacionais. Essas informações são utilizadas exclusivamente para funcionamento da plataforma e gestão das operações logísticas.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">8. BLOQUEIO OU SUSPENSÃO</p>
+    <p>A plataforma poderá suspender ou cancelar contas que violem estes termos, utilizem o sistema de forma irregular ou tentem comprometer a segurança da plataforma.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">9. ALTERAÇÕES NOS TERMOS</p>
+    <p>Os termos poderão ser atualizados a qualquer momento, sendo responsabilidade do usuário revisá-los periodicamente.</p>
+    <p style="font-weight:700;color:#004E89;margin:10px 0 4px;">10. FORO</p>
+    <p>Fica eleito o foro da comarca de Ribeirão Preto – SP, para resolução de eventuais conflitos relacionados ao uso da plataforma.</p>
+    <div style="background:#e3f2fd;border-radius:9px;padding:12px;margin-top:14px;border-left:4px solid #004E89;">
+      <p style="font-weight:700;color:#004E89;margin-bottom:6px;">DECLARAÇÃO DE CIÊNCIA</p>
+      <p>Ao clicar em "ACEITO OS TERMOS DE USO", o usuário declara que: leu este documento; compreendeu todas as condições; autoriza o rastreamento durante o uso da plataforma; concorda integralmente com as regras aqui descritas.</p>
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="aceitarTermosModal()" style="margin-top:16px;">✅ Li e Aceito os Termos</button>
+</div></div>
+
 <script>
 const GOOGLE_KEY_DEFAULT='AIzaSyB3cRabRR5vQgwtudkGKXMwBI35c1iNGrs';
 // Limpa chave antiga inválida do localStorage para usar a nova padrão
@@ -1018,6 +1079,17 @@ async function fazerCadastro(){
   if(!nome||!emailUser||!senha){showM('reg-msg','Preencha nome, login e senha');return;}
   if(!/^[a-z0-9._-]+$/.test(emailUser)){showM('reg-msg','Login inválido. Use apenas letras minúsculas e números.');return;}
   if(senha.length<6){showM('reg-msg','Senha minimo 6 caracteres');return;}
+  // ⚠️ OBRIGATÓRIO: verificar aceite dos termos
+  if(!$('r-aceite-termos').checked){
+    showM('reg-msg','❌ Você precisa ler e aceitar os Termos de Uso antes de se cadastrar.');
+    $('r-aceite-termos').closest('div').style.border='2px solid #e53935';
+    $('r-aceite-termos').closest('div').style.background='#ffebee';
+    setTimeout(()=>{
+      $('r-aceite-termos').closest('div').style.border='1.5px solid #FFD700';
+      $('r-aceite-termos').closest('div').style.background='#fff8e1';
+    },3000);
+    return;
+  }
   const email=emailUser+'@montarotai.com';
   btn.disabled=true;btn.textContent='Cadastrando...';
   try{
@@ -1031,8 +1103,30 @@ async function fazerCadastro(){
       d.endereco_rua=rua;d.endereco_numero=num;d.endereco_bairro=bairro;d.endereco_cidade=cidade;
       d.codigo_loja=Math.random().toString(36).substring(2,8).toUpperCase();
     }else{d.placa_moto=v('r-placa');d.chave_pix=v('r-pix');}
-    const{error}=await db.from('usuarios').insert([d]);
+    const{error,data:novoUser}=await db.from('usuarios').insert([d]).select().single();
     if(error){showM('reg-msg','Erro: '+error.message);return;}
+    // Registrar aceite do termo no banco
+    const userId=novoUser?novoUser.id:null;
+    const agora=new Date();
+    const aceiteData={
+      usuario_id:userId,
+      usuario_email:email,
+      usuario_nome:nome,
+      usuario_tipo:tipo,
+      versao_termo:'1.0',
+      data_aceite:agora.toISOString(),
+      ip_aceite: await fetch('https://api.ipify.org?format=json').then(r=>r.json()).then(j=>j.ip).catch(()=>'N/D'),
+      pdf_base64: null // será gerado abaixo
+    };
+    // Gerar PDF do termo com jsPDF
+    try{
+      const pdf=await gerarPdfTermo({nome,email,tipo,data:agora});
+      aceiteData.pdf_base64=pdf;
+    }catch(er){console.warn('PDF falhou:',er);}
+    // Salvar no banco (não bloqueia o cadastro se falhar)
+    db.from('termos_aceite').insert([aceiteData]).then(({error:e2})=>{
+      if(e2)console.warn('Erro ao salvar termo:',e2.message);
+    });
     showM('reg-msg','✅ Cadastro realizado! Login: '+email,true);
     setTimeout(()=>{$('l-email').value=email;document.querySelectorAll('.tab')[0].click();},1800);
   }catch(e){showM('reg-msg','Erro: '+e.message);}
@@ -1473,13 +1567,14 @@ async function pullAdm(){
 }
 
 function admTab(aba,btn){
-  ['painel','lojas','entregadores','financeiro','impersonar'].forEach(a=>$('adm-'+a).classList.add('hidden'));
+  ['painel','lojas','entregadores','financeiro','impersonar','termos'].forEach(a=>$('adm-'+a).classList.add('hidden'));
   document.querySelectorAll('.adm-tab').forEach(b=>b.classList.remove('active'));
   $('adm-'+aba).classList.remove('hidden');
   if(btn)btn.classList.add('active');
   if(aba==='lojas')carregarAdmLojas();
   else if(aba==='entregadores')carregarAdmEnt();
   else if(aba==='financeiro')carregarFinAdm();
+  else if(aba==='termos')carregarTermosAdm();
 }
 
 async function carregarAdmLojas(){
@@ -4199,6 +4294,132 @@ async function salvarCfgEnt(){
   const{error}=await db.from('usuarios').update(d).eq('id',U.id);
   if(error){showM('ent-cfg-msg','Erro: '+error.message);return;}
   U={...U,...d};salvarU();$('ent-nome').textContent=d.nome;showM('ent-cfg-msg','Salvo!',true);setTimeout(()=>closeM('cfg-ent'),1500);
+}
+
+// ============================================================
+// TERMOS DE USO
+// ============================================================
+
+function abrirTermos(){
+  openM('termos');
+}
+
+function aceitarTermosModal(){
+  const cb=$('r-aceite-termos');
+  if(cb){cb.checked=true;}
+  closeM('termos');
+}
+
+// Gera PDF do termo de aceite usando jsPDF
+async function gerarPdfTermo({nome,email,tipo,data}){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const dStr=data.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const hStr=data.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const lw=170; // largura útil
+  const ml=20;  // margem esquerda
+  let y=20;
+
+  const linha=(txt,sz,bold,cor,center)=>{
+    doc.setFontSize(sz||11);
+    doc.setFont('helvetica',bold?'bold':'normal');
+    doc.setTextColor(cor||'#000000');
+    if(center){doc.text(txt,105,y,{align:'center'});}
+    else{
+      const linhas=doc.splitTextToSize(txt,lw);
+      doc.text(linhas,ml,y);
+      y+=linhas.length*(sz||11)*0.45+1;
+      return;
+    }
+    y+=(sz||11)*0.45+1;
+  };
+
+  const pular=(n=4)=>{y+=n;};
+  const hr=()=>{doc.setDrawColor('#004E89');doc.setLineWidth(0.4);doc.line(ml,y,ml+lw,y);pular(4);};
+
+  // Cabeçalho
+  linha('TERMO DE USO E CONSENTIMENTO DE RASTREAMENTO',14,true,'#004E89',true);
+  linha('Aplicativo MONTA ROTAÍ',11,false,'#555555',true);
+  pular(2);hr();
+
+  // Identificação do usuário
+  linha('IDENTIFICAÇÃO DO USUÁRIO',10,true,'#004E89');pular(1);
+  linha('Nome: '+nome,10);
+  linha('E-mail: '+email,10);
+  linha('Perfil: '+(tipo==='loja'?'Estabelecimento / Loja':'Entregador'),10);
+  linha('Data do Aceite: '+dStr+' às '+hStr,10);
+  linha('Versão do Termo: 1.0',10);
+  pular(3);hr();
+
+  const sec=(n,t,txt)=>{
+    if(y>250){doc.addPage();y=20;}
+    linha(n+'. '+t,10,true,'#004E89');pular(1);
+    linha(txt,10);pular(3);
+  };
+
+  sec('1','ACEITE ELETRÔNICO','Ao marcar a opção "LI E ACEITO OS TERMOS DE USO" durante o cadastro, o usuário concorda de forma livre, informada e inequívoca com todas as regras deste documento, tendo este aceite validade jurídica equivalente a uma assinatura eletrônica conforme legislação brasileira.');
+  sec('2','OBJETIVO DO APLICATIVO','O MONTA ROTAÍ é uma plataforma tecnológica destinada à organização e agrupamento de rotas de entrega, monitoramento em tempo real de entregadores, controle logístico de entregas, gestão operacional e financeira de pedidos e análise de desempenho. O aplicativo não é responsável por vínculos trabalhistas, contratações ou relações comerciais entre empresas e entregadores.');
+  sec('3','AUTORIZAÇÃO DE RASTREAMENTO','O usuário autoriza expressamente a coleta e utilização de dados de localização em tempo real durante o uso da plataforma, para fins de monitoramento de entregas, otimização de rotas, registro de deslocamento, segurança operacional e auditoria logística. O usuário está ciente de que sua localização poderá ser registrada, armazenada e visualizada por administradores do sistema e empresas vinculadas.');
+  sec('4','RESPONSABILIDADES DO USUÁRIO','O usuário compromete-se a utilizar o aplicativo de forma ética e legal, fornecer informações verdadeiras no cadastro, não tentar violar ou manipular o sistema, não compartilhar acesso com terceiros não autorizados e respeitar as regras operacionais. Fraude, manipulação de rotas ou falsificação de localização resultarão em bloqueio da conta.');
+  sec('5','PROPRIEDADE INTELECTUAL','Todo o sistema MONTA ROTAÍ, incluindo código-fonte, design, funcionalidades, algoritmos de roteirização, estrutura de banco de dados e identidade visual, é propriedade exclusiva da plataforma. É proibida qualquer forma de cópia, engenharia reversa, reprodução, comercialização ou distribuição sem autorização formal.');
+  sec('6','LIMITAÇÃO DE RESPONSABILIDADE','O aplicativo é ferramenta tecnológica de gestão logística, não sendo responsável por atrasos de entrega, conduta de entregadores, problemas operacionais das empresas ou perdas decorrentes de uso indevido do sistema.');
+  sec('7','PRIVACIDADE E DADOS','Os dados coletados (nome, telefone, e-mail, localização, histórico de rotas e registros operacionais) são utilizados exclusivamente para funcionamento da plataforma e gestão logística das operações.');
+  sec('8','BLOQUEIO OU SUSPENSÃO','A plataforma poderá suspender contas que violem estes termos, usem o sistema de forma irregular ou tentem comprometer a segurança da plataforma.');
+  sec('9','ALTERAÇÕES NOS TERMOS','Os termos poderão ser atualizados a qualquer momento, sendo responsabilidade do usuário revisá-los periodicamente.');
+  sec('10','FORO','Fica eleito o foro da comarca de Ribeirão Preto – SP para resolução de eventuais conflitos relacionados ao uso da plataforma.');
+
+  if(y>230){doc.addPage();y=20;}
+  hr();
+  linha('DECLARAÇÃO DE CIÊNCIA E ACEITE',11,true,'#004E89',true);pular(2);
+  linha('Ao aceitar eletronicamente este documento, o usuário declara ter lido, compreendido e concordado integralmente com todas as condições acima, autorizando o rastreamento durante o uso da plataforma.',10,false,'#333');
+  pular(6);
+  linha('Assinatura Eletrônica: '+nome,10,true);
+  linha('Data e Hora: '+dStr+' '+hStr,10);
+  linha('E-mail cadastrado: '+email,10);
+  linha('Versão: 1.0 | Plataforma: MONTA ROTAÍ',10,false,'#888');
+
+  return doc.output('datauristring');
+}
+
+// Admin: carrega lista de aceites e permite download
+async function carregarTermosAdm(){
+  const el=$('adm-termos-lst');
+  el.innerHTML='<p style="color:#aaa;text-align:center;padding:20px;">⏳ Carregando...</p>';
+  const{data,error}=await db.from('termos_aceite').select('*').order('data_aceite',{ascending:false});
+  if(error){el.innerHTML='<p style="color:#e53935;">❌ Erro: '+error.message+'<br><small>Execute o SQL do banco de dados para criar a tabela termos_aceite.</small></p>';return;}
+  if(!data||!data.length){el.innerHTML='<p style="color:#aaa;text-align:center;padding:20px;">Nenhum termo aceito ainda.</p>';return;}
+  el.innerHTML=data.map((t,i)=>{
+    const d=new Date(t.data_aceite);
+    const dStr=d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR');
+    const tipoBadge=t.usuario_tipo==='loja'?'background:#e3f2fd;color:#004E89;':'background:#e8f5e9;color:#2e7d32;';
+    return `
+    <div class="secao" style="margin-bottom:10px;border-left:4px solid #004E89;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+        <div style="flex:1;">
+          <strong style="font-size:14px;">${t.usuario_nome||'-'}</strong>
+          <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:6px;${tipoBadge}">${t.usuario_tipo==='loja'?'LOJA':'ENTREGADOR'}</span><br>
+          <small style="color:#888;line-height:1.8;">
+            📧 ${t.usuario_email||'-'}<br>
+            📅 ${dStr}<br>
+            🌐 IP: ${t.ip_aceite||'N/D'} | Versão: ${t.versao_termo||'1.0'}
+          </small>
+        </div>
+        <div style="flex-shrink:0;">
+          ${t.pdf_base64?`<button class="btn-sm blue" onclick="downloadPdfTermo('${t.id}','${(t.usuario_nome||'usuario').replace(/'/g,'')}')">⬇️ PDF</button>`:'<span style="font-size:10px;color:#aaa;">Sem PDF</span>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Download do PDF de um aceite específico
+async function downloadPdfTermo(id,nome){
+  const{data,error}=await db.from('termos_aceite').select('pdf_base64,usuario_nome,data_aceite').eq('id',id).single();
+  if(error||!data||!data.pdf_base64){alert('PDF não disponível para este registro.');return;}
+  const link=document.createElement('a');
+  link.href=data.pdf_base64;
+  link.download='Termo_'+nome.replace(/\s+/g,'_')+'_'+new Date(data.data_aceite).toLocaleDateString('pt-BR').replace(/\//g,'-')+'.pdf';
+  link.click();
 }
 </script>
 </body>
