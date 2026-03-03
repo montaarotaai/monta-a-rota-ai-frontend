@@ -42,7 +42,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .msg-ok{background:#e8f5e9;color:#2e7d32;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:9px;}
 .msg-warn{background:#fff8e1;color:#e65100;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:9px;}
 .header{color:white;position:relative;}
-.header-bg{width:100%;display:block;}
+/* Altura e recorte da imagem de fundo PADRÃO para todos os perfis (admin, loja, entregador) */
+.header-bg{width:100%;display:block;height:200px;object-fit:cover;object-position:center center;}
 .header-content{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:14px 16px 16px;background:linear-gradient(to bottom,rgba(0,0,0,0) 40%,rgba(0,20,60,0.6) 100%);}
 .header h1{font-size:19px;font-weight:700;}
 .header p{font-size:12px;opacity:.85;margin-top:2px;}
@@ -108,9 +109,9 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 .adm-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
 .adm-tab{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#e0e0e0;color:#555;}
 .adm-tab.active{background:#004E89;color:white;}
-/* Desktop: limita altura do header para não ficar desproporcional em telas largas */
+/* Desktop: centraliza páginas em tela larga */
 @media (min-width: 700px){
-  .header-bg{max-height:220px;object-fit:cover;object-position:center top;}
+  .header-bg{height:220px;}
   #pg-admin, #pg-loja, #pg-entregador{max-width:520px;margin:0 auto;}
 }
 </style>
@@ -146,7 +147,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <div style="display:flex;align-items:center;gap:0;">
           <input type="text" id="r-email-user" placeholder="seunome" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._-]/g,'')"
             style="flex:1;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px 0 0 8px;font-size:14px;border-right:none;">
-          <span style="background:#f5f5f5;border:1.5px solid #e0e0e0;border-left:none;padding:10px 10px;border-radius:0 8px 8px 0;font-size:13px;color:#666;white-space:nowrap;">@montarotaai.com</span>
+          <span style="background:#f5f5f5;border:1.5px solid #e0e0e0;border-left:none;padding:10px 10px;border-radius:0 8px 8px 0;font-size:13px;color:#666;white-space:nowrap;">@montarotai.com</span>
         </div>
         <input type="hidden" id="r-email">
       </div>
@@ -725,7 +726,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <h2 style="margin-bottom:14px;">✏️ Editar Loja</h2>
   <input type="hidden" id="adm-edit-loja-id">
   <div class="fg"><label>Nome da Loja</label><input type="text" id="adm-edit-nome-loja"></div>
-  <div class="fg"><label>Email (login do sistema)</label><input type="email" id="adm-edit-email" placeholder="loja@montarotaai.com"></div>
+  <div class="fg"><label>Email (login do sistema)</label><input type="email" id="adm-edit-email" placeholder="loja@montarotai.com"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="adm-edit-tel"></div>
   <div class="fg"><label>CNPJ</label><input type="text" id="adm-edit-cnpj"></div>
   <div class="g2"><div class="fg"><label>Rua</label><input type="text" id="adm-edit-rua"></div><div class="fg"><label>Número</label><input type="text" id="adm-edit-nend"></div></div>
@@ -742,7 +743,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <h2 style="margin-bottom:14px;">✏️ Editar Entregador</h2>
   <input type="hidden" id="adm-edit-ent-id">
   <div class="fg"><label>Nome Completo</label><input type="text" id="adm-edit-ent-nome" oninput="this.value=this.value.toUpperCase()"></div>
-  <div class="fg"><label>Email (login do sistema)</label><input type="email" id="adm-edit-ent-email" placeholder="entregador@montarotaai.com"></div>
+  <div class="fg"><label>Email (login do sistema)</label><input type="email" id="adm-edit-ent-email" placeholder="entregador@montarotai.com"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="adm-edit-ent-tel" placeholder="(16) 99999-9999"></div>
   <div class="g2b">
     <div class="fg"><label>Placa da Moto</label><input type="text" id="adm-edit-ent-placa" placeholder="ABC-1234" oninput="this.value=this.value.toUpperCase()"></div>
@@ -1017,7 +1018,7 @@ async function fazerCadastro(){
   if(!nome||!emailUser||!senha){showM('reg-msg','Preencha nome, login e senha');return;}
   if(!/^[a-z0-9._-]+$/.test(emailUser)){showM('reg-msg','Login inválido. Use apenas letras minúsculas e números.');return;}
   if(senha.length<6){showM('reg-msg','Senha minimo 6 caracteres');return;}
-  const email=emailUser+'@montarotaai.com';
+  const email=emailUser+'@montarotai.com';
   btn.disabled=true;btn.textContent='Cadastrando...';
   try{
     const{data:ex}=await db.from('usuarios').select('id').eq('email',email).single();
