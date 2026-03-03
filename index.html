@@ -736,7 +736,25 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="btn btn-primary" onclick="salvarEditLojaAdm()">✅ Salvar Alterações</button>
 </div></div>
 
-<!-- Config Entregador -->
+<!-- Editar Entregador (pelo Admin) -->
+<div id="m-adm-edit-ent" class="modal"><div class="modal-box">
+  <button class="modal-close" onclick="closeM('adm-edit-ent')">&times;</button>
+  <h2 style="margin-bottom:14px;">✏️ Editar Entregador</h2>
+  <input type="hidden" id="adm-edit-ent-id">
+  <div class="fg"><label>Nome Completo</label><input type="text" id="adm-edit-ent-nome" oninput="this.value=this.value.toUpperCase()"></div>
+  <div class="fg"><label>Email (login do sistema)</label><input type="email" id="adm-edit-ent-email" placeholder="entregador@montarotaai.com"></div>
+  <div class="fg"><label>Telefone</label><input type="tel" id="adm-edit-ent-tel" placeholder="(16) 99999-9999"></div>
+  <div class="g2b">
+    <div class="fg"><label>Placa da Moto</label><input type="text" id="adm-edit-ent-placa" placeholder="ABC-1234" oninput="this.value=this.value.toUpperCase()"></div>
+    <div class="fg"><label>Chave Pix</label><input type="text" id="adm-edit-ent-pix"></div>
+  </div>
+  <div class="fg"><label>Observações</label><input type="text" id="adm-edit-ent-obs" placeholder="Anotações internas"></div>
+  <div class="fg"><label>Nova Senha (em branco = não alterar)</label><input type="password" id="adm-edit-ent-senha" placeholder="Mínimo 6 caracteres"></div>
+  <div id="adm-edit-ent-msg" style="margin-top:6px;"></div>
+  <button class="btn btn-primary" onclick="salvarEditEntAdm()">✅ Salvar Alterações</button>
+</div></div>
+
+<!-- Config Entregador (pelo próprio) -->
 <div id="m-cfg-ent" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('cfg-ent')">&times;</button>
   <h2 style="margin-bottom:13px;">&#9881; Meus Dados</h2>
@@ -1356,6 +1374,43 @@ async function salvarEditLojaAdm(){
   setTimeout(()=>{closeM('adm-edit-loja');carregarAdmLojas();},1500);
 }
 
+async function abrirEditEntAdm(id){
+  const{data:e}=await db.from('usuarios').select('*').eq('id',id).single();
+  if(!e)return;
+  $('adm-edit-ent-id').value=id;
+  $('adm-edit-ent-nome').value=e.nome||'';
+  $('adm-edit-ent-email').value=e.email||'';
+  $('adm-edit-ent-tel').value=e.telefone||'';
+  $('adm-edit-ent-placa').value=e.placa_moto||'';
+  $('adm-edit-ent-pix').value=e.chave_pix||'';
+  $('adm-edit-ent-obs').value=e.observacoes||'';
+  $('adm-edit-ent-senha').value='';
+  clearM('adm-edit-ent-msg');
+  openM('adm-edit-ent');
+}
+
+async function salvarEditEntAdm(){
+  const id=$('adm-edit-ent-id').value;if(!id)return;
+  const d={
+    nome:($('adm-edit-ent-nome').value||'').trim(),
+    telefone:($('adm-edit-ent-tel').value||'').trim(),
+    placa_moto:($('adm-edit-ent-placa').value||'').trim(),
+    chave_pix:($('adm-edit-ent-pix').value||'').trim(),
+    observacoes:($('adm-edit-ent-obs').value||'').trim()||null,
+  };
+  const novoEmail=($('adm-edit-ent-email').value||'').trim();
+  if(novoEmail)d.email=novoEmail;
+  const novaSenha=($('adm-edit-ent-senha').value||'').trim();
+  if(novaSenha.length>=6)d.senha_hash=novaSenha;
+  const btn=document.querySelector('#m-adm-edit-ent .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  const{error}=await db.from('usuarios').update(d).eq('id',id);
+  if(btn){btn.disabled=false;btn.textContent='✅ Salvar Alterações';}
+  if(error){showM('adm-edit-ent-msg','❌ Erro: '+error.message,false);return;}
+  showM('adm-edit-ent-msg','✅ Entregador atualizado com sucesso!',true);
+  setTimeout(()=>{closeM('adm-edit-ent');carregarAdmEnt();},1500);
+}
+
 async function carregarDadosAdmin(){
   const{data:e}=await db.from('usuarios').select('id').eq('tipo','entregador')
   const{data:l}=await db.from('usuarios').select('id').eq('tipo','loja')
@@ -1450,14 +1505,22 @@ async function carregarAdmLojas(){
 async function carregarAdmEnt(){
   const el=$('adm-ent-lst');el.innerHTML='<p>Carregando...</p>';
   const{data}=await db.from('usuarios').select('*').eq('tipo','entregador');
-  if(!data||!data.length){el.innerHTML='<p>Nenhum entregador</p>';return;}
+  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">Nenhum entregador cadastrado</p>';return;}
   el.innerHTML=data.map(e=>`
-    <div class="secao">
-      <div style="display:flex;justify-content:space-between;">
-        <div><strong>${e.nome}</strong> <span class="badge ${e.online?'b-online':'b-offline'}">${e.online?'Online':'Offline'}</span><br>
-        <small style="color:#888;">Tel: ${e.telefone||'-'} | Placa: ${e.placa_moto||'-'} | Pix: ${e.chave_pix||'-'}</small></div>
-        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;">
+    <div class="secao" style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <strong style="font-size:14px;">${e.nome}</strong>
+          <span class="badge ${e.online?'b-online':'b-offline'}" style="margin-left:5px;">${e.online?'Online':'Offline'}</span><br>
+          <small style="color:#888;line-height:1.7;">
+            📧 ${e.email||'-'}<br>
+            📞 ${e.telefone||'-'} | 🏍️ ${e.placa_moto||'-'}<br>
+            💰 Pix: ${e.chave_pix||'-'}
+          </small>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0;">
           <span class="badge b-${e.status}">${e.status}</span>
+          <button class="btn-sm orange" onclick="abrirEditEntAdm('${e.id}')">✏️ Editar</button>
           <button class="btn-sm ${e.status==='ativo'?'red':'green'}" onclick="toggleStAdm('${e.id}','${e.status}','ent')">${e.status==='ativo'?'Bloquear':'Ativar'}</button>
         </div>
       </div>
@@ -3216,15 +3279,42 @@ function salvarGoogleKey(){
 }
 async function salvarCfgLj(){
   const rua=v('cfg-rua'),num=v('cfg-nend'),bairro=v('cfg-bairro'),cidade=v('cfg-cidade')||'Ribeirao Preto',comp=v('cfg-comp');
-  const d={nome_loja:v('cfg-nlj'),telefone:v('cfg-tel'),cnpj:v('cfg-cnpj'),cidade,
+  const d={
+    nome_loja:v('cfg-nlj'),
+    nome:v('cfg-nlj'),
+    telefone:v('cfg-tel'),
+    cnpj:v('cfg-cnpj'),
+    cidade,
     endereco:fEnd(rua,num,bairro,cidade,comp),
-    endereco_rua:rua,endereco_numero:num,endereco_bairro:bairro,endereco_cidade:cidade,endereco_complemento:comp,
-    horario_abertura:v('cfg-ab')||null,horario_fechamento:v('cfg-fch')||null};
+    endereco_rua:rua,
+    endereco_numero:num,
+    endereco_bairro:bairro,
+    endereco_cidade:cidade,
+    endereco_complemento:comp,
+    horario_abertura:v('cfg-ab')||null,
+    horario_fechamento:v('cfg-fch')||null
+  };
   const ns=v('cfg-senha');if(ns.length>=6)d.senha_hash=ns;
-  const{error}=await db.from('usuarios').update(d).eq('id',U.id);
-  if(error){showM('cfg-lj-msg','Erro: '+error.message);return;}
+  const btn=document.querySelector('#m-cfg-lj .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  let{error}=await db.from('usuarios').update(d).eq('id',U.id);
+  // Se falhou por colunas TIME ainda nao existirem, tenta sem horarios
+  if(error&&(error.message.includes('horario_abertura')||error.message.includes('horario_fechamento'))){
+    const d2={...d};delete d2.horario_abertura;delete d2.horario_fechamento;
+    const r2=await db.from('usuarios').update(d2).eq('id',U.id);
+    error=r2.error;
+    if(!r2.error)showM('cfg-lj-msg','✅ Salvo! (execute o SQL do banco para habilitar horários)',true);
+  }
+  if(btn){btn.disabled=false;btn.textContent='Salvar';}
+  if(error){showM('cfg-lj-msg','❌ Erro: '+error.message,false);return;}
   U={...U,...d};salvarU();
-  $('loja-nome').textContent=d.nome_loja||U.nome;showM('cfg-lj-msg','Salvo!',true);setTimeout(()=>closeM('cfg-lj'),1500);
+  // Atualiza geocode do endereço novo
+  if(rua||bairro){
+    geocode(d.endereco).then(g=>{if(g){lojaGeoCache=g;db.from('usuarios').update({loja_lat:g.lat,loja_lng:g.lng}).eq('id',U.id);}});
+  }
+  $('loja-nome').textContent=d.nome_loja||U.nome;
+  showM('cfg-lj-msg','✅ Dados salvos com sucesso!',true);
+  setTimeout(()=>closeM('cfg-lj'),1500);
 }
 
 // ============ ENTREGADOR ============
