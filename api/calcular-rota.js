@@ -1,189 +1,131 @@
 // ═══════════════════════════════════════════════════════════════
-//  MONTA ROTAÍ — API Serverless: /api/calcular-rota
-//  © 2025 Monta Rotaí. Sistema Proprietário.
+// MONTA ROTAÍ — API Serverless
 // ═══════════════════════════════════════════════════════════════
 
-const { createClient } = require('@supabase/supabase-js');
+const { createClient } = require('@supabase/supabase-js')
 
-const SB_URL = process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SB_URL = process.env.SUPABASE_URL
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY
 
-
-// ─────────────────────────────────────────────────
-// DISTÂNCIA
-// ─────────────────────────────────────────────────
+// ─────────────────────────────────────────
+// DISTÂNCIA HAVERSINE
+// ─────────────────────────────────────────
 
 function distKm(lat1, lng1, lat2, lng2) {
 
-  const R = 6371;
+  const R = 6371
 
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
 
   const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) *
-    Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng / 2) ** 2;
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1*Math.PI/180) *
+    Math.cos(lat2*Math.PI/180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2)
 
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 
+  return R * c
 }
 
-function angleDeg(lat1, lng1, lat2, lng2) {
-  return Math.atan2(lng2 - lng1, lat2 - lat1) * 180 / Math.PI;
-}
-
-
-// ─────────────────────────────────────────────────
+// ─────────────────────────────────────────
 // NORMALIZA ENDEREÇO
-// ─────────────────────────────────────────────────
+// ─────────────────────────────────────────
 
 function chaveEnd(end) {
 
-  if (!end || !end.trim()) return '_sem_' + Math.random();
+  if(!end) return '_'
 
-  let s = end.toLowerCase()
+  let s = end
+    .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(avenida|avenue|av\.?|rua|r\.?|alameda|al\.?|travessa|tv\.?|estrada|est\.?|praca|pca\.?|rodovia|rod\.?|viela|vila|v\.?)\b/g, ' ')
-    .replace(/\b(apto?|apartamento|ap\.?|bloco|bl\.?|torre|t\.?|sala|sl\.?|casa|lote|lt\.?|cond|condominio|kit|subsetor|setor|conjunto|cj\.?)\b.*/,'')
-    .replace(/[-,]\s*[a-z\s]{3,}$/, '')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim()
 
-  const m = s.match(/([a-z][a-z0-9\s]{2,}?)\s+(\d{2,5})\b/);
-
-  if (m) {
-
-    const palavras = m[1].trim().split(/\s+/);
-    const filtradas = palavras.filter(p => p.length > 2);
-
-    return (filtradas.slice(-3).join(' ') + ' ' + m[2]).trim();
-
-  }
-
-  return s.substring(0, 40);
-
+  return s.substring(0,40)
 }
 
+// ─────────────────────────────────────────
+// GEOCODE
+// ─────────────────────────────────────────
 
-// ─────────────────────────────────────────────────
-// GEOCODING
-// ─────────────────────────────────────────────────
+async function geocode(endereco){
 
-async function geocode(endereco) {
+  try{
 
-  if (!endereco) return null;
+    const url =
+      "https://nominatim.openstreetmap.org/search?format=json&limit=1&q="
+      + encodeURIComponent(endereco + ", Ribeirao Preto SP Brasil")
 
-  try {
+    const r = await fetch(url)
 
-    const q = encodeURIComponent(endereco + ', Ribeirao Preto, SP, Brasil');
+    const j = await r.json()
 
-    const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
-      { headers: { 'User-Agent': 'MontaRotai/1.0' } }
-    );
-
-    const d = await r.json();
-
-    if (d && d[0]) {
+    if(j && j[0]){
 
       return {
-        lat: parseFloat(d[0].lat),
-        lng: parseFloat(d[0].lon)
-      };
+        lat: parseFloat(j[0].lat),
+        lng: parseFloat(j[0].lon)
+      }
 
     }
 
-  } catch (e) {}
+  }catch(e){}
 
-  return null;
-
-}
-
-
-// ─────────────────────────────────────────────────
-// VALOR CORRIDA
-// ─────────────────────────────────────────────────
-
-function calcularValorCorrida(distancia, taxaTipo, taxaBase, kmLimite, taxaExcedente, taxaFixoBase) {
-
-  if (taxaTipo === 'por_km') {
-
-    if (distancia <= kmLimite) return taxaBase;
-
-    return taxaBase + (distancia - kmLimite) * taxaExcedente;
-
-  }
-
-  if (taxaTipo === 'fixo_mais_km') {
-
-    if (distancia <= kmLimite) return taxaFixoBase + taxaBase;
-
-    return taxaFixoBase + taxaBase + (distancia - kmLimite) * taxaExcedente;
-
-  }
-
-  return taxaBase;
+  return null
 
 }
 
-
-// ─────────────────────────────────────────────────
+// ─────────────────────────────────────────
 // ALGORITMO DE ROTA
-// ─────────────────────────────────────────────────
+// ─────────────────────────────────────────
 
-async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlobal, taxaConfig }) {
+async function otimizarRota({pedidos, entregadores, lojaLat, lojaLng}){
 
-  const RP_LAT = -21.1775;
-  const RP_LNG = -47.8103;
+  const db = createClient(SB_URL, SB_KEY)
 
-  const baseLat = lojaLat || RP_LAT;
-  const baseLng = lojaLng || RP_LNG;
+  const mapa = {}
 
+  for(const p of pedidos){
 
-  const mapaEnds = {};
+    const key = chaveEnd(p.endereco_entrega)
 
-  pedidos.forEach(p => {
+    if(!mapa[key]) mapa[key] = []
 
-    const k = chaveEnd(p.endereco_entrega);
+    mapa[key].push(p)
 
-    if (!mapaEnds[k]) mapaEnds[k] = [];
+  }
 
-    mapaEnds[k].push(p);
+  const paradas = []
 
-  });
+  for(const grupo of Object.values(mapa)){
 
-  const paradaList = Object.values(mapaEnds);
+    const rep = grupo[0]
 
-  const db = createClient(SB_URL, SB_KEY);
+    let lat = parseFloat(rep.lat_entrega || 0)
+    let lng = parseFloat(rep.lng_entrega || 0)
 
-  const paradasGeo = [];
+    if(!lat || !lng){
 
+      const g = await geocode(rep.endereco_entrega)
 
-  for (const grupo of paradaList) {
+      if(g){
 
-    const rep = grupo[0];
+        lat = g.lat
+        lng = g.lng
 
-    let lat = parseFloat(rep.lat_entrega || 0);
-    let lng = parseFloat(rep.lng_entrega || 0);
+        for(const p of grupo){
 
-    if (!lat || !lng) {
-
-      const g = await geocode(rep.endereco_entrega);
-
-      if (g) {
-
-        lat = g.lat;
-        lng = g.lng;
-
-        for (const p of grupo) {
-
-          await db.from('entregas')
-          .update({ lat_entrega: lat, lng_entrega: lng })
-          .eq('id', p.id);
+          await db
+          .from("entregas")
+          .update({
+            lat_entrega: lat,
+            lng_entrega: lng
+          })
+          .eq("id", p.id)
 
         }
 
@@ -191,178 +133,184 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
 
     }
 
-    const dist = distKm(baseLat, baseLng, lat, lng);
-    const ang = ((angleDeg(baseLat, baseLng, lat, lng) % 360 + 360) % 360);
+    const dist = distKm(lojaLat, lojaLng, lat, lng)
 
-    paradasGeo.push({
-      ids: grupo.map(p => p.id),
-      labels: grupo.map(p => p.numero_pedido ? '#' + p.numero_pedido : p.cliente_nome || 'Entrega'),
-      end: rep.endereco_entrega,
+    paradas.push({
       lat,
       lng,
       dist,
-      ang,
-      qtdPeds: grupo.length
-    });
+      pedidos: grupo
+    })
 
   }
 
+  // ordenar pela distância da loja
 
-  // CLUSTERIZAÇÃO ANGULAR
+  paradas.sort((a,b)=>a.dist-b.dist)
 
-  paradasGeo.sort((a, b) => a.ang - b.ang);
+  const grupos = entregadores.map(e=>({
+    entId:e.id,
+    entNome:e.nome,
+    paradas:[]
+  }))
 
-  const grupos_ent = entregadores.map(ent => ({
-    entId: ent.id,
-    entNome: ent.nome,
-    paradas: []
-  }));
+  let idx = 0
 
-  const clusterSize = Math.ceil(paradasGeo.length / grupos_ent.length);
+  for(const p of paradas){
 
-  const clusters = [];
+    grupos[idx].paradas.push(p)
 
-  for (let i = 0; i < paradasGeo.length; i += clusterSize) {
-    clusters.push(paradasGeo.slice(i, i + clusterSize));
+    idx++
+
+    if(idx>=grupos.length) idx=0
+
   }
 
-  clusters.forEach((cluster, i) => {
+  // ordenar rota interna
 
-    if (!grupos_ent[i]) return;
+  for(const g of grupos){
 
-    grupos_ent[i].paradas = cluster;
+    let latAtual = lojaLat
+    let lngAtual = lojaLng
 
-  });
+    const ordenado = []
+    const resto = [...g.paradas]
 
+    while(resto.length){
 
-  // NEAREST DENTRO DO CLUSTER
+      let melhor = 0
+      let melhorDist = 9999
 
-  grupos_ent.forEach(g => {
+      resto.forEach((p,i)=>{
 
-    const ordenadas = [];
-    const restantes = [...g.paradas];
+        const d = distKm(latAtual,lngAtual,p.lat,p.lng)
 
-    let latAtual = baseLat;
-    let lngAtual = baseLng;
-
-    while (restantes.length > 0) {
-
-      let melhor = 0;
-      let melhorDist = Infinity;
-
-      restantes.forEach((p, i) => {
-
-        const d = distKm(latAtual, lngAtual, p.lat, p.lng);
-
-        if (d < melhorDist) {
-
-          melhorDist = d;
-          melhor = i;
-
+        if(d<melhorDist){
+          melhorDist=d
+          melhor=i
         }
 
-      });
+      })
 
-      const proxima = restantes.splice(melhor, 1)[0];
+      const next = resto.splice(melhor,1)[0]
 
-      ordenadas.push(proxima);
+      ordenado.push(next)
 
-      latAtual = proxima.lat;
-      lngAtual = proxima.lng;
+      latAtual = next.lat
+      lngAtual = next.lng
 
     }
 
-    g.paradas = ordenadas;
+    g.paradas = ordenado
 
-  });
+  }
 
+  const resultado = []
 
-  const resultado = grupos_ent
-  .filter(g => g.paradas.length > 0)
-  .map(g => ({
+  for(const g of grupos){
 
-    entId: g.entId,
-    entNome: g.entNome,
-    pedidos: g.paradas,
-    totalParadas: g.paradas.length
+    const pedidosFlat = []
 
-  }));
+    for(const parada of g.paradas){
 
+      for(const p of parada.pedidos){
+
+        pedidosFlat.push({
+          id:p.id,
+          num:p.numero_pedido,
+          cliente:p.cliente_nome,
+          end:p.endereco_entrega,
+          dist:parada.dist
+        })
+
+      }
+
+    }
+
+    resultado.push({
+      entId:g.entId,
+      entNome:g.entNome,
+      pedidos:pedidosFlat,
+      totalParadas:g.paradas.length,
+      totalPedidos:pedidosFlat.length
+    })
+
+  }
 
   return {
-
-    grupos: resultado,
-    totalPedidos: pedidos.length,
-    totalParadas: paradasGeo.length
-
-  };
+    grupos:resultado,
+    totalPedidos:pedidos.length
+  }
 
 }
 
+// ─────────────────────────────────────────
+// API HANDLER
+// ─────────────────────────────────────────
 
-// ─────────────────────────────────────────────────
-// HANDLER API
-// ─────────────────────────────────────────────────
+module.exports = async function handler(req,res){
 
-module.exports = async function handler(req, res) {
+  const origin = req.headers.origin || ""
 
-  const origin = req.headers.origin || '';
+  const allowed = [
+    "https://montarotai.vercel.app",
+    "https://monta-a-rota-ai-frontend.vercel.app",
+    "http://localhost:3000"
+  ]
 
-  const allowedOrigins = [
-    'https://monta-a-rota-ai-frontend.vercel.app',
-    'https://montarotai.vercel.app',
-    'http://localhost:3000'
-  ];
+  if(!allowed.includes(origin))
+    return res.status(403).json({error:"origem bloqueada"})
 
-  if (!allowedOrigins.includes(origin)) {
-    return res.status(403).json({ error: 'Acesso não autorizado' });
-  }
+  res.setHeader("Access-Control-Allow-Origin",origin)
+  res.setHeader("Access-Control-Allow-Methods","POST,OPTIONS")
+  res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization")
 
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if(req.method==="OPTIONS")
+    return res.status(200).end()
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if(req.method!=="POST")
+    return res.status(405).json({error:"method"})
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
+  try{
 
-  try {
+    const {lojaId,distribuicao} = req.body
 
-    const { lojaId, limiteGlobal, distribuicao } = req.body;
+    const db = createClient(SB_URL,SB_KEY)
 
-    if (!lojaId) {
-      return res.status(400).json({ error: 'lojaId obrigatório' });
-    }
+    const {data:user} = await db
+    .from("usuarios")
+    .select("loja_lat,loja_lng")
+    .eq("id",lojaId)
+    .single()
 
-    const db = createClient(SB_URL, SB_KEY);
+    const {data:pedidos} = await db
+    .from("entregas")
+    .select("*")
+    .eq("loja_id",lojaId)
+    .eq("status","pendente")
 
-    const { data: pedidos } = await db
-      .from('entregas')
-      .select('*')
-      .eq('loja_id', lojaId)
-      .eq('status', 'pendente');
-
-    const entregadores = (distribuicao || []).map(([id, v]) => ({
-      id,
-      nome: v.nome
-    }));
+    const entregadores =
+      (distribuicao||[])
+      .map(([id,v])=>({
+        id,
+        nome:v.nome
+      }))
 
     const resultado = await otimizarRota({
       pedidos,
       entregadores,
-      limiteGlobal
-    });
+      lojaLat:user.loja_lat,
+      lojaLng:user.loja_lng
+    })
 
-    return res.status(200).json(resultado);
+    return res.status(200).json(resultado)
 
-  } catch (err) {
+  }catch(err){
 
-    console.error('[calcular-rota]', err);
+    console.error(err)
 
-    return res.status(500).json({ error: 'Erro interno no servidor' });
+    return res.status(500).json({error:"server"})
 
   }
 
-};
+}
