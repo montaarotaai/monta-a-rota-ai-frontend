@@ -1329,11 +1329,12 @@ async function abrirEditLojaAdm(id){
   $('adm-edit-email').value=l.email||'';
   $('adm-edit-tel').value=l.telefone||'';
   $('adm-edit-cnpj').value=l.cnpj||'';
-  $('adm-edit-rua').value=l.rua||'';
-  $('adm-edit-nend').value=l.numero_endereco||'';
-  $('adm-edit-bairro').value=l.bairro||'';
-  $('adm-edit-cidade').value=l.cidade||'';
-  $('adm-edit-comp').value=l.complemento||'';
+  // Campos de endereço — usa os nomes corretos das colunas
+  $('adm-edit-rua').value=l.endereco_rua||'';
+  $('adm-edit-nend').value=l.endereco_numero||'';
+  $('adm-edit-bairro').value=l.endereco_bairro||'';
+  $('adm-edit-cidade').value=l.endereco_cidade||l.cidade||'Ribeirao Preto';
+  $('adm-edit-comp').value=l.endereco_complemento||'';
   $('adm-edit-senha').value='';
   clearM('adm-edit-loja-msg');
   openM('adm-edit-loja');
@@ -1823,9 +1824,17 @@ async function toggleStAdm(id,st,tipo){
   if(tipo==='loja')carregarAdmLojas();else carregarAdmEnt();
 }
 async function saveTaxAdm(id){
-  const val=parseFloat($('tx-'+id).value);
-  await db.from('usuarios').update({taxa_sistema:val}).eq('id',id);
-  const m=$('tx-msg-'+id);m.textContent='Salvo!';setTimeout(()=>{m.textContent='';},2000);
+  const inp=$('tx-'+id);
+  const val=parseFloat(inp.value);
+  if(isNaN(val)||val<0){const m=$('tx-msg-'+id);m.style.color='#e53935';m.textContent='❌ Valor inválido';return;}
+  const{error}=await db.from('usuarios').update({taxa_sistema:val}).eq('id',id);
+  const m=$('tx-msg-'+id);
+  if(error){m.style.color='#e53935';m.textContent='❌ Erro: '+error.message;}
+  else{
+    m.style.color='#27ae60';m.textContent='✅ Taxa salva: R$ '+val.toFixed(2);
+    inp.value=val.toFixed(2);
+    setTimeout(()=>{m.textContent='';},3000);
+  }
 }
 
 async function carregarAdmImpersonar(){
