@@ -1,35 +1,33 @@
 // ═══════════════════════════════════════════════════════════════
 //  MONTA ROTAÍ — API Serverless: /api/calcular-rota
-//  © 2025 Monta Rotaí. Sistema Proprietário. Todos os direitos
-//  reservados. Leis 9.609/98 e 9.610/98.
-//  ─────────────────────────────────────────────────────────────
-//  Este arquivo roda NO SERVIDOR (Vercel Serverless Function).
-//  O algoritmo de otimização de rota nunca chega ao navegador.
+//  © 2025 Monta Rotaí. Sistema Proprietário.
 // ═══════════════════════════════════════════════════════════════
 
 const { createClient } = require('@supabase/supabase-js');
 
-// ── Credenciais (variáveis de ambiente na Vercel) ──
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 
 // ─────────────────────────────────────────────────
-// FUNÇÕES MATEMÁTICAS
+// DISTÂNCIA
 // ─────────────────────────────────────────────────
 
 function distKm(lat1, lng1, lat2, lng2) {
+
   const R = 6371;
+
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
 
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLng / 2) ** 2;
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
 }
 
 function angleDeg(lat1, lng1, lat2, lng2) {
@@ -45,8 +43,7 @@ function chaveEnd(end) {
 
   if (!end || !end.trim()) return '_sem_' + Math.random();
 
-  let s = end
-    .toLowerCase()
+  let s = end.toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\b(avenida|avenue|av\.?|rua|r\.?|alameda|al\.?|travessa|tv\.?|estrada|est\.?|praca|pca\.?|rodovia|rod\.?|viela|vila|v\.?)\b/g, ' ')
@@ -59,12 +56,16 @@ function chaveEnd(end) {
   const m = s.match(/([a-z][a-z0-9\s]{2,}?)\s+(\d{2,5})\b/);
 
   if (m) {
+
     const palavras = m[1].trim().split(/\s+/);
     const filtradas = palavras.filter(p => p.length > 2);
+
     return (filtradas.slice(-3).join(' ') + ' ' + m[2]).trim();
+
   }
 
   return s.substring(0, 40);
+
 }
 
 
@@ -82,61 +83,51 @@ async function geocode(endereco) {
 
     const r = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
-      {
-        headers: {
-          'User-Agent': 'MontaRotai/1.0 (admin@montarotai.com)'
-        }
-      }
+      { headers: { 'User-Agent': 'MontaRotai/1.0' } }
     );
 
     const d = await r.json();
 
     if (d && d[0]) {
+
       return {
         lat: parseFloat(d[0].lat),
         lng: parseFloat(d[0].lon)
       };
+
     }
 
   } catch (e) {}
 
   return null;
+
 }
 
 
 // ─────────────────────────────────────────────────
-// CÁLCULO DE VALOR
+// VALOR CORRIDA
 // ─────────────────────────────────────────────────
 
-function calcularValorCorrida(
-  distancia,
-  taxaTipo,
-  taxaBase,
-  kmLimite,
-  taxaExcedente,
-  taxaFixoBase
-) {
+function calcularValorCorrida(distancia, taxaTipo, taxaBase, kmLimite, taxaExcedente, taxaFixoBase) {
 
   if (taxaTipo === 'por_km') {
 
     if (distancia <= kmLimite) return taxaBase;
 
     return taxaBase + (distancia - kmLimite) * taxaExcedente;
+
   }
 
   if (taxaTipo === 'fixo_mais_km') {
 
-    if (distancia <= kmLimite)
-      return taxaFixoBase + taxaBase;
+    if (distancia <= kmLimite) return taxaFixoBase + taxaBase;
 
-    return (
-      taxaFixoBase +
-      taxaBase +
-      (distancia - kmLimite) * taxaExcedente
-    );
+    return taxaFixoBase + taxaBase + (distancia - kmLimite) * taxaExcedente;
+
   }
 
   return taxaBase;
+
 }
 
 
@@ -144,14 +135,7 @@ function calcularValorCorrida(
 // ALGORITMO DE ROTA
 // ─────────────────────────────────────────────────
 
-async function otimizarRota({
-  pedidos,
-  entregadores,
-  lojaLat,
-  lojaLng,
-  limiteGlobal,
-  taxaConfig
-}) {
+async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlobal, taxaConfig }) {
 
   const RP_LAT = -21.1775;
   const RP_LNG = -47.8103;
@@ -186,8 +170,6 @@ async function otimizarRota({
     let lat = parseFloat(rep.lat_entrega || 0);
     let lng = parseFloat(rep.lng_entrega || 0);
 
-    let geocodeFailed = false;
-
     if (!lat || !lng) {
 
       const g = await geocode(rep.endereco_entrega);
@@ -199,197 +181,129 @@ async function otimizarRota({
 
         for (const p of grupo) {
 
-          await db
-            .from('entregas')
-            .update({
-              lat_entrega: lat,
-              lng_entrega: lng
-            })
-            .eq('id', p.id);
+          await db.from('entregas')
+          .update({ lat_entrega: lat, lng_entrega: lng })
+          .eq('id', p.id);
 
         }
-
-      } else {
-
-        geocodeFailed = true;
-        lat = 0;
-        lng = 0;
 
       }
 
     }
 
-    const dist = geocodeFailed
-      ? 0
-      : distKm(baseLat, baseLng, lat, lng);
-
-    const ang = geocodeFailed
-      ? 0
-      : ((angleDeg(baseLat, baseLng, lat, lng) % 360 + 360) % 360);
+    const dist = distKm(baseLat, baseLng, lat, lng);
+    const ang = ((angleDeg(baseLat, baseLng, lat, lng) % 360 + 360) % 360);
 
     paradasGeo.push({
       ids: grupo.map(p => p.id),
-      labels: grupo.map(p =>
-        p.numero_pedido
-          ? '#' + p.numero_pedido
-          : p.cliente_nome || 'Entrega'
-      ),
-      end: rep.endereco_entrega || '',
+      labels: grupo.map(p => p.numero_pedido ? '#' + p.numero_pedido : p.cliente_nome || 'Entrega'),
+      end: rep.endereco_entrega,
       lat,
       lng,
       dist,
       ang,
-      geocodeFailed,
       qtdPeds: grupo.length
     });
 
   }
 
 
-  paradasGeo.sort((a, b) => a.dist - b.dist);
+  // ───────── CLUSTERIZAÇÃO ANGULAR ─────────
 
-
-  const limite = limiteGlobal || 10;
+  paradasGeo.sort((a, b) => a.ang - b.ang);
 
   const grupos_ent = entregadores.map(ent => ({
     entId: ent.id,
     entNome: ent.nome,
-    limite,
-    paradas: [],
-    totalParadas: 0,
-    ultimaLat: baseLat,
-    ultimaLng: baseLng
+    paradas: []
   }));
 
+  const clusterSize = Math.ceil(paradasGeo.length / grupos_ent.length);
 
-  const naoAtribuidas = [...paradasGeo];
+  const clusters = [];
 
-  let progresso = true;
+  for (let i = 0; i < paradasGeo.length; i += clusterSize) {
+
+    clusters.push(paradasGeo.slice(i, i + clusterSize));
+
+  }
+
+  clusters.forEach((cluster, i) => {
+
+    if (!grupos_ent[i]) return;
+
+    grupos_ent[i].paradas = cluster;
+
+  });
 
 
-  while (progresso && naoAtribuidas.length > 0) {
+  // ───────── NEAREST DENTRO DO CLUSTER ─────────
 
-    progresso = false;
+  grupos_ent.forEach(g => {
 
-    for (const g of grupos_ent) {
+    const ordenadas = [];
+    const restantes = [...g.paradas];
 
-      if (g.totalParadas >= g.limite || !naoAtribuidas.length)
-        continue;
+    let latAtual = baseLat;
+    let lngAtual = baseLng;
 
-      let melhorIdx = -1;
+    while (restantes.length > 0) {
+
+      let melhor = 0;
       let melhorDist = Infinity;
 
-      naoAtribuidas.forEach((p, i) => {
+      restantes.forEach((p, i) => {
 
-        if (p.geocodeFailed) return;
-
-        const d = distKm(
-          g.ultimaLat,
-          g.ultimaLng,
-          p.lat,
-          p.lng
-        );
+        const d = distKm(latAtual, lngAtual, p.lat, p.lng);
 
         if (d < melhorDist) {
 
           melhorDist = d;
-          melhorIdx = i;
+          melhor = i;
 
         }
 
       });
 
-      if (melhorIdx === -1)
-        melhorIdx = naoAtribuidas.findIndex(() => true);
+      const proxima = restantes.splice(melhor, 1)[0];
 
-      if (melhorIdx >= 0) {
+      ordenadas.push(proxima);
 
-        const p = naoAtribuidas.splice(melhorIdx, 1)[0];
-
-        g.paradas.push(p);
-
-        g.totalParadas++;
-
-        g.ultimaLat = p.lat || g.ultimaLat;
-        g.ultimaLng = p.lng || g.ultimaLng;
-
-        progresso = true;
-
-      }
+      latAtual = proxima.lat;
+      lngAtual = proxima.lng;
 
     }
 
-  }
-
-
-  naoAtribuidas.forEach(p => {
-
-    const comEspaco = grupos_ent.sort(
-      (a, b) => a.totalParadas - b.totalParadas
-    );
-
-    comEspaco[0].paradas.push(p);
-
-    comEspaco[0].totalParadas++;
+    g.paradas = ordenadas;
 
   });
 
 
   const resultado = grupos_ent
-    .filter(g => g.paradas.length > 0)
-    .map(g => {
+  .filter(g => g.paradas.length > 0)
+  .map(g => ({
 
-      g.paradas.sort((a, b) => a.dist - b.dist);
+    entId: g.entId,
+    entNome: g.entNome,
+    pedidos: g.paradas,
+    totalParadas: g.paradas.length
 
-      const pedidosFlat = g.paradas.flatMap(parada =>
-        parada.ids.map((id, idx) => {
-
-          const dist = parada.dist;
-
-          const valor = taxaConfig
-            ? calcularValorCorrida(
-                dist,
-                taxaConfig.taxa_tipo,
-                taxaConfig.taxa_entrega,
-                taxaConfig.taxa_km_limite,
-                taxaConfig.taxa_km_excedente,
-                taxaConfig.taxa_fixo_base
-              )
-            : 0;
-
-          return {
-            id,
-            num: (parada.labels[idx] || '').replace(/^#/, ''),
-            end: parada.end,
-            dist: parseFloat(dist.toFixed(2)),
-            valor: parseFloat(valor.toFixed(2))
-          };
-
-        })
-      );
-
-      return {
-        entId: g.entId,
-        entNome: g.entNome,
-        pedidos: pedidosFlat,
-        totalParadas: g.paradas.length,
-        totalPedidos: pedidosFlat.length
-      };
-
-    });
+  }));
 
 
   return {
+
     grupos: resultado,
     totalPedidos: pedidos.length,
     totalParadas: paradasGeo.length
+
   };
 
 }
 
 
 // ─────────────────────────────────────────────────
-// HANDLER DA API
+// HANDLER API
 // ─────────────────────────────────────────────────
 
 module.exports = async function handler(req, res) {
@@ -420,9 +334,6 @@ module.exports = async function handler(req, res) {
 
     const { lojaId, limiteGlobal, distribuicao } = req.body;
 
-    if (!lojaId)
-      return res.status(400).json({ error: 'lojaId obrigatório' });
-
     const db = createClient(SB_URL, SB_KEY);
 
     const { data: pedidos } = await db
@@ -448,9 +359,7 @@ module.exports = async function handler(req, res) {
 
     console.error('[calcular-rota]', err);
 
-    return res.status(500).json({
-      error: 'Erro interno no servidor'
-    });
+    return res.status(500).json({ error: 'Erro interno no servidor' });
 
   }
 
