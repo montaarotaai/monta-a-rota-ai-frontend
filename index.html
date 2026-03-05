@@ -47,8 +47,8 @@
     }else{if(o)o.style.display='none';}
   }
   function _check(){
-    var w=window.outerWidth-window.innerWidth>160;
-    var h=window.outerHeight-window.innerHeight>160;
+    var w=window.outerWidth-window.innerWidth>300;
+    var h=window.outerHeight-window.innerHeight>300;
     if(w||h){if(!_devopen){_devopen=true;_showOverlay(true);}}
     else{if(_devopen){_devopen=false;_showOverlay(false);}}
   }
@@ -4648,8 +4648,8 @@ async function abrirGanhosEnt(){
   });
   // Oculta nav de mes ao abrir (filtro padrão é hoje)
   const navEl=$('gnh-nav-mes');if(navEl)navEl.style.display='none';
-  await carregarResumoGanhos();
-  await carregarGanhos();
+  await _carregarDadosGanhos(); // 1 única query para tudo
+  await Promise.all([carregarResumoGanhos(), carregarGanhos()]);
   // Mostrar histórico mensal se houver
   mostrarHistoricoMensal();
 }
@@ -4689,14 +4689,14 @@ function filtroGanhos(per,btn){
   } else {
     navEl.style.display='none';
   }
-  carregarResumoGanhos();
-  carregarGanhos();
+  Promise.all([carregarResumoGanhos(), carregarGanhos()]);
 }
 
 function navMes(dir){
   const novoOffset=_gnhMesOffset+dir;
   if(novoOffset>0)return;
   _gnhMesOffset=novoOffset;
+  _gnhCache.ts=0; // invalida cache ao mudar de mês
   atualizarLabelMes();
   carregarResumoGanhos(); // atualiza resumo pro mês navegado
   carregarGanhos();
@@ -4748,23 +4748,50 @@ function periodoRange(per,mesOffset){
 // Helper seguro para queries em tabelas que podem não existir
 async function safeQuery(fn){ try{ const r=await fn(); return r.data||[]; }catch(e){ return []; } }
 
+// ── Cache de ganhos: evita re-buscar dados já carregados no mesmo minuto ──
+var _gnhCache={entregas:null,vales:null,ts:0,mesRef:null};
+function _gnhCacheValido(mesRef){
+  return _gnhCache.ts&&_gnhCache.mesRef===mesRef&&(Date.now()-_gnhCache.ts)<60000;
+}
+
+async function _carregarDadosGanhos(){
+  // Sempre busca dados do mês corrente (ou do mês selecionado em _gnhMesOffset)
+  // Uma única query de entregas + uma de vales, em paralelo — em vez de 5~7 queries separadas
+  const agora=new Date();
+  const anoRef=new Date(agora.getFullYear(),agora.getMonth()+(_gnhMesOffset||0),1);
+  const inicioMes=new Date(anoRef.getFullYear(),anoRef.getMonth(),1);
+  const fimMes=new Date(anoRef.getFullYear(),anoRef.getMonth()+1,0,23,59,59,999);
+  // Para cobrir Ontem e Esta Semana que podem cair fora do mês atual,
+  // buscamos desde o início da semana (máx 6 dias atrás) ou início do mês, o que for menor
+  const inicioSem=new Date(agora);
+  inicioSem.setDate(inicioSem.getDate()-((agora.getDay()+6)%7));inicioSem.setHours(0,0,0,0);
+  const inicioReal=inicioSem<inicioMes?inicioSem:inicioMes;
+  const mesRef=`${anoRef.getFullYear()}-${anoRef.getMonth()}`;
+  if(_gnhCacheValido(mesRef))return;
+  const [entregas,vales]=await Promise.all([
+    safeQuery(()=>db.from('entregas').select('id,valor_corrida,valor_entregador,valor_incentivo,tipo_incentivo,created_at,entregue_at,loja_id,status,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioReal.toISOString()).lte('created_at',fimMes.toISOString()).order('created_at',{ascending:true})),
+    safeQuery(()=>db.from('vales_entregadores').select('valor,observacao,created_at,loja:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',inicioReal.toISOString()).lte('created_at',fimMes.toISOString()).order('created_at',{ascending:false})),
+  ]);
+  _gnhCache={entregas,vales,ts:Date.now(),mesRef,inicioReal,fimMes,inicioMes};
+}
+
 async function carregarResumoGanhos(){
   const el=$('gnh-resumo');
   if(!el)return;
   el.innerHTML='<p style="text-align:center;color:#aaa;font-size:12px;padding:8px 0;">Carregando resumo...</p>';
   const per=_gnhFiltro||'hoje';
   const agora=new Date();
+  // Garante dados carregados (usa cache se disponível)
+  await _carregarDadosGanhos();
+  const {entregas:dadosTodos,vales:valesTodos,inicioMes}=_gnhCache;
 
   if(per==='mes'){
-    const {inicio,fim}=periodoRange('mes',_gnhMesOffset);
-    const alvoDate=new Date(agora.getFullYear(),agora.getMonth()+_gnhMesOffset,1);
+    const alvoDate=new Date(agora.getFullYear(),agora.getMonth()+(_gnhMesOffset||0),1);
     const nomeMesFmt=(alvoDate.toLocaleString('pt-BR',{month:'long',year:'numeric'})).replace(/^\w/,c=>c.toUpperCase());
-
-    const dados = await safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador,created_at,loja_id,entregue_at,l:loja_id(taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim));
-    const valesMesArr = await safeQuery(()=>db.from('vales_entregadores').select('valor').eq('entregador_id',U.id).gte('created_at',inicio).lte('created_at',fim));
-
+    const dados=dadosTodos.filter(e=>new Date(e.created_at)>=inicioMes);
+    const valesMesArr=valesTodos.filter(v=>new Date(v.created_at)>=inicioMes);
     const totalBrutoMes=dados.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-    let totalCombMes=0; const combCtrl={};
+    let totalCombMes=0;const combCtrl={};
     dados.forEach(e=>{
       if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
       const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
@@ -4773,11 +4800,9 @@ async function carregarResumoGanhos(){
     });
     const totalValesMes=valesMesArr.reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const liquidoMes=totalBrutoMes+totalCombMes-totalValesMes;
-
     const semanas=[0,0,0,0],cntSem=[0,0,0,0];
     dados.forEach(e=>{const dia=new Date(e.created_at).getDate();const si=dia<=7?0:dia<=14?1:dia<=21?2:3;semanas[si]+=parseFloat(e.valor_corrida||e.valor_entregador||0);cntSem[si]++;});
     const semLabels=['1ª sem','2ª sem','3ª sem','4ª sem'];
-
     el.innerHTML=`
       <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:12px;padding:14px;text-align:center;margin-bottom:8px;color:white;">
         <p style="font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;">${nomeMesFmt}</p>
@@ -4793,33 +4818,22 @@ async function carregarResumoGanhos(){
           ${cntSem[i]>0?`<p style="font-size:10px;color:#777;">${cntSem[i]}x</p>`:''}
         </div>`).join('')}
       </div>`;
-
   } else {
-    // Hoje / Ontem / Esta Semana — mostra os 4 cards comparativos
+    // Hoje / Ontem / Esta Semana — filtra localmente, sem novas queries
     const inicioHoje=new Date(agora);inicioHoje.setHours(0,0,0,0);
     const inicioOntem=new Date(agora);inicioOntem.setDate(inicioOntem.getDate()-1);inicioOntem.setHours(0,0,0,0);
     const fimOntem=new Date(agora);fimOntem.setDate(fimOntem.getDate()-1);fimOntem.setHours(23,59,59,999);
     const inicioSem=new Date(agora);inicioSem.setDate(inicioSem.getDate()-((agora.getDay()+6)%7));inicioSem.setHours(0,0,0,0);
-    const fimSem=new Date(inicioSem);fimSem.setDate(fimSem.getDate()+6);fimSem.setHours(23,59,59,999);
-    const inicioMes=new Date(agora.getFullYear(),agora.getMonth(),1);
-    const fimMes=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
-
-    // Queries de corridas — sempre seguras (tabela entregas sempre existe)
-    const [dH,dO,dS,dM] = await Promise.all([
-      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()).lte('created_at',new Date().toISOString())),
-      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString())),
-      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()).lte('created_at',fimSem.toISOString())),
-      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString())),
-    ]);
-    // Vales — tabela pode não existir, isolado em try/catch próprio
-    const valesArr = await safeQuery(()=>db.from('vales_entregadores').select('valor,created_at').eq('entregador_id',U.id).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()));
-
+    const dH=dadosTodos.filter(e=>new Date(e.created_at)>=inicioHoje);
+    const dO=dadosTodos.filter(e=>{const d=new Date(e.created_at);return d>=inicioOntem&&d<=fimOntem;});
+    const dS=dadosTodos.filter(e=>new Date(e.created_at)>=inicioSem);
+    const dM=dadosTodos.filter(e=>new Date(e.created_at)>=inicioMes);
+    const valesArr=valesTodos;
     const soma=arr=>arr.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
     const valesHoje=valesArr.filter(v=>new Date(v.created_at)>=inicioHoje).reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const valesOntem=valesArr.filter(v=>{const d=new Date(v.created_at);return d>=inicioOntem&&d<=fimOntem;}).reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const valesSem=valesArr.filter(v=>new Date(v.created_at)>=inicioSem).reduce((s,v)=>s+parseFloat(v.valor||0),0);
-    const valesMes=valesArr.reduce((s,v)=>s+parseFloat(v.valor||0),0);
-
+    const valesMes=valesArr.filter(v=>new Date(v.created_at)>=inicioMes).reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const cards=[
       {label:'Hoje',      val:soma(dH)-valesHoje,  cnt:dH.length, bg:'#e8f5e9',cor:'#2e7d32',per:'hoje',  id:'gnhf-hoje'},
       {label:'Ontem',     val:soma(dO)-valesOntem, cnt:dO.length, bg:'#fff3e0',cor:'#e65100',per:'ontem', id:'gnhf-ontem'},
@@ -4841,8 +4855,12 @@ async function carregarGanhos(){
   const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
   const{inicio,fim}=periodoRange(per,per==='mes'?_gnhMesOffset:0);
 
-  const data = await safeQuery(()=>db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:true}));
-  const valesData = await safeQuery(()=>db.from('vales_entregadores').select('valor,observacao,created_at,loja:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false}));
+  // Usa cache se disponível — evita re-buscar dados do banco desnecessariamente
+  await _carregarDadosGanhos();
+  const inicioDate=new Date(inicio);
+  const fimDate=new Date(fim);
+  const data=(_gnhCache.entregas||[]).filter(e=>{const d=new Date(e.created_at);return d>=inicioDate&&d<=fimDate;});
+  const valesData=(_gnhCache.vales||[]).filter(v=>{const d=new Date(v.created_at);return d>=inicioDate&&d<=fimDate;});
 
   if(!data.length){
     el.innerHTML=`
