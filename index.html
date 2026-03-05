@@ -3230,7 +3230,7 @@ async function carregarRel(){
   <div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
     <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">💰 Custo Detalhado por Entregador</div>
     ${entArr.map((ent,i)=>`
-    <div style="padding:10px 0;border-bottom:1px solid #f5f5f5;">
+    <div style="padding:10px 0;border-bottom:1px solid #f5f5f5;" data-total="${ent.total}">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div style="display:flex;align-items:center;gap:7px;">
           <div style="width:10px;height:10px;border-radius:50%;background:${cores[i%cores.length]};"></div>
@@ -4269,14 +4269,25 @@ async function carregarGanhos(){
   }catch(e){}
 
   if(!data||!data.length){
-    // Ainda mostra vales mesmo sem entregas
-    if(valesData.length){
-      const totalVales=valesData.reduce((s,v)=>s+parseFloat(v.valor||0),0);
-      el.innerHTML=`<p style="color:#999;text-align:center;padding:10px">Nenhuma entrega no período.</p>
-        ${renderValesEnt(valesData,totalVales)}`;
-    }else{
-      el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';
-    }
+    const totalVales=valesData.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    el.innerHTML=`
+      <p style="color:#999;text-align:center;padding:10px">Nenhuma entrega no período.</p>
+      ${totalVales>0?`
+      <div style="background:#fff3e0;border-radius:11px;padding:14px;border:2px solid #FF6B35;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:13px;color:#555;">Corridas</span>
+          <strong style="color:#2e7d32;">${fR(0)}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:13px;color:#e74c3c;">💸 Vales descontados</span>
+          <strong style="color:#e74c3c;">-${fR(totalVales)}</strong>
+        </div>
+        <div style="border-top:2px solid #FF6B35;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:14px;font-weight:800;color:#222;">💰 A RECEBER</span>
+          <strong style="font-size:20px;color:${-totalVales>=0?'#2e7d32':'#e74c3c'};">${fR(-totalVales)}</strong>
+        </div>
+      </div>
+      ${renderValesEnt(valesData,totalVales)}`:''}`;
     return;
   }
   const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
@@ -4315,15 +4326,30 @@ async function carregarGanhos(){
     labelPer=labels[per]||per;
   }
   el.innerHTML=`
+    ${totalVales>0||totalCombustivel>0?`
+    <div style="background:#f8f9fa;border-radius:11px;padding:14px;margin-bottom:12px;border:2px solid #e0e0e0;">
+      <p style="font-size:11px;font-weight:700;color:#888;margin-bottom:8px;">${labelPer} — ${data.length} entrega(s)</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-size:13px;color:#555;">🛵 Corridas (bruto)</span>
+        <strong style="color:#555;">${fR(tot)}</strong>
+      </div>
+      ${totalCombustivel>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-size:13px;color:#555;">⛽ Combustível</span>
+        <strong style="color:#555;">+${fR(totalCombustivel)}</strong>
+      </div>`:''}
+      ${totalVales>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-size:13px;color:#e74c3c;">💸 Vales descontados</span>
+        <strong style="color:#e74c3c;">-${fR(totalVales)}</strong>
+      </div>`:''}
+      <div style="border-top:2.5px solid #004E89;margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:15px;font-weight:800;color:#222;">💰 A RECEBER</span>
+        <strong style="font-size:26px;font-weight:900;color:${saldoFinal>=0?'#2e7d32':'#e74c3c'};">${fR(saldoFinal)}</strong>
+      </div>
+    </div>`:`
     <div style="background:#e8f5e9;padding:12px;border-radius:11px;text-align:center;margin-bottom:12px;border:2px solid #00C9A7;">
       <p style="font-size:11px;color:#666;">${labelPer} — ${data.length} entrega(s)</p>
       <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(saldoFinal)}</p>
-      ${totalVales>0?`<p style="font-size:11px;color:#e74c3c;margin-top:2px;">💸 Vales descontados: ${fR(totalVales)}</p>`:''}
-      ${totalCombustivel>0?`<div style="margin-top:6px;display:flex;justify-content:center;gap:14px;font-size:12px;color:#555;">
-        <span>🛵 Corridas: <strong>${fR(tot)}</strong></span>
-        <span>⛽ Combustível: <strong>${fR(totalCombustivel)}</strong></span>
-      </div>`:''}
-    </div>
+    </div>`}
     ${totalVales>0?renderValesEnt(valesData,totalVales):''}
     <p style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">📋 Detalhes das corridas:</p>
     ${data.map((e,i)=>{
@@ -4639,16 +4665,31 @@ async function carregarValesParaEnt(entId){
       .order('created_at',{ascending:false});
     if(!vales||!vales.length){el.innerHTML='';return;}
     const totalVales=vales.reduce((s,v)=>s+parseFloat(v.valor||0),0);
-    el.innerHTML=`<div style="background:#fff3e0;border-radius:7px;padding:8px 10px;border:1px solid #ffcc02;">
-      <p style="font-size:10px;font-weight:700;color:#e65100;margin-bottom:5px;">💸 VALES NO PERÍODO — Total: ${fR(totalVales)}</p>
-      ${vales.map(v=>{
-        const dt=new Date(v.created_at).toLocaleDateString('pt-BR')+' '+new Date(v.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0;border-top:1px solid #ffe08050;">
-          <span style="color:#555;">${v.observacao||'Vale'} — <span style="color:#888;font-size:10px;">${dt}</span></span>
-          <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
-        </div>`;
-      }).join('')}
-    </div>`;
+
+    // Pega o total bruto do entregador que está no card pai (data-total)
+    const cardPai=el.closest('[data-total]');
+    const totalBruto=cardPai?parseFloat(cardPai.dataset.total||0):0;
+    const liquido=totalBruto-totalVales;
+
+    el.innerHTML=`
+      <div style="background:#fff3e0;border-radius:8px;padding:10px;border:1.5px solid #FF6B35;margin-top:6px;">
+        <p style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:7px;">💸 VALES / ADIANTAMENTOS</p>
+        ${totalBruto>0?`<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+          <span style="color:#555;">Corridas (bruto)</span>
+          <strong style="color:#555;">${fR(totalBruto)}</strong>
+        </div>`:''}
+        ${vales.map(v=>{
+          const dt=new Date(v.created_at).toLocaleDateString('pt-BR')+' '+new Date(v.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+          return`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-top:1px solid #ffe08070;">
+            <span style="color:#555;">💸 ${v.observacao||'Vale'}<br><span style="font-size:10px;color:#aaa;">${dt}</span></span>
+            <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
+          </div>`;
+        }).join('')}
+        <div style="border-top:2px solid #FF6B35;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <strong style="font-size:13px;color:#222;">💰 A PAGAR</strong>
+          <strong style="font-size:18px;color:${liquido>=0?'#2e7d32':'#e74c3c'};">${fR(liquido)}</strong>
+        </div>
+      </div>`;
   }catch(e){el.innerHTML='';}
 }
 
