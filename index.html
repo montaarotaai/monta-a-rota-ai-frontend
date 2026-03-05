@@ -639,7 +639,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="row" style="margin-bottom:11px;flex-wrap:wrap;gap:6px;">
     <button class="btn-sm blue" onclick="abrirDefinirQuantidade()" style="padding:8px 13px;background:#004E89;">🔢 Definir Qtd / Rota IA</button>
     <button class="btn-sm blue" onclick="otimizarRotaInteligente()" style="padding:8px 13px;">🤖 Otimizar Auto</button>
-    <button class="btn-sm orange" onclick="avisarPedidoPronto()" style="padding:8px 13px;">📢 Pedido Pronto</button>
+    <button onclick="avisarPedidoPronto()" style="padding:8px 16px;background:linear-gradient(135deg,#FF6B35,#e74c3c);color:white;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(231,76,60,.4);">🔔 Pedido Pronto</button>
   </div>
   <div id="rota-lst"></div>
 </div></div>
@@ -1187,6 +1187,126 @@ function beep(freq=880,dur=0.4){
   try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const o=ctx.createOscillator();const g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(0.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);o.start();o.stop(ctx.currentTime+dur);}catch(e){}
 }
 function beepAlerta(){beep(660,0.2);setTimeout(()=>beep(880,0.3),300);}
+
+// ============================================================
+// ALARME PEDIDO PRONTO — som persistente até silenciar
+// ============================================================
+let _alarmeInterval=null;
+let _alarmeAtivo=false;
+let _alarmeChRealtimeLoja=null; // canal realtime escutando alertas
+
+function tocarAlarmePedidoPronto(){
+  if(_alarmeAtivo)return; // já tocando
+  _alarmeAtivo=true;
+
+  // Toca sequência chamativa: 3 beeps rápidos
+  function sequencia(){
+    if(!_alarmeAtivo)return;
+    beep(880,0.15);
+    setTimeout(()=>{if(_alarmeAtivo)beep(1100,0.15);},200);
+    setTimeout(()=>{if(_alarmeAtivo)beep(880,0.25);},400);
+  }
+  sequencia();
+  // Repete a cada 2.5 segundos
+  _alarmeInterval=setInterval(sequencia,2500);
+
+  // Mostra banner de alerta no entregador
+  mostrarBannerAlerta();
+}
+
+function silenciarAlarmePedidoPronto(){
+  _alarmeAtivo=false;
+  if(_alarmeInterval){clearInterval(_alarmeInterval);_alarmeInterval=null;}
+  esconderBannerAlerta();
+}
+
+function mostrarBannerAlerta(){
+  let banner=$('ent-alarme-banner');
+  if(!banner){
+    banner=document.createElement('div');
+    banner.id='ent-alarme-banner';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML=`
+    <div style="
+      position:fixed;top:0;left:0;right:0;z-index:99999;
+      background:linear-gradient(135deg,#FF6B35,#e74c3c);
+      color:white;
+      padding:0;
+      box-shadow:0 4px 20px rgba(0,0,0,.4);
+      animation:pulseAlerta 1s ease-in-out infinite;
+    ">
+      <div style="padding:16px 18px 10px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:4px;">🔔</div>
+        <div style="font-size:17px;font-weight:900;letter-spacing:.5px;">PEDIDO PRONTO NA LOJA!</div>
+        <div style="font-size:12px;opacity:.9;margin-top:3px;">Vá buscar o pedido agora</div>
+      </div>
+      <button onclick="silenciarAlarmePedidoPronto()" style="
+        width:100%;
+        background:rgba(0,0,0,.25);
+        color:white;
+        border:none;
+        border-top:1px solid rgba(255,255,255,.3);
+        padding:12px;
+        font-size:14px;
+        font-weight:800;
+        cursor:pointer;
+        letter-spacing:.3px;
+      ">🔕 TOQUE AQUI PARA SILENCIAR</button>
+    </div>`;
+  // Adiciona animação CSS se ainda não existe
+  if(!$('style-alarme')){
+    const st=document.createElement('style');
+    st.id='style-alarme';
+    st.textContent=`
+      @keyframes pulseAlerta{
+        0%{box-shadow:0 4px 20px rgba(231,76,60,.4);}
+        50%{box-shadow:0 4px 40px rgba(231,76,60,.9),0 0 0 6px rgba(231,76,60,.3);}
+        100%{box-shadow:0 4px 20px rgba(231,76,60,.4);}
+      }`;
+    document.head.appendChild(st);
+  }
+}
+
+function esconderBannerAlerta(){
+  const banner=$('ent-alarme-banner');
+  if(banner)banner.innerHTML='';
+}
+
+// Subscription Realtime — entregador escuta alertas da sua loja ativa
+let _realtimeAlertaCh=null;
+function iniciarEscutaAlertas(lojaId){
+  if(_realtimeAlertaCh){
+    try{db.removeChannel(_realtimeAlertaCh);}catch(e){}
+    _realtimeAlertaCh=null;
+  }
+  if(!lojaId)return;
+
+  _realtimeAlertaCh=db.channel('alertas-loja-'+lojaId)
+    .on('postgres_changes',{
+      event:'INSERT',
+      schema:'public',
+      table:'alertas_pedido_pronto',
+      filter:`loja_id=eq.${lojaId}`
+    }, payload=>{
+      // Novo alerta inserido para esta loja — toca alarme!
+      tocarAlarmePedidoPronto();
+    })
+    .subscribe((status)=>{
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        // Reconecta em 3s
+        setTimeout(()=>iniciarEscutaAlertas(lojaId),3000);
+      }
+    });
+}
+
+function pararEscutaAlertas(){
+  if(_realtimeAlertaCh){
+    try{db.removeChannel(_realtimeAlertaCh);}catch(e){}
+    _realtimeAlertaCh=null;
+  }
+  silenciarAlarmePedidoPronto();
+}
 
 // Calcular valor corrida
 function calcularValorCorrida(distancia,taxaTipo,taxaBase,kmLimite,taxaExcedente,taxaFixoBase){
@@ -2327,11 +2447,31 @@ async function salvarTaxaLj(){
 
 // Avisar pedido pronto (toca alerta em todos entregadores vinculados e online)
 async function avisarPedidoPronto(){
-  // Marca pedidos pendentes sem entregador como pedido_pronto=true
+  // Marca pedidos pendentes como pedido_pronto=true
   const{data:ents}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','pendente');
   if(!ents||!ents.length){alert('Nenhum pedido pendente para avisar.');return;}
   for(const e of ents)await db.from('entregas').update({pedido_pronto:true}).eq('id',e.id);
-  alert('Aviso enviado! Os entregadores online serao notificados.');
+
+  // Grava alerta na tabela — o Realtime vai disparar para todos os entregadores da loja
+  try{
+    await db.from('alertas_pedido_pronto').insert([{
+      loja_id: U.id,
+      ativo: true,
+      mensagem: 'Pedido pronto para retirada!'
+    }]);
+  }catch(e){
+    // Se tabela não existir ainda, só o update acima basta
+    console.warn('[Alerta] Tabela alertas_pedido_pronto não existe ainda:',e.message);
+  }
+
+  // Feedback visual no botão
+  const btn=document.querySelector('[onclick="avisarPedidoPronto()"]');
+  if(btn){
+    const orig=btn.innerHTML;
+    btn.innerHTML='✅ Aviso enviado!';
+    btn.style.background='#2e7d32';
+    setTimeout(()=>{btn.innerHTML=orig;btn.style.background='';},2500);
+  }
 }
 
 // Calcular valor corrida baseado no endereco
@@ -3689,7 +3829,9 @@ async function initEnt(){
   // Lojas vinculadas
   await carregarLojaAtiva();
   if(U.online)inicRast();
-  // Polling alertas
+  // Inicia escuta de alertas se já tem loja ativa
+  if(U.loja_ativa_id&&U.online)iniciarEscutaAlertas(U.loja_ativa_id);
+  // Polling alertas (fallback caso Realtime falhe)
   ivs.alerta=setInterval(verificarAlertas,8000);
   verificarAlertas();
   // Notif rota
@@ -3792,6 +3934,8 @@ async function confirmarLojaAtiva(){
   await db.from('usuarios').update({loja_ativa_id:lid,online:true}).eq('id',U.id);
   U.loja_ativa_id=lid;U.online=true;salvarU();
   atuBtnOn(true);inicRast();await carregarLojaAtiva();
+  // Inicia escuta de alertas para esta loja
+  iniciarEscutaAlertas(lid);
 }
 
 async function verificarAlertas(){
@@ -3853,11 +3997,15 @@ async function toggleOnline(){
     const av=$('gps-bg-aviso');
     if(av)av.classList.remove('hidden');
     await carregarLojaAtiva();
+    // Inicia escuta de alertas ao ficar online
+    if(U.loja_ativa_id)iniciarEscutaAlertas(U.loja_ativa_id);
   }else{
     if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
     if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
     swPostMessage({type:'STOP_GPS'});
     carregarLojaAtiva();
+    // Para escuta e silencia alarme ao ficar offline
+    pararEscutaAlertas();
   }
 }
 
@@ -5505,3 +5653,4 @@ async function downloadPdfTermo(id,nome){
 </script>
 </body>
 </html>
+               
