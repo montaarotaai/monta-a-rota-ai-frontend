@@ -3203,11 +3203,25 @@ async function carregarRel(){
       });
     }catch(e){}
   }
-  // Adiciona totalVales e liquido a cada entregador
-  entArr.forEach(e=>{
-    e.vales=valesPorEnt[e._id]||[];
-    e.totalVales=e.vales.reduce((s,v)=>s+parseFloat(v.valor||0),0);
-    e.liquido=e.total-e.totalVales;
+  // Adiciona totalVales, combustível e liquido a cada entregador
+  entArr.forEach(ent=>{
+    ent.vales=valesPorEnt[ent._id]||[];
+    ent.totalVales=ent.vales.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+
+    // Calcula combustível por turno (só se loja usa taxa fixo_mais_km)
+    let combEnt=0;
+    if(U.taxa_tipo==='fixo_mais_km'&&parseFloat(U.taxa_fixo_base||0)>0){
+      const combCtrlEnt={};
+      ent.lista.forEach(e=>{
+        const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
+        const diaKey=dt.toISOString().split('T')[0];
+        const turno=dt.getHours()<16?'almoco':'jantar';
+        const chave=`${diaKey}_${turno}`;
+        if(!combCtrlEnt[chave]){combCtrlEnt[chave]=true;combEnt+=parseFloat(U.taxa_fixo_base);}
+      });
+    }
+    ent.totalCombustivel=combEnt;
+    ent.liquido=ent.total+combEnt-ent.totalVales;
   });
 
   const melhor=entArr[0];
@@ -3301,8 +3315,9 @@ async function carregarRel(){
           <strong style="font-size:14px;color:#004E89;text-decoration:underline;">${ent.nome}</strong>
         </div>
         <div style="text-align:right;">
-          ${ent.totalVales>0?`<div style="font-size:11px;color:#999;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
+          ${(ent.totalVales>0||ent.totalCombustivel>0)?`<div style="font-size:11px;color:#999;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
           <div style="font-size:16px;font-weight:900;color:${ent.liquido>0?'#2e7d32':'#e74c3c'};">${fR(ent.liquido)}</div>
+          ${ent.totalCombustivel>0?`<div style="font-size:10px;color:#e65100;">+${fR(ent.totalCombustivel)} combustível</div>`:''}
           ${ent.totalVales>0?`<div style="font-size:10px;color:#e74c3c;">-${fR(ent.totalVales)} em vales</div>`:''}
         </div>
       </div>
@@ -4943,7 +4958,21 @@ async function abrirPagamento(entId, entNome) {
   const totalBruto = listaCorridas.reduce((s, e) => s + parseFloat(e.valor_corrida || e.valor_entregador || 0), 0);
   const totalVales = listaVales.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
   const totalPago = pgtos.reduce((s, p) => s + parseFloat(p.valor_pago || 0), 0);
-  const liquido = totalBruto - totalVales;
+
+  // Calcula combustível total — mesmo algoritmo do extrato
+  const _combCtrlLiq = {};
+  let totalCombustivel = 0;
+  listaCorridas.forEach(e => {
+    if (!e.l || e.l.taxa_tipo !== 'fixo_mais_km' || !(e.l.taxa_fixo_base > 0)) return;
+    const dt = e.entregue_at ? new Date(e.entregue_at) : new Date(e.created_at);
+    const diaKey = dt.toISOString().split('T')[0];
+    const turno = dt.getHours() < 16 ? 'almoco' : 'jantar';
+    const chave = `${e.loja_id}_${diaKey}_${turno}`;
+    if (!_combCtrlLiq[chave]) { _combCtrlLiq[chave] = true; totalCombustivel += parseFloat(e.l.taxa_fixo_base); }
+  });
+
+  // CORRETO: corridas + combustível - vales
+  const liquido = totalBruto + totalCombustivel - totalVales;
 
   // Verifica se há corridas de períodos anteriores
   const temPendenciasAntigas = listaCorridas.some(e => e.created_at < dtIni);
@@ -4951,7 +4980,7 @@ async function abrirPagamento(entId, entNome) {
   // Salva para confirmarPagamento usar (usa dtIni/dtFim da corrida mais antiga/mais nova)
   const dtPgtoIni = listaCorridas.length > 0 ? listaCorridas[0].created_at : dtIni;
   const dtPgtoFim = listaCorridas.length > 0 ? listaCorridas[listaCorridas.length-1].created_at : dtFim;
-  _pgtoAtual = {entId, entNome, listaCorridas, listaVales, totalBruto, totalVales, liquido, dtIni: dtPgtoIni, dtFim: dtPgtoFim};
+  _pgtoAtual = {entId, entNome, listaCorridas, listaVales, totalBruto, totalCombustivel, totalVales, liquido, dtIni: dtPgtoIni, dtFim: dtPgtoFim};
 
   el.innerHTML = `
     <!-- Cabeçalho -->
@@ -5097,7 +5126,7 @@ async function abrirPagamento(entId, entNome) {
 
 async function confirmarPagamento() {
   if (!_pgtoAtual) return;
-  const {entId, entNome, listaCorridas, listaVales, totalBruto, totalVales, liquido, dtIni, dtFim} = _pgtoAtual;
+  const {entId, entNome, listaCorridas, listaVales, totalBruto, totalCombustivel, totalVales, liquido, dtIni, dtFim} = _pgtoAtual;
   if (listaCorridas.length === 0) return;
 
   const btn = $('pgto-btn-confirmar');
@@ -5108,7 +5137,7 @@ async function confirmarPagamento() {
     const {data: pgto, error: errPgto} = await db.from('pagamentos_entregadores').insert([{
       entregador_id: entId,
       loja_id: U.id,
-      valor_bruto: totalBruto,
+      valor_bruto: totalBruto + (totalCombustivel||0), // corridas + combustível
       total_vales: totalVales,
       valor_pago: liquido,
       periodo_ini: dtIni,
