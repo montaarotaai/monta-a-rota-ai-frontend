@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monta Rotaí v7</title>
+<title>Monta Rotaí v8</title>
 <!-- ╔══════════════════════════════════════════════════════╗
      ║  MONTA ROTAÍ — Sistema Proprietário                 ║
      ║  © 2025 Monta Rotaí. Todos os direitos reservados.  ║
@@ -382,9 +382,14 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div class="card"><h3>Hoje</h3><div class="val" id="lj-hj">0</div></div>
       <div class="card"><h3>Online</h3><div class="val" id="lj-online-cnt">0</div></div>
     </div>
-    <!-- Taxa config -->
-    <div class="secao">
-      <div class="s-title">&#128176; Configuracao de Taxa ao Entregador</div>
+    <!-- Taxa config — painel colapsável -->
+    <div class="secao" style="padding:0;overflow:hidden;">
+      <button onclick="toggleTaxaCfgPanel()" id="taxa-cfg-toggle-btn" style="width:100%;background:none;border:none;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left;">
+        <span style="font-size:14px;font-weight:700;color:#555;">⚙️ Configurações de Taxa e Pagamento</span>
+        <span id="taxa-cfg-arrow" style="font-size:18px;color:#999;transition:transform .3s;">▾</span>
+      </button>
+      <div id="taxa-cfg-panel" style="display:none;padding:0 16px 16px;">
+      <div class="s-title" style="margin-top:4px;">&#128176; Configuracao de Taxa ao Entregador</div>
       <div class="fg">
         <label>Tipo de taxa</label>
         <select id="lj-taxa-tipo" onchange="toggleTaxaTipo()">
@@ -425,6 +430,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <button class="btn btn-blue" onclick="salvarTaxaLj()" style="margin-top:4px;">Salvar Configuracao de Taxa</button>
       </div>
       <div id="taxa-msg" style="font-size:12px;margin-top:5px;"></div>
+      </div><!-- /taxa-cfg-panel -->
     </div>
     <!-- Promoção Chuva -->
     <div class="secao" id="lj-chuva-secao">
@@ -863,16 +869,14 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="modal-close" onclick="closeM('realocar')">&times;</button>
   <h2 style="margin-bottom:9px;">🔄 Realocar Pedido</h2>
   <input type="hidden" id="realocar-ped-id">
+  <input type="hidden" id="realocar-selected-val">
   <p id="realocar-ped-info" style="font-size:13px;color:#555;margin-bottom:12px;background:#f0f4ff;padding:9px;border-radius:8px;"></p>
   <div class="fg">
-    <label>Entregador atual será substituído por:</label>
-    <select id="realocar-select" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;">
-      <option value="">Selecione entregador...</option>
-      <option value="__devolver__">↩️ Devolver para lista (sem entregador)</option>
-    </select>
+    <label style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px;display:block;">Selecione o destino:</label>
+    <div id="realocar-lista" style="display:flex;flex-direction:column;gap:7px;"></div>
   </div>
-  <div id="realocar-msg" style="margin-bottom:8px;"></div>
-  <button class="btn btn-primary" onclick="confirmarRealocar()">✅ Confirmar Realocação</button>
+  <div id="realocar-msg" style="margin-bottom:8px;margin-top:10px;"></div>
+  <button class="btn btn-primary" onclick="confirmarRealocar()" style="margin-top:4px;">✅ Confirmar Realocação</button>
 </div></div>
 
 <!-- Modal Vale Entregador -->
@@ -1153,6 +1157,20 @@ function switchTab(tab,el){
 function toggleCad(){
   const t=document.querySelector('input[name="rtype"]:checked').value;
   $('c-loja').classList.toggle('hidden',t!=='loja');$('c-ent').classList.toggle('hidden',t!=='entregador');
+}
+function toggleTaxaCfgPanel(){
+  const panel=$('taxa-cfg-panel');
+  const arrow=$('taxa-cfg-arrow');
+  const btn=$('taxa-cfg-toggle-btn');
+  if(panel.style.display==='none'){
+    panel.style.display='block';
+    arrow.style.transform='rotate(180deg)';
+    btn.style.borderBottom='1px solid #e0e0e0';
+  }else{
+    panel.style.display='none';
+    arrow.style.transform='';
+    btn.style.borderBottom='none';
+  }
 }
 function toggleTaxaTipo(){
   const t=v('lj-taxa-tipo');
@@ -2746,19 +2764,37 @@ async function gerarRotaComIA(){
     _rotaIAGrupos=r.grupos;_rotaPlanoGrupos=r.grupos;
     const body=$('rota-plano-body');
     const cores=['#004E89','#FF6B35','#00C9A7','#8e44ad','#e74c3c','#27ae60'];
-    body.innerHTML='<div style="background:#e8f5e9;border-radius:9px;padding:11px;margin-bottom:12px;font-size:13px;color:#2e7d32;font-weight:700;">Rota otimizada: '+r.totalEntregadores+' entregador(es) - '+r.totalParadas+' paradas - '+r.totalPedidos+' pedidos</div>'
+    const kmTotalGeral=r.grupos.reduce((s,g)=>s+(g.kmTotal||0),0);
+    const valorTotalGeral=r.grupos.reduce((s,g)=>s+(g.valorTotal||0),0);
+    body.innerHTML='<div style="background:#e8f5e9;border-radius:9px;padding:11px;margin-bottom:12px;font-size:13px;color:#2e7d32;font-weight:700;">✅ Rota otimizada: '+r.totalEntregadores+' entregador(es) — '+r.totalParadas+' paradas — '+r.totalPedidos+' pedidos'+(kmTotalGeral>0?'<span style="font-weight:400;color:#555;font-size:12px;display:block;margin-top:3px;">📏 '+kmTotalGeral.toFixed(1)+'km total estimado'+(valorTotalGeral>0?' · 💰 R$ '+valorTotalGeral.toFixed(2)+' em corridas':'')+'</span>':'')+'</div>'
       +r.grupos.map((g,gi)=>{
-        const pm={};g.pedidos.forEach(p=>{const k=p._paradaEnd||p.end;if(!pm[k])pm[k]={labels:p._paradaLabels||['#'+p.num],end:p.end,dist:p.dist,ids:[]};pm[k].ids.push(p.id);});
+        const pm={};g.pedidos.forEach(p=>{const k=p._paradaEnd||p.end;if(!pm[k])pm[k]={labels:p._paradaLabels||['#'+p.num],end:p.end,dist:p.dist,valor:p.valor||0,ids:[]};pm[k].ids.push(p.id);});
         const pl=Object.values(pm);
+        const setorLabel=g.setorNome||g.descricao||'';
+        const extras=g.sugestaoExtras||[];
         return '<div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:10px;border-left:4px solid '+cores[gi%cores.length]+'">'
-          +'<div style="font-weight:700;font-size:14px;color:'+cores[gi%cores.length]+';">'+g.entNome+' — '+pl.length+' parada(s) - '+g.pedidos.length+' ped.</div>'
-          +'<div style="font-size:11px;color:#888;margin-bottom:8px;">'+g.descricao+'</div>'
+          +'<div style="font-weight:700;font-size:14px;color:'+cores[gi%cores.length]+';">'+g.entNome+' — '+pl.length+' parada(s) · '+g.pedidos.length+' ped.</div>'
+          +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px;">'
+          +(setorLabel?'<span style="background:'+cores[gi%cores.length]+'22;color:'+cores[gi%cores.length]+';font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">'+setorLabel+'</span>':'')
+          +(g.kmTotal>0?'<span style="background:#f0f4ff;color:#004E89;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;">📏 '+g.kmTotal.toFixed(1)+'km</span>':'')
+          +(g.valorTotal>0?'<span style="background:#f0fff4;color:#2e7d32;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;">💰 R$ '+g.valorTotal.toFixed(2)+'</span>':'')
+          +'</div>'
           +pl.map((parada,pi)=>'<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:12px;">'
-            +'<strong>'+(pi+1)+'. '+parada.labels.join(' + ')+'</strong><br>'
+            +'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+            +'<strong>'+(pi+1)+'. '+parada.labels.join(' + ')+'</strong>'
+            +(parada.dist>0&&parada.dist<900?'<span style="color:#888;font-size:11px;white-space:nowrap;margin-left:6px;">'+parada.dist.toFixed(1)+'km'+(parada.valor>0?' · R$'+parada.valor.toFixed(2):'')+'</span>':'')
+            +'</div>'
             +'<span style="color:#555;">'+parada.end+'</span>'
-            +(parada.dist>0&&parada.dist<900?' - '+parada.dist.toFixed(1)+'km':'')
-            +(parada.labels.length>1?' ['+parada.labels.length+' pedidos mesmo endereço]':'')
+            +(parada.labels.length>1?'<br><span style="font-size:10px;color:#8e44ad;font-weight:600;">'+parada.labels.length+' pedidos mesmo endereço</span>':'')
             +'</div>').join('')
+          // Sugestão inteligente: pedido extra compatível com essa rota
+          +(extras.length>0?'<div style="margin-top:8px;background:#fff8e1;border:1.5px dashed #FFC107;border-radius:8px;padding:9px;">'
+            +'<div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:5px;">💡 SUGESTÃO INTELIGENTE — '+extras.length+' pedido'+( extras.length>1?'s':'')+' do mesmo setor que caberia'+( extras.length>1?'m':'')+' nessa rota:</div>'
+            +extras.map(e=>'<div style="font-size:11px;color:#555;padding:3px 0;border-bottom:1px solid #ffe082;">'
+              +'<strong>'+e.labels.join(' + ')+'</strong> — '+(e.end.substring(0,45))+(e.dist>0?' ('+e.dist.toFixed(1)+'km)':'')
+              +'</div>').join('')
+            +'<div style="font-size:10px;color:#888;margin-top:5px;">Esses pedidos estão no mesmo setor mas foram atribuídos a outro entregador por limite de quantidade. Use Realocar para mover.</div>'
+            +'</div>':'')
           +'</div>';
       }).join('');
     btn.textContent='Gerar Rota com IA';btn.disabled=false;
@@ -4422,34 +4458,54 @@ function calcularValorChuva(createdAt, lojaId){
 // ============================================================
 async function abrirRealocarLoja(pedId, pedInfo, entAtual){
   $('realocar-ped-id').value=pedId;
+  $('realocar-selected-val').value='';
   const info=pedInfo+(entAtual?'\nEntregador atual: '+entAtual:'\nSem entregador atribuído');
   $('realocar-ped-info').textContent=info;
   clearM('realocar-msg');
 
-  // Carrega todos entregadores vinculados à loja (online ou não)
-  const sel=$('realocar-select');
-  sel.innerHTML='<option value="">Carregando...</option>';
+  const lista=$('realocar-lista');
+  lista.innerHTML='<p style="font-size:12px;color:#999;">Carregando entregadores...</p>';
   const{data:assoc}=await db.from('loja_entregadores')
     .select('entregador_id,e:entregador_id(id,nome,online)')
     .eq('loja_id',U.id);
 
-  sel.innerHTML='<option value="">Selecione entregador...</option><option value="__devolver__">↩️ Devolver para lista (sem entregador)</option>';
+  function selecionarRealocar(val){
+    $('realocar-selected-val').value=val;
+    lista.querySelectorAll('.realocar-item').forEach(el=>{
+      el.style.borderColor=el.dataset.val===val?'#004E89':'#e0e0e0';
+      el.style.background=el.dataset.val===val?'#e8f4ff':'#fff';
+      el.querySelector('.realocar-radio').style.background=el.dataset.val===val?'#004E89':'#e0e0e0';
+    });
+  }
+  window._selecionarRealocar=selecionarRealocar;
+
+  // Item: devolver para lista
+  let html=`<div class="realocar-item" data-val="__devolver__" onclick="_selecionarRealocar('__devolver__')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;background:#fff;transition:all .15s;">
+    <div style="width:14px;height:14px;border-radius:50%;background:#e0e0e0;flex-shrink:0;" class="realocar-radio"></div>
+    <span style="font-size:22px;">↩️</span>
+    <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:#555;">Devolver para lista</div><div style="font-size:11px;color:#999;">Sem entregador atribuído</div></div>
+  </div>`;
+
   if(assoc&&assoc.length){
     assoc.forEach(a=>{
       if(!a.e)return;
-      const status=a.e.online?'🟢 Online':'⚫ Offline';
-      const opt=document.createElement('option');
-      opt.value=a.e.id;
-      opt.textContent=a.e.nome+' — '+status;
-      sel.appendChild(opt);
+      const online=a.e.online;
+      const corBolinha=online?'#4CAF50':'#9e9e9e';
+      const statusTxt=online?'Online':'Offline';
+      html+=`<div class="realocar-item" data-val="${a.e.id}" onclick="_selecionarRealocar('${a.e.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid #e0e0e0;border-radius:10px;cursor:pointer;background:#fff;transition:all .15s;">
+        <div style="width:14px;height:14px;border-radius:50%;background:#e0e0e0;flex-shrink:0;" class="realocar-radio"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:${corBolinha};flex-shrink:0;box-shadow:0 0 0 2px ${corBolinha}33;"></div>
+        <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:#222;">${a.e.nome}</div><div style="font-size:11px;color:${corBolinha};font-weight:600;">${statusTxt}</div></div>
+      </div>`;
     });
   }
+  lista.innerHTML=html;
   openM('realocar');
 }
 
 async function confirmarRealocar(){
   const pedId=$('realocar-ped-id').value;
-  const novoEnt=$('realocar-select').value;
+  const novoEnt=$('realocar-selected-val').value;
   if(!novoEnt){showM('realocar-msg','Selecione um entregador ou "Devolver para lista".',false);return;}
 
   if(novoEnt==='__devolver__'){
@@ -4616,26 +4672,48 @@ function aceitarTermosModal(){
 }
 
 // ============================================================
-// SQL NECESSÁRIO NO SUPABASE PARA AS NOVAS FUNCIONALIDADES:
-// (execute no SQL Editor do Supabase)
-//
-// -- Promoção Chuva (campos na tabela usuarios):
+// SQL COMPLETO NECESSÁRIO NO SUPABASE — execute no SQL Editor:
+// ============================================================
+// -- 1. Promoção Chuva (campos na tabela usuarios):
 // ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promocao_chuva_ativa boolean DEFAULT false;
 // ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promocao_chuva_inicio timestamptz;
 // ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promocao_chuva_valor numeric DEFAULT 0;
 //
-// -- Tabela de Vales de Entregadores:
+// -- 2. Tabela de Vales/Adiantamentos de Entregadores:
 // CREATE TABLE IF NOT EXISTS vales_entregadores (
 //   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-//   entregador_id uuid REFERENCES usuarios(id),
-//   loja_id uuid REFERENCES usuarios(id),
-//   valor numeric NOT NULL,
+//   entregador_id uuid REFERENCES usuarios(id) ON DELETE CASCADE,
+//   loja_id uuid REFERENCES usuarios(id) ON DELETE CASCADE,
+//   valor numeric NOT NULL CHECK (valor > 0),
 //   observacao text,
-//   criado_por uuid,
+//   criado_por uuid REFERENCES usuarios(id),
 //   created_at timestamptz DEFAULT now()
 // );
 // CREATE INDEX IF NOT EXISTS idx_vales_entregador ON vales_entregadores(entregador_id);
 // CREATE INDEX IF NOT EXISTS idx_vales_loja ON vales_entregadores(loja_id);
+// CREATE INDEX IF NOT EXISTS idx_vales_created ON vales_entregadores(created_at);
+//
+// -- 3. RLS (Row Level Security) para vales_entregadores:
+// ALTER TABLE vales_entregadores ENABLE ROW LEVEL SECURITY;
+//
+// -- Loja pode inserir vales para seus entregadores:
+// CREATE POLICY "loja_insert_vale" ON vales_entregadores
+//   FOR INSERT TO authenticated
+//   WITH CHECK (loja_id = auth.uid());
+//
+// -- Loja pode ver seus próprios vales:
+// CREATE POLICY "loja_select_vale" ON vales_entregadores
+//   FOR SELECT TO authenticated
+//   USING (loja_id = auth.uid() OR entregador_id = auth.uid());
+//
+// -- Entregador pode ver seus próprios vales:
+// CREATE POLICY "entregador_select_vale" ON vales_entregadores
+//   FOR SELECT TO authenticated
+//   USING (entregador_id = auth.uid());
+//
+// -- 4. Campos de localização da loja (se ainda não existem):
+// ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS loja_lat numeric;
+// ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS loja_lng numeric;
 // ============================================================
 
 async function gerarPdfTermo({nome,email,tipo,data}){
