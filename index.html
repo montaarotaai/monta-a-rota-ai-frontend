@@ -4179,12 +4179,26 @@ async function carregarResumoGanhos(){
     const nomeMes=alvoDate.toLocaleString('pt-BR',{month:'long',year:'numeric'});
     const nomeMesFmt=nomeMes.charAt(0).toUpperCase()+nomeMes.slice(1);
 
-    // Busca o mês inteiro + semanas dentro do mês (para breakdown semanal)
-    const [rMes]=await Promise.all([
-      db.from('entregas').select('valor_corrida,valor_entregador,created_at').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim)
+    // Busca o mês inteiro + vales do mês
+    const [rMes, rValesMes]=await Promise.all([
+      db.from('entregas').select('valor_corrida,valor_entregador,created_at,loja_id,entregue_at,l:loja_id(taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim),
+      db.from('vales_entregadores').select('valor').eq('entregador_id',U.id).gte('created_at',inicio).lte('created_at',fim).catch(()=>({data:[]}))
     ]);
     const dados=rMes.data||[];
-    const totalMes=dados.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+    const totalBrutoMes=dados.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+
+    // Combustível do mês (mesmo cálculo do carregarGanhos)
+    let totalCombMes=0;
+    const combCtrlMes={};
+    dados.forEach(e=>{
+      if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
+      const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
+      const chave=`${e.loja_id}_${dt.toISOString().split('T')[0]}_${dt.getHours()<16?'a':'j'}`;
+      if(!combCtrlMes[chave]){combCtrlMes[chave]=true;totalCombMes+=parseFloat(e.l.taxa_fixo_base);}
+    });
+
+    const totalValesMes=(rValesMes.data||[]).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const liquidoMes=totalBrutoMes+totalCombMes-totalValesMes;
 
     // Divide por semana do mês (S1=dias 1-7, S2=8-14, S3=15-21, S4=22-fim)
     const semanas=[0,0,0,0];const cntSem=[0,0,0,0];
@@ -4198,10 +4212,12 @@ async function carregarResumoGanhos(){
     el.innerHTML=`
       <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:12px;padding:14px;text-align:center;margin-bottom:8px;color:white;">
         <p style="font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${nomeMesFmt}</p>
-        <p style="font-size:32px;font-weight:900;margin:4px 0;">${fR(totalMes)}</p>
+        <p style="font-size:32px;font-weight:900;margin:4px 0;">${fR(liquidoMes)}</p>
         <p style="font-size:12px;opacity:.85;">${dados.length} corrida${dados.length!==1?'s':''}</p>
+        ${totalValesMes>0?`<p style="font-size:11px;opacity:.9;margin-top:2px;">✅ já descontado R$${totalValesMes.toFixed(2)} em vales</p>`:''}
+        ${totalCombMes>0?`<p style="font-size:11px;opacity:.9;">⛽ inclui R$${totalCombMes.toFixed(2)} combustível</p>`:''}
       </div>
-      ${totalMes>0?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px;">
+      ${dados.length>0?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px;">
         ${semanas.map((v,i)=>v>0||cntSem[i]>0?`<div style="background:#f5f5f5;border-radius:8px;padding:7px 4px;text-align:center;">
           <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">${semLabels[i]}</p>
           <p style="font-size:13px;font-weight:800;color:#2e7d32;">${fR(v)}</p>
@@ -4225,20 +4241,25 @@ async function carregarResumoGanhos(){
     const inicioMes=new Date(agora.getFullYear(),agora.getMonth(),1);
     const fimMes=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
 
-    const[rH,rO,rS,rM]=await Promise.all([
+    const[rH,rO,rS,rM,rVales]=await Promise.all([
       db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()).lte('created_at',new Date().toISOString()),
       db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString()),
       db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()).lte('created_at',fimSem.toISOString()),
       db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()),
+      db.from('vales_entregadores').select('valor,created_at').eq('entregador_id',U.id).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()).catch(()=>({data:[]}))
     ]);
     const soma=arr=>(arr||[]).reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
     const dH=rH.data||[],dO=rO.data||[],dS=rS.data||[],dM=rM.data||[];
+    const valesHoje=(rVales.data||[]).filter(v=>new Date(v.created_at)>=inicioHoje).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const valesOntem=(rVales.data||[]).filter(v=>{const d=new Date(v.created_at);return d>=inicioOntem&&d<=fimOntem;}).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const valesSem=(rVales.data||[]).filter(v=>new Date(v.created_at)>=inicioSem).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const valesMes=(rVales.data||[]).reduce((s,v)=>s+parseFloat(v.valor||0),0);
 
     const cards=[
-      {label:'Hoje',val:soma(dH),cnt:dH.length,bg:'#e8f5e9',cor:'#2e7d32',per:'hoje',id:'gnhf-hoje'},
-      {label:'Ontem',val:soma(dO),cnt:dO.length,bg:'#fff3e0',cor:'#e65100',per:'ontem',id:'gnhf-ontem'},
-      {label:'Esta Semana',val:soma(dS),cnt:dS.length,bg:'#e3f2fd',cor:'#1565C0',per:'semana',id:'gnhf-semana'},
-      {label:'Este Mês',val:soma(dM),cnt:dM.length,bg:'#f3e5f5',cor:'#6a1b9a',per:'mes',id:'gnhf-mes'},
+      {label:'Hoje',val:soma(dH)-valesHoje,cnt:dH.length,bg:'#e8f5e9',cor:'#2e7d32',per:'hoje',id:'gnhf-hoje'},
+      {label:'Ontem',val:soma(dO)-valesOntem,cnt:dO.length,bg:'#fff3e0',cor:'#e65100',per:'ontem',id:'gnhf-ontem'},
+      {label:'Esta Semana',val:soma(dS)-valesSem,cnt:dS.length,bg:'#e3f2fd',cor:'#1565C0',per:'semana',id:'gnhf-semana'},
+      {label:'Este Mês',val:soma(dM)-valesMes,cnt:dM.length,bg:'#f3e5f5',cor:'#6a1b9a',per:'mes',id:'gnhf-mes'},
     ];
     el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
       ${cards.map(c=>`<div style="background:${c.bg};border-radius:10px;padding:12px;text-align:center;cursor:pointer;${per===c.per?'border:2px solid '+c.cor+';':''}" onclick="filtroGanhos('${c.per}',$('${c.id}'))">
