@@ -3148,6 +3148,30 @@ async function carregarRel(){
     pE[k].kmTotal+=parseFloat(e.distancia_km||0);
   });
   const entArr=Object.values(pE).sort((a,b)=>b.lista.length-a.lista.length);
+
+  // Busca vales de todos os entregadores do período de uma vez
+  const entIds=entArr.map(e=>e._id).filter(Boolean);
+  let valesPorEnt={};
+  if(entIds.length){
+    try{
+      const{data:vd}=await db.from('vales_entregadores')
+        .select('entregador_id,valor,observacao,created_at')
+        .eq('loja_id',U.id)
+        .in('entregador_id',entIds)
+        .gte('created_at',dtIni).lte('created_at',dtFim);
+      (vd||[]).forEach(v=>{
+        if(!valesPorEnt[v.entregador_id])valesPorEnt[v.entregador_id]=[];
+        valesPorEnt[v.entregador_id].push(v);
+      });
+    }catch(e){}
+  }
+  // Adiciona totalVales e liquido a cada entregador
+  entArr.forEach(e=>{
+    e.vales=valesPorEnt[e._id]||[];
+    e.totalVales=e.vales.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    e.liquido=e.total-e.totalVales;
+  });
+
   const melhor=entArr[0];
   const pior=entArr[entArr.length-1];
   const cores=['#FF6B35','#004E89','#00C9A7','#8e44ad','#e74c3c','#f39c12','#27ae60'];
@@ -3230,41 +3254,47 @@ async function carregarRel(){
   <div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
     <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">💰 Custo Detalhado por Entregador</div>
     ${entArr.map((ent,i)=>`
-    <div style="padding:10px 0;border-bottom:1px solid #f5f5f5;" data-total="${ent.total}">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
+    <div style="padding:12px 0;border-bottom:1px solid #f0f0f0;">
+
+      <!-- Linha principal: nome + valor a pagar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
         <div style="display:flex;align-items:center;gap:7px;">
-          <div style="width:10px;height:10px;border-radius:50%;background:${cores[i%cores.length]};"></div>
-          <strong style="font-size:13px;">${ent.nome}</strong>
+          <div style="width:10px;height:10px;border-radius:50%;background:${cores[i%cores.length]};flex-shrink:0;"></div>
+          <strong style="font-size:14px;">${ent.nome}</strong>
         </div>
-        <span style="font-weight:700;color:#004E89;font-size:13px;">${fR(ent.total)}</span>
+        <div style="text-align:right;">
+          ${ent.totalVales>0?`<div style="font-size:11px;color:#999;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
+          <div style="font-size:16px;font-weight:900;color:${ent.liquido>0?'#2e7d32':'#e74c3c'};">${fR(ent.liquido)}</div>
+          ${ent.totalVales>0?`<div style="font-size:10px;color:#e74c3c;">-${fR(ent.totalVales)} em vales</div>`:''}
+        </div>
       </div>
-      <div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:#666;flex-wrap:wrap;">
-        <span>🚀 ${ent.lista.length} corridas</span>
-        <span>✅ ${ent.entregues} entregues</span>
-        <span>📏 ${ent.kmTotal.toFixed(1)}km total</span>
-        <span>📊 Média: ${fR(ent.lista.length>0?ent.total/ent.lista.length:0)}/corrida</span>
+
+      <!-- Resumo rápido -->
+      <div style="font-size:11px;color:#777;margin-bottom:8px;">
+        ✅ ${ent.entregues} entregues · 📏 ${ent.kmTotal.toFixed(1)}km · 📊 média ${fR(ent.lista.length>0?ent.total/ent.lista.length:0)}/corrida
       </div>
-      <!-- Chave Pix do entregador -->
-      <div style="margin-top:7px;background:${ent.chave_pix?'#e8f5e9':'#fff3e0'};border:1px solid ${ent.chave_pix?'#a5d6a7':'#ffcc02'};border-radius:7px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+
+      <!-- PIX -->
+      <div style="background:${ent.chave_pix?'#e8f5e9':'#fff3e0'};border:1px solid ${ent.chave_pix?'#a5d6a7':'#ffcc02'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
         <div>
-          <span style="font-size:10px;font-weight:700;color:${ent.chave_pix?'#2e7d32':'#e65100'};">💰 PIX PAGAMENTO</span><br>
-          <span style="font-size:12px;font-weight:700;color:${ent.chave_pix?'#1b5e20':'#bf360c'};">${ent.chave_pix||'⚠️ Chave Pix não cadastrada'}</span>
-          ${ent.telefone?`<span style="font-size:10px;color:#888;display:block;margin-top:2px;">📞 ${ent.telefone}</span>`:''}
+          <div style="font-size:10px;font-weight:700;color:${ent.chave_pix?'#2e7d32':'#e65100'};">💰 PIX PAGAMENTO</div>
+          <div style="font-size:13px;font-weight:700;color:${ent.chave_pix?'#1b5e20':'#bf360c'};">${ent.chave_pix||'⚠️ Chave Pix não cadastrada'}</div>
+          ${ent.telefone?`<div style="font-size:10px;color:#888;">📞 ${ent.telefone}</div>`:''}
         </div>
-        ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋 Copiar',2000)})" style="background:#27ae60;color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
+        ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋 Copiar',2000)})" style="background:#27ae60;color:white;border:none;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
       </div>
-      <!-- Vale: apenas para entregadores reais (não "Sem entregador") -->
-      ${ent._id&&ent._id!=='sem'?`<div style="margin-top:7px;">
-        <button onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#FF6B35;color:white;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">💸 Registrar Vale / Adiantamento</button>
-        <div id="vales-lst-${ent._id}" style="margin-top:6px;"></div>
+
+      <!-- Vales do período (inline, sem clicar) -->
+      ${ent.vales.length>0?`<div style="background:#fff8e1;border-radius:7px;padding:8px 10px;margin-bottom:8px;border:1px solid #ffe082;">
+        ${ent.vales.map(v=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
+          <span style="color:#555;">💸 ${v.observacao||'Vale'} · <span style="color:#aaa;">${new Date(v.created_at).toLocaleDateString('pt-BR')}</span></span>
+          <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
+        </div>`).join('')}
       </div>`:''}
-      <!-- Barra de taxa de conclusão -->
-      <div style="margin-top:6px;">
-        <div style="font-size:10px;color:#888;margin-bottom:2px;">Taxa de conclusão: ${ent.lista.length>0?Math.round(ent.entregues/ent.lista.length*100):0}%</div>
-        <div style="background:#f0f0f0;border-radius:20px;height:6px;overflow:hidden;">
-          <div style="background:${ent.lista.length>0&&ent.entregues/ent.lista.length>=0.8?'#27ae60':'#e74c3c'};height:100%;width:${ent.lista.length>0?Math.round(ent.entregues/ent.lista.length*100):0}%;border-radius:20px;transition:width .5s;"></div>
-        </div>
-      </div>
+
+      <!-- Botão registrar novo vale -->
+      <button onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#FF6B35;color:white;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">💸 Registrar Vale / Adiantamento</button>
+
     </div>`).join('')}
   </div>
 
