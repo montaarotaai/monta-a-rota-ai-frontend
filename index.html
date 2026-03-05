@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monta Rotaí</title>
+<title>Monta Rotaí v7</title>
 <!-- ╔══════════════════════════════════════════════════════╗
      ║  MONTA ROTAÍ — Sistema Proprietário                 ║
      ║  © 2025 Monta Rotaí. Todos os direitos reservados.  ║
@@ -426,6 +426,22 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       </div>
       <div id="taxa-msg" style="font-size:12px;margin-top:5px;"></div>
     </div>
+    <!-- Promoção Chuva -->
+    <div class="secao" id="lj-chuva-secao">
+      <div class="s-title">🌧️ Promoção Chuva</div>
+      <p style="font-size:12px;color:#666;margin-bottom:9px;">Ative quando chover, for domingo ou feriado. O valor extra é somado às corridas <strong>a partir do momento da ativação</strong>.</p>
+      <div class="g2b" style="margin-bottom:9px;">
+        <div class="fg"><label>Valor extra por entrega (R$)</label>
+          <input type="number" id="lj-chuva-valor" step="0.50" min="0" placeholder="Ex: 3.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;">
+        </div>
+        <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+          <button id="lj-chuva-btn" class="btn btn-blue" onclick="togglePromocaoChuva()" style="padding:10px;">🌧️ Ativar Promoção</button>
+        </div>
+      </div>
+      <div id="lj-chuva-status" class="hidden" style="background:#e3f2fd;border-radius:8px;padding:10px;font-size:12px;color:#004E89;font-weight:700;text-align:center;"></div>
+      <div id="lj-chuva-msg" style="font-size:12px;margin-top:5px;"></div>
+    </div>
+
     <!-- Mapa -->
     <div class="secao">
       <div class="s-title">&#128205; Entregadores Online</div>
@@ -842,7 +858,42 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="btn btn-primary" onclick="salvarCfgEnt()">Salvar</button>
 </div></div>
 
-<!-- ========== MODAL TERMOS DE USO ========== -->
+<!-- Modal Realocar Pedido (Loja) -->
+<div id="m-realocar" class="modal"><div class="modal-box">
+  <button class="modal-close" onclick="closeM('realocar')">&times;</button>
+  <h2 style="margin-bottom:9px;">🔄 Realocar Pedido</h2>
+  <input type="hidden" id="realocar-ped-id">
+  <p id="realocar-ped-info" style="font-size:13px;color:#555;margin-bottom:12px;background:#f0f4ff;padding:9px;border-radius:8px;"></p>
+  <div class="fg">
+    <label>Entregador atual será substituído por:</label>
+    <select id="realocar-select" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;">
+      <option value="">Selecione entregador...</option>
+      <option value="__devolver__">↩️ Devolver para lista (sem entregador)</option>
+    </select>
+  </div>
+  <div id="realocar-msg" style="margin-bottom:8px;"></div>
+  <button class="btn btn-primary" onclick="confirmarRealocar()">✅ Confirmar Realocação</button>
+</div></div>
+
+<!-- Modal Vale Entregador -->
+<div id="m-vale" class="modal"><div class="modal-box">
+  <button class="modal-close" onclick="closeM('vale')">&times;</button>
+  <h2 style="margin-bottom:9px;">💸 Registrar Vale</h2>
+  <input type="hidden" id="vale-ent-id">
+  <p id="vale-ent-info" style="font-size:13px;color:#555;margin-bottom:10px;background:#fff3e0;padding:9px;border-radius:8px;"></p>
+  <div class="fg">
+    <label>Valor do Vale (R$)</label>
+    <input type="number" id="vale-valor" step="0.50" min="0.01" placeholder="Ex: 50.00" style="padding:10px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:15px;width:100%;">
+  </div>
+  <div class="fg">
+    <label>Motivo / Observação (opcional)</label>
+    <input type="text" id="vale-obs" placeholder="Ex: Vale combustível, adiantamento..." style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;width:100%;">
+  </div>
+  <div id="vale-msg" style="margin-bottom:8px;"></div>
+  <button class="btn btn-orange" onclick="confirmarVale()">✅ Registrar Vale e Descontar</button>
+</div></div>
+
+<!-- Termos de Uso -->
 <div id="m-termos" class="modal"><div class="modal-box" style="max-height:90vh;overflow-y:auto;padding:20px;">
   <button class="modal-close" onclick="closeM('termos')">&times;</button>
   <div style="text-align:center;margin-bottom:16px;">
@@ -2130,6 +2181,8 @@ async function initLoja(){
   criarMapa('loja');await pullLj();
   ivs.mLj=setInterval(pullLj,5000);
   iniciarRealtimeDrivers('loja');
+  // Inicializa promoção chuva
+  initPromocaoChuva();
 }
 
 async function pullLj(){
@@ -2535,7 +2588,10 @@ async function salvarPedido(){
   const rua=v('p-rua');if(!rua){showM('ped-msg','Informe a rua de entrega');return;}
   const num=v('p-nend'),bairro=v('p-bairro'),cidade=v('p-cidade')||'Ribeirao Preto',comp=v('p-comp');
   const geo=window._pedidoGeo;
-  const valor=geo?geo.valor:(U.taxa_entrega||0);
+  const valorBase=geo?geo.valor:(U.taxa_entrega||0);
+  // Adiciona bônus de chuva se promoção estiver ativa
+  const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
+  const valor=valorBase+chuvaBonus;
   const dist=geo?geo.dist:0;
   const dados={
     loja_id:U.id,
@@ -2553,7 +2609,9 @@ async function salvarPedido(){
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){showM('ped-msg','Erro: '+error.message);return;}
-  showM('ped-msg','Pedido salvo! '+fR(valor),true);
+  let msg='Pedido salvo! '+fR(valor);
+  if(chuvaBonus>0)msg+=' (inclui +'+fR(chuvaBonus)+' 🌧️ chuva)';
+  showM('ped-msg',msg,true);
   const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
   setTimeout(()=>closeM('pedido'),1300);
@@ -2810,6 +2868,7 @@ async function carregarPedidos(){
         <button class="btn-sm green" onclick="ljFinalizarEntrega('${e.id}')">✅ Finalizar</button>
         <button class="btn-sm red" onclick="cancelarEnt('${e.id}')">✖ Cancelar</button>
         ${e.status==='pendente'?`<button class="btn-sm orange" onclick="avisarPedidoPronto()">🔔 Pronto</button>`:''}
+        <button class="btn-sm purple" onclick="abrirRealocarLoja('${e.id}','${(e.numero_pedido||e.cliente_nome||'Entrega').replace(/'/g,"\\'")}','${e.entregador?e.entregador.nome.replace(/'/g,"\\'"):''}')">🔄 Realocar</button>
       </div>
     </div>`;
   }).join('');
@@ -3036,6 +3095,7 @@ async function carregarRel(){
     const nome=e.entregador?.nome||'Sem entregador';
     if(!pE[k]){
       pE[k]={
+        _id:k==='sem'?null:k,
         nome,
         telefone:e.entregador?.telefone||null,
         chave_pix:e.entregador?.chave_pix||null,
@@ -3155,6 +3215,11 @@ async function carregarRel(){
         </div>
         ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋 Copiar',2000)})" style="background:#27ae60;color:white;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
       </div>
+      <!-- Vale: apenas para entregadores reais (não "Sem entregador") -->
+      ${ent._id&&ent._id!=='sem'?`<div style="margin-top:7px;">
+        <button onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#FF6B35;color:white;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">💸 Registrar Vale / Adiantamento</button>
+        <div id="vales-lst-${ent._id}" style="margin-top:6px;"></div>
+      </div>`:''}
       <!-- Barra de taxa de conclusão -->
       <div style="margin-top:6px;">
         <div style="font-size:10px;color:#888;margin-bottom:2px;">Taxa de conclusão: ${ent.lista.length>0?Math.round(ent.entregues/ent.lista.length*100):0}%</div>
@@ -3243,6 +3308,12 @@ async function carregarRel(){
         datasets:[{label:'Entregas/dia',data:dias.map(d=>pDia[d]),borderColor:'#FF6B35',backgroundColor:'rgba(255,107,53,.1)',tension:.3,fill:true}]
       },options:{responsive:true,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},stepSize:1}}}}});
     }
+    // Carregar vales de cada entregador
+    entArr.forEach(ent=>{
+      if(ent._id&&ent._id!=='sem'){
+        carregarValesParaEnt(ent._id);
+      }
+    });
   },150);
 }
 
@@ -4146,7 +4217,30 @@ async function carregarGanhos(){
   const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
   const{inicio,fim}=periodoRange(per,per==='mes'?_gnhMesOffset:0);
   const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
-  if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';return;}
+
+  // Busca vales do mesmo período (de todas as lojas vinculadas)
+  let valesData=[];
+  try{
+    const{data:vd}=await db.from('vales_entregadores')
+      .select('valor,observacao,created_at,loja:loja_id(nome_loja,nome)')
+      .eq('entregador_id',U.id)
+      .gte('created_at',inicio)
+      .lte('created_at',fim)
+      .order('created_at',{ascending:false});
+    valesData=vd||[];
+  }catch(e){}
+
+  if(!data||!data.length){
+    // Ainda mostra vales mesmo sem entregas
+    if(valesData.length){
+      const totalVales=valesData.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+      el.innerHTML=`<p style="color:#999;text-align:center;padding:10px">Nenhuma entrega no período.</p>
+        ${renderValesEnt(valesData,totalVales)}`;
+    }else{
+      el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega no período.</p>';
+    }
+    return;
+  }
   const tot=data.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
 
   // ── Calcula Combustível por Turno ──
@@ -4168,6 +4262,8 @@ async function carregarGanhos(){
     }
   });
   const totGeral=tot+totalCombustivel;
+  const totalVales=valesData.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+  const saldoFinal=totGeral-totalVales;
 
   // Label dinâmico para meses passados
   let labelPer='';
@@ -4183,12 +4279,14 @@ async function carregarGanhos(){
   el.innerHTML=`
     <div style="background:#e8f5e9;padding:12px;border-radius:11px;text-align:center;margin-bottom:12px;border:2px solid #00C9A7;">
       <p style="font-size:11px;color:#666;">${labelPer} — ${data.length} entrega(s)</p>
-      <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(totGeral)}</p>
+      <p style="font-size:28px;font-weight:800;color:#2e7d32;">${fR(saldoFinal)}</p>
+      ${totalVales>0?`<p style="font-size:11px;color:#e74c3c;margin-top:2px;">💸 Vales descontados: ${fR(totalVales)}</p>`:''}
       ${totalCombustivel>0?`<div style="margin-top:6px;display:flex;justify-content:center;gap:14px;font-size:12px;color:#555;">
         <span>🛵 Corridas: <strong>${fR(tot)}</strong></span>
         <span>⛽ Combustível: <strong>${fR(totalCombustivel)}</strong></span>
       </div>`:''}
     </div>
+    ${totalVales>0?renderValesEnt(valesData,totalVales):''}
     <p style="font-size:12px;font-weight:700;color:#444;margin-bottom:6px;">📋 Detalhes das corridas:</p>
     ${data.map((e,i)=>{
       const hr=e.entregue_at?new Date(e.entregue_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
@@ -4207,6 +4305,288 @@ async function carregarGanhos(){
         <span class="badge b-entregue" style="margin-top:4px;display:inline-block;">✅ Entregue</span>
       </div>`;
     }).join('')}`;
+}
+
+function renderValesEnt(vales,total){
+  if(!vales||!vales.length)return'';
+  return`<div style="background:#fff3e0;border-radius:10px;padding:12px;margin-bottom:12px;border:2px solid #FF6B35;">
+    <p style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:7px;">💸 VALES / ADIANTAMENTOS — Total descontado: <span style="color:#e74c3c;">${fR(total)}</span></p>
+    ${vales.map(v=>{
+      const dt=new Date(v.created_at).toLocaleDateString('pt-BR')+' '+new Date(v.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      const nomeLoja=v.loja?v.loja.nome_loja||v.loja.nome:'Loja';
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #ffe08066;">
+        <div>
+          <strong style="font-size:12px;">${v.observacao||'Vale'}</strong><br>
+          <span style="font-size:10px;color:#888;">🏪 ${nomeLoja} — ${dt}</span>
+        </div>
+        <strong style="color:#e74c3c;font-size:14px;">-${fR(v.valor)}</strong>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ============================================================
+// PROMOÇÃO CHUVA
+// ============================================================
+let _chuvaAtiva=false;
+let _chuvaInicio=null; // timestamp ISO do momento de ativação
+
+async function initPromocaoChuva(){
+  // Carrega estado de chuva salvo no banco para a loja
+  try{
+    const{data:cfg}=await db.from('usuarios').select('promocao_chuva_ativa,promocao_chuva_inicio,promocao_chuva_valor').eq('id',U.id).single();
+    if(cfg){
+      _chuvaAtiva=cfg.promocao_chuva_ativa||false;
+      _chuvaInicio=cfg.promocao_chuva_inicio||null;
+      if(cfg.promocao_chuva_valor){
+        const el=$('lj-chuva-valor');if(el)el.value=parseFloat(cfg.promocao_chuva_valor).toFixed(2);
+      }
+      atualizarUIChuva();
+    }
+  }catch(e){}
+}
+
+function atualizarUIChuva(){
+  const btn=$('lj-chuva-btn');
+  const statusEl=$('lj-chuva-status');
+  if(!btn||!statusEl)return;
+  if(_chuvaAtiva){
+    btn.textContent='⏹️ Desativar Promoção';
+    btn.style.background='#e74c3c';
+    statusEl.classList.remove('hidden');
+    const inicio=_chuvaInicio?new Date(_chuvaInicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
+    statusEl.textContent='🌧️ PROMOÇÃO CHUVA ATIVA desde '+inicio+' — Entregas a partir deste horário recebem o valor extra.';
+  }else{
+    btn.textContent='🌧️ Ativar Promoção';
+    btn.style.background='#004E89';
+    statusEl.classList.add('hidden');
+  }
+}
+
+async function togglePromocaoChuva(){
+  const valorEl=$('lj-chuva-valor');
+  const msgEl=$('lj-chuva-msg');
+  if(!_chuvaAtiva){
+    // Ativar
+    const valor=parseFloat(valorEl?valorEl.value:0);
+    if(!valor||valor<=0){
+      if(msgEl){msgEl.style.color='#e53935';msgEl.textContent='❌ Informe um valor válido para a promoção chuva.';}
+      return;
+    }
+    _chuvaAtiva=true;
+    _chuvaInicio=new Date().toISOString();
+    try{
+      await db.from('usuarios').update({
+        promocao_chuva_ativa:true,
+        promocao_chuva_inicio:_chuvaInicio,
+        promocao_chuva_valor:valor
+      }).eq('id',U.id);
+    }catch(e){console.warn('[chuva ativar]',e);}
+    U.promocao_chuva_ativa=true;
+    U.promocao_chuva_inicio=_chuvaInicio;
+    U.promocao_chuva_valor=valor;
+    salvarU();
+    if(msgEl){msgEl.style.color='#2e7d32';msgEl.textContent='✅ Promoção chuva ativada! Valor extra: R$ '+valor.toFixed(2)+'/entrega.';}
+  }else{
+    // Desativar
+    _chuvaAtiva=false;
+    try{
+      await db.from('usuarios').update({
+        promocao_chuva_ativa:false,
+        promocao_chuva_inicio:null
+      }).eq('id',U.id);
+    }catch(e){console.warn('[chuva desativar]',e);}
+    U.promocao_chuva_ativa=false;
+    salvarU();
+    if(msgEl){msgEl.style.color='#555';msgEl.textContent='Promoção chuva desativada.';}
+  }
+  atualizarUIChuva();
+  setTimeout(()=>{if(msgEl)msgEl.textContent='';},3000);
+}
+
+// Calcula o valor extra de chuva para um pedido baseado no horário de criação
+function calcularValorChuva(createdAt, lojaId){
+  // Para pedidos da loja atual (U.id)
+  if(lojaId&&lojaId!==U.id)return 0;
+  if(!_chuvaAtiva||!_chuvaInicio)return 0;
+  const criacao=new Date(createdAt);
+  const inicio=new Date(_chuvaInicio);
+  if(criacao>=inicio){
+    return parseFloat(U.promocao_chuva_valor||0);
+  }
+  return 0;
+}
+
+// ============================================================
+// REALOCAR PEDIDO (LOJA)
+// ============================================================
+async function abrirRealocarLoja(pedId, pedInfo, entAtual){
+  $('realocar-ped-id').value=pedId;
+  const info=pedInfo+(entAtual?'\nEntregador atual: '+entAtual:'\nSem entregador atribuído');
+  $('realocar-ped-info').textContent=info;
+  clearM('realocar-msg');
+
+  // Carrega todos entregadores vinculados à loja (online ou não)
+  const sel=$('realocar-select');
+  sel.innerHTML='<option value="">Carregando...</option>';
+  const{data:assoc}=await db.from('loja_entregadores')
+    .select('entregador_id,e:entregador_id(id,nome,online)')
+    .eq('loja_id',U.id);
+
+  sel.innerHTML='<option value="">Selecione entregador...</option><option value="__devolver__">↩️ Devolver para lista (sem entregador)</option>';
+  if(assoc&&assoc.length){
+    assoc.forEach(a=>{
+      if(!a.e)return;
+      const status=a.e.online?'🟢 Online':'⚫ Offline';
+      const opt=document.createElement('option');
+      opt.value=a.e.id;
+      opt.textContent=a.e.nome+' — '+status;
+      sel.appendChild(opt);
+    });
+  }
+  openM('realocar');
+}
+
+async function confirmarRealocar(){
+  const pedId=$('realocar-ped-id').value;
+  const novoEnt=$('realocar-select').value;
+  if(!novoEnt){showM('realocar-msg','Selecione um entregador ou "Devolver para lista".',false);return;}
+
+  if(novoEnt==='__devolver__'){
+    // Remover entregador — volta para pendente
+    const{error}=await db.from('entregas').update({
+      entregador_id:null,
+      status:'pendente',
+      status_detalhado:'pendente',
+      aceito_at:null,
+      pedido_pronto:false
+    }).eq('id',pedId);
+    if(error){showM('realocar-msg','❌ Erro: '+error.message,false);return;}
+    showM('realocar-msg','✅ Pedido devolvido para a lista!',true);
+  }else{
+    // Atribuir a novo entregador
+    const{error}=await db.from('entregas').update({
+      entregador_id:novoEnt,
+      status:'aceito',
+      status_detalhado:'aceito',
+      aceito_at:new Date().toISOString(),
+      pedido_pronto:true
+    }).eq('id',pedId);
+    if(error){showM('realocar-msg','❌ Erro: '+error.message,false);return;}
+    showM('realocar-msg','✅ Pedido realocado com sucesso!',true);
+  }
+  setTimeout(()=>{closeM('realocar');carregarPedidos();},1200);
+}
+
+// ============================================================
+// VALE ENTREGADOR
+// ============================================================
+async function abrirValeEnt(entId, entNome){
+  $('vale-ent-id').value=entId;
+
+  // Busca saldo a receber do entregador no período atual (semana)
+  const{ini:dtIni,fim:dtFim}=getRelPeriodoHelper('semana');
+  const{data:ents}=await db.from('entregas')
+    .select('valor_corrida,valor_entregador')
+    .eq('entregador_id',entId)
+    .eq('loja_id',U.id)
+    .in('status',['entregue'])
+    .gte('created_at',dtIni)
+    .lte('created_at',dtFim);
+
+  // Busca vales já lançados da semana
+  let valesExist=[];
+  try{
+    const{data:vd}=await db.from('vales_entregadores')
+      .select('valor,observacao,created_at')
+      .eq('entregador_id',entId)
+      .eq('loja_id',U.id)
+      .gte('created_at',dtIni)
+      .lte('created_at',dtFim);
+    valesExist=vd||[];
+  }catch(e){}
+
+  const totalGanhos=(ents||[]).reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  const totalVales=valesExist.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+  const saldoDisp=totalGanhos-totalVales;
+
+  $('vale-ent-info').innerHTML=`<strong>${entNome}</strong><br>
+    Ganhos esta semana: <strong style="color:#2e7d32;">${fR(totalGanhos)}</strong><br>
+    Vales já lançados: <strong style="color:#e74c3c;">${fR(totalVales)}</strong><br>
+    Saldo disponível: <strong style="color:${saldoDisp>=0?'#1565c0':'#e74c3c'};">${fR(saldoDisp)}</strong>`;
+
+  $('vale-valor').value='';
+  $('vale-obs').value='';
+  clearM('vale-msg');
+  openM('vale');
+}
+
+function getRelPeriodoHelper(per){
+  const agora=new Date();
+  let ini,fim=new Date(agora);fim.setHours(23,59,59,999);
+  if(per==='hoje'){ini=new Date(agora);ini.setHours(0,0,0,0);}
+  else if(per==='semana'){
+    ini=new Date(agora);ini.setDate(ini.getDate()-((agora.getDay()+6)%7));ini.setHours(0,0,0,0);
+    fim=new Date(ini);fim.setDate(fim.getDate()+6);fim.setHours(23,59,59,999);
+  }
+  else{ini=new Date(agora.getFullYear(),agora.getMonth(),1);fim=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);}
+  return{ini:ini.toISOString(),fim:fim.toISOString()};
+}
+
+async function confirmarVale(){
+  const entId=$('vale-ent-id').value;
+  const valor=parseFloat($('vale-valor').value);
+  const obs=$('vale-obs').value||'Vale';
+  if(!valor||valor<=0){showM('vale-msg','❌ Informe um valor válido para o vale.',false);return;}
+
+  const dados={
+    entregador_id:entId,
+    loja_id:U.id,
+    valor:valor,
+    observacao:obs,
+    created_at:new Date().toISOString(),
+    criado_por:U.id
+  };
+
+  const{error}=await db.from('vales_entregadores').insert([dados]);
+  if(error){
+    // Tabela pode não existir — cria via JS storage como fallback
+    const chave='vales_'+U.id+'_'+entId;
+    const valesList=JSON.parse(localStorage.getItem(chave)||'[]');
+    valesList.push({...dados,local:true});
+    localStorage.setItem(chave,JSON.stringify(valesList));
+    showM('vale-msg','⚠️ Vale registrado localmente (banco: '+error.message+'). Execute o SQL para criar a tabela vales_entregadores.',false);
+  }else{
+    showM('vale-msg','✅ Vale de '+fR(valor)+' registrado com sucesso!',true);
+  }
+  setTimeout(()=>{closeM('vale');carregarRel();},1400);
+}
+
+async function carregarValesParaEnt(entId){
+  const el=document.getElementById('vales-lst-'+entId);
+  if(!el)return;
+  try{
+    const{ini:dtIni,fim:dtFim}=getRelPeriodoHelper($('rel-f').value||'semana');
+    const{data:vales}=await db.from('vales_entregadores')
+      .select('valor,observacao,created_at')
+      .eq('entregador_id',entId)
+      .eq('loja_id',U.id)
+      .gte('created_at',dtIni)
+      .lte('created_at',dtFim)
+      .order('created_at',{ascending:false});
+    if(!vales||!vales.length){el.innerHTML='';return;}
+    const totalVales=vales.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    el.innerHTML=`<div style="background:#fff3e0;border-radius:7px;padding:8px 10px;border:1px solid #ffcc02;">
+      <p style="font-size:10px;font-weight:700;color:#e65100;margin-bottom:5px;">💸 VALES NO PERÍODO — Total: ${fR(totalVales)}</p>
+      ${vales.map(v=>{
+        const dt=new Date(v.created_at).toLocaleDateString('pt-BR')+' '+new Date(v.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0;border-top:1px solid #ffe08050;">
+          <span style="color:#555;">${v.observacao||'Vale'} — <span style="color:#888;font-size:10px;">${dt}</span></span>
+          <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }catch(e){el.innerHTML='';}
 }
 
 async function abrirCfgEnt(){
@@ -4235,7 +4615,29 @@ function aceitarTermosModal(){
   closeM('termos');
 }
 
-// Gera PDF do termo de aceite usando jsPDF
+// ============================================================
+// SQL NECESSÁRIO NO SUPABASE PARA AS NOVAS FUNCIONALIDADES:
+// (execute no SQL Editor do Supabase)
+//
+// -- Promoção Chuva (campos na tabela usuarios):
+// ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promocao_chuva_ativa boolean DEFAULT false;
+// ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promocao_chuva_inicio timestamptz;
+// ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS promocao_chuva_valor numeric DEFAULT 0;
+//
+// -- Tabela de Vales de Entregadores:
+// CREATE TABLE IF NOT EXISTS vales_entregadores (
+//   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+//   entregador_id uuid REFERENCES usuarios(id),
+//   loja_id uuid REFERENCES usuarios(id),
+//   valor numeric NOT NULL,
+//   observacao text,
+//   criado_por uuid,
+//   created_at timestamptz DEFAULT now()
+// );
+// CREATE INDEX IF NOT EXISTS idx_vales_entregador ON vales_entregadores(entregador_id);
+// CREATE INDEX IF NOT EXISTS idx_vales_loja ON vales_entregadores(loja_id);
+// ============================================================
+
 async function gerarPdfTermo({nome,email,tipo,data}){
   const{jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
