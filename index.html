@@ -3749,6 +3749,8 @@ async function carregarRel(){
         },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{font:{size:10},callback:v=>'R$'+v.toFixed(2)}},x:{ticks:{font:{size:10}}}}}});
       }
     }
+    // Entregas por dia
+    const c3=document.getElementById('lj-chart-dias');
     if(c3&&dias.length>1){
       if(c3._ch)c3._ch.destroy();
       c3._ch=new Chart(c3,{type:'line',data:{
