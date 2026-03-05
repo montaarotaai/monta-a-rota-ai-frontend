@@ -2191,7 +2191,7 @@ async function initLoja(){
     if($('lj-km-limite2'))$('lj-km-limite2').value=parseFloat(U.taxa_km_limite||7).toFixed(1);
     if($('lj-taxa-km-exc2'))$('lj-taxa-km-exc2').value=parseFloat(U.taxa_km_excedente||0).toFixed(2);
   }else{if($('lj-taxa-new'))$('lj-taxa-new').value=parseFloat(U.taxa_entrega||0).toFixed(2);}
-  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
+  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
   // Geocode loja
   if(U.loja_lat&&U.loja_lng){lojaGeoCache={lat:U.loja_lat,lng:U.loja_lng};}
@@ -2630,7 +2630,7 @@ async function salvarPedido(){
   let msg='Pedido salvo! '+fR(valor);
   if(chuvaBonus>0)msg+=' (inclui +'+fR(chuvaBonus)+' 🌧️ chuva)';
   showM('ped-msg',msg,true);
-  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
+  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
   setTimeout(()=>closeM('pedido'),1300);
 }
@@ -3088,7 +3088,7 @@ async function salvarEdicaoPedido(){
 async function marcarEnt(id){
   await db.from('entregas').update({status:'entregue',status_detalhado:'entregue',entregue_at:new Date().toISOString()}).eq('id',id);
   carregarPedidos();
-  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).gte('created_at',iDia()).lte('created_at',fDia());
+  const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
 }
 async function cancelarEnt(id){if(!confirm('Cancelar esta entrega?'))return;await db.from('entregas').update({status:'cancelado',status_detalhado:'cancelado'}).eq('id',id);carregarPedidos();}
@@ -3116,7 +3116,7 @@ async function carregarRel(){
     return{ini:ini.toISOString(),fim:fim.toISOString()};
   }
   const{ini:dtIni,fim:dtFim}=getRelPeriodo(p);
-  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome,telefone,chave_pix,placa_moto)').eq('loja_id',U.id).gte('created_at',dtIni).lte('created_at',dtFim);
+  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome,telefone,chave_pix,placa_moto)').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',dtIni).lte('created_at',dtFim);
   if(!ents||!ents.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no período.</p>';return;}
 
   const tS=ents.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
@@ -3124,14 +3124,16 @@ async function carregarRel(){
   const entregues=ents.filter(e=>e.status==='entregue');
   const taxaConc=ents.length>0?Math.round(entregues.length/ents.length*100):0;
 
-  // Dados por entregador
+  // Dados por entregador — ignora pedidos sem entregador no detalhamento
   const pE={};
   ents.forEach(e=>{
+    // Pedidos sem entregador atribuído: conta nos totais gerais mas não cria card individual
     const k=e.entregador_id||'sem';
-    const nome=e.entregador?.nome||'Sem entregador';
+    const nome=e.entregador?.nome||null;
+    if(k==='sem')return; // pula — não cria grupo "Sem entregador"
     if(!pE[k]){
       pE[k]={
-        _id:k==='sem'?null:k,
+        _id:k,
         nome,
         telefone:e.entregador?.telefone||null,
         chave_pix:e.entregador?.chave_pix||null,
@@ -4606,16 +4608,21 @@ async function confirmarVale(){
 
   const{error}=await db.from('vales_entregadores').insert([dados]);
   if(error){
-    // Tabela pode não existir — cria via JS storage como fallback
+    // Fallback local enquanto SQL não foi rodado
     const chave='vales_'+U.id+'_'+entId;
     const valesList=JSON.parse(localStorage.getItem(chave)||'[]');
     valesList.push({...dados,local:true});
     localStorage.setItem(chave,JSON.stringify(valesList));
-    showM('vale-msg','⚠️ Vale registrado localmente (banco: '+error.message+'). Execute o SQL para criar a tabela vales_entregadores.',false);
+    $('vale-msg').innerHTML='<div style="background:#fff3e0;border:1.5px solid #FF9800;border-radius:8px;padding:10px;font-size:12px;">'
+      +'<strong style="color:#e65100;">⚠️ SQL não executado no Supabase</strong><br>'
+      +'<span style="color:#555;">O vale foi salvo localmente, mas <strong>não vai aparecer para o entregador</strong> nem persistir se limpar o cache.<br><br>'
+      +'Para funcionar de verdade, rode o arquivo <strong>montarotai_setup_v2.sql</strong> no SQL Editor do Supabase.</span>'
+      +'</div>';
+    return; // não fecha o modal — deixa o usuário ver o aviso
   }else{
     showM('vale-msg','✅ Vale de '+fR(valor)+' registrado com sucesso!',true);
+    setTimeout(()=>{closeM('vale');carregarRel();},1400);
   }
-  setTimeout(()=>{closeM('vale');carregarRel();},1400);
 }
 
 async function carregarValesParaEnt(entId){
