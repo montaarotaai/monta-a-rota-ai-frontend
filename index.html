@@ -3863,7 +3863,9 @@ async function abrirHistCorridas(entId, entNome, periodo){
         <button onclick="$('hist-corridas-box').innerHTML='';$('hist-corridas-box').dataset.aberto='';" style="background:none;border:1.5px solid #eaecf0;border-radius:8px;padding:7px 20px;font-size:12px;font-weight:700;color:#555;cursor:pointer;">✕ Fechar</button>
       </div>
     </div>`;
-}openM('ger');$('ger-cod').textContent=U.codigo_loja||'------';carregarGer();}
+}
+
+async function abrirGerEnt(){openM('ger');$('ger-cod').textContent=U.codigo_loja||'------';carregarGer();}
 async function carregarGer(){
   $('ger-lst').innerHTML='<p>Carregando...</p>';
   const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(id,nome,telefone,placa_moto,chave_pix,online)').eq('loja_id',U.id);
