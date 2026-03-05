@@ -81,26 +81,35 @@ const ADJACENCIA_RP = {
   'jardim california':    ['jardim abussafe', 'nova alianca'],
 };
 
-// ── Calcula compatibilidade entre dois bairros (0=incompatível, 1=mesmo, 0.7=adjacente) ──
-function compatBairros(b1, b2) {
-  if (!b1 || !b2) return 0.3; // sem info = tenta junto
+// ── Calcula compatibilidade entre dois bairros ───────────────────
+// Retorna: 1.0=mesmo bairro, 0.75=adjacente, 0.4=vizinho de vizinho, 0.0=distante
+// Se bairro for null (coluna ainda não existe no banco), usa distância física como fallback
+function compatBairros(b1, b2, lat1, lng1, lat2, lng2) {
+  // Fallback geográfico quando não tem bairro resolvido
+  if (!b1 || !b2) {
+    if (lat1 && lng1 && lat2 && lng2) {
+      const d = distKm(lat1, lng1, lat2, lng2);
+      if (d < 2.0) return 0.85;  // muito próximos = provavelmente mesmo bairro
+      if (d < 4.0) return 0.55;  // razoavelmente próximos
+      if (d < 7.0) return 0.25;  // longe
+      return 0.0;                 // muito longe
+    }
+    return 0.3; // sem coordenadas — tenta junto
+  }
   const n1 = normBairro(b1);
   const n2 = normBairro(b2);
   if (n1 === n2) return 1.0;
 
-  // Verifica adjacência no mapa
   const vizinhos1 = ADJACENCIA_RP[n1] || [];
   const vizinhos2 = ADJACENCIA_RP[n2] || [];
   if (vizinhos1.some(v => normBairro(v) === n2)) return 0.75;
   if (vizinhos2.some(v => normBairro(v) === n1)) return 0.75;
 
-  // Verifica vizinhos de vizinhos (2 graus de separação = ainda aceitável)
   for (const v of vizinhos1) {
     const vizinhosV = ADJACENCIA_RP[normBairro(v)] || [];
     if (vizinhosV.some(vv => normBairro(vv) === n2)) return 0.4;
   }
-
-  return 0.0; // bairros distantes — não agrupar
+  return 0.0;
 }
 
 // ── Normaliza chave de endereço para deduplicar paradas ─────────
@@ -172,9 +181,6 @@ function calcularValorCorrida(distancia, taxaTipo, taxaBase, kmLimite, taxaExced
   return taxaBase;
 }
 
-// ── Pausa mínima entre requests ao Nominatim (respeita rate limit) ──
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 // ══════════════════════════════════════════════════════════════════
 //  ALGORITMO PRINCIPAL v3 — Cluster por Bairro Real (OSM)
 //
@@ -201,9 +207,10 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
   });
   const paradaList = Object.values(mapaEnds);
 
-  // ── PASSO 2: Geocode + Reverse Geocode de cada parada ───────────
-  const paradasGeo = [];
-  for (const grupo of paradaList) {
+  // ── PASSO 2: Geocode + Reverse Geocode — PARALELO com Promise.all ─
+  // Resolve todas as paradas em paralelo para não estourar timeout Vercel.
+  // Cada etapa tem try/catch individual — falha em uma não derruba tudo.
+  const paradasGeo = await Promise.all(paradaList.map(async (grupo) => {
     const rep = grupo[0];
     let lat = parseFloat(rep.lat_entrega || 0);
     let lng = parseFloat(rep.lng_entrega || 0);
@@ -212,39 +219,40 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
 
     // 2a. Geocode se não tiver coordenadas
     if (!lat || !lng) {
-      await sleep(300); // respeita rate limit Nominatim
-      const g = await geocode(rep.endereco_entrega);
-      if (g) {
-        lat = g.lat; lng = g.lng;
-        for (const p of grupo) {
-          await db.from('entregas').update({ lat_entrega: lat, lng_entrega: lng }).eq('id', p.id);
-        }
-      } else { geocodeFailed = true; lat = 0; lng = 0; }
+      try {
+        const g = await geocode(rep.endereco_entrega);
+        if (g) {
+          lat = g.lat; lng = g.lng;
+          // Persiste coords — ignora erro se coluna não existir
+          db.from('entregas').update({ lat_entrega: lat, lng_entrega: lng })
+            .in('id', grupo.map(p => p.id)).catch(() => {});
+        } else { geocodeFailed = true; }
+      } catch(e) { geocodeFailed = true; }
     }
 
-    // 2b. Reverse geocode → bairro real do OSM
-    if (!geocodeFailed && !bairro) {
-      await sleep(300);
-      bairro = await reverseGeocodeBairro(lat, lng);
-      // Persiste o bairro para não consultar de novo
-      if (bairro) {
-        for (const p of grupo) {
-          await db.from('entregas').update({ bairro_geocodificado: bairro }).eq('id', p.id).catch(() => {});
+    // 2b. Reverse geocode → bairro real (só se tem coordenadas e ainda não tem bairro)
+    if (!geocodeFailed && lat && lng && !bairro) {
+      try {
+        bairro = await reverseGeocodeBairro(lat, lng);
+        // Persiste bairro — ignora erro caso coluna bairro_geocodificado ainda não exista
+        if (bairro) {
+          db.from('entregas').update({ bairro_geocodificado: bairro })
+            .in('id', grupo.map(p => p.id)).catch(() => {});
         }
-      }
+      } catch(e) { /* falha silenciosa — bairro fica null, usa fallback */ }
     }
 
-    const dist = geocodeFailed ? 0 : distKm(baseLat, baseLng, lat, lng);
-    paradasGeo.push({
+    const dist = (geocodeFailed || !lat || !lng) ? 0 : distKm(baseLat, baseLng, lat, lng);
+    return {
       ids: grupo.map(p => p.id),
       labels: grupo.map(p => p.numero_pedido ? '#' + p.numero_pedido : p.cliente_nome || 'Entrega'),
       end: rep.endereco_entrega || '',
-      lat, lng, dist, geocodeFailed,
-      bairro: bairro || 'Sem bairro',
+      lat: lat || 0, lng: lng || 0, dist, geocodeFailed,
+      bairro: bairro || null,
       bairroNorm: normBairro(bairro || ''),
       qtdPeds: grupo.length
-    });
-  }
+    };
+  }));
 
   // Ordena por distância (mais próximo primeiro)
   paradasGeo.sort((a, b) => a.dist - b.dist);
@@ -261,10 +269,9 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
     let melhorScore = 0;
 
     for (const cluster of clusters) {
-      // Compatibilidade = média com todos os bairros do cluster
       let totalScore = 0;
       for (const p of cluster) {
-        totalScore += compatBairros(parada.bairro, p.bairro);
+        totalScore += compatBairros(parada.bairro, p.bairro, parada.lat, parada.lng, p.lat, p.lng);
       }
       const avgScore = totalScore / cluster.length;
       if (avgScore > 0.5 && avgScore > melhorScore) {
@@ -311,7 +318,9 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
         let pares = 0;
         for (const p of cluster) {
           for (const bairroExistente of g.bairros) {
-            totalAfin += compatBairros(p.bairro, bairroExistente);
+            // Pega coordenada de uma parada já atribuída com esse bairro
+            const pExist = g.paradas.find(x => x.bairro === bairroExistente);
+            totalAfin += compatBairros(p.bairro, bairroExistente, p.lat, p.lng, pExist?.lat, pExist?.lng);
             pares++;
           }
         }
@@ -345,7 +354,7 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
       outro.paradas.forEach(p => {
         // Verifica se p tem bairro compatível com este entregador
         let afin = 0;
-        g.bairros.forEach(b => { afin = Math.max(afin, compatBairros(p.bairro, b)); });
+        g.paradas.forEach(gp => { afin = Math.max(afin, compatBairros(p.bairro, gp.bairro, p.lat, p.lng, gp.lat, gp.lng)); });
         if (afin >= 0.75) { // mesmo bairro ou adjacente direto
           extras.push({ end: p.end, labels: p.labels, dist: p.dist, bairro: p.bairro });
         }
