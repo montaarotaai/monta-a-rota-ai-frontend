@@ -287,9 +287,12 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
     }
   }
 
-  // ── PASSO 4: Distribui clusters entre entregadores ───────────────
-  // Ordena clusters por tamanho (maior primeiro = mais eficiente)
-  clusters.sort((a, b) => b.length - a.length);
+  // ── PASSO 4: Distribui paradas entre entregadores ───────────────
+  // REGRA PRINCIPAL: Use o MÍNIMO de entregadores possível.
+  // Só aciona um novo entregador quando o anterior lotou (chegou no limite).
+  // Dentro do limite, agrupa por compatibilidade de bairro.
+  // Resultado: 4 pedidos com limite=3 → 1 entregador (3 pedidos) + 1 entregador (1 pedido)
+  //            NUNCA → 3 entregadores com 2+1+1
 
   const grupos_ent = entregadores.map(ent => ({
     entId: ent.id,
@@ -300,46 +303,56 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
     totalKm: 0
   }));
 
-  // Atribui cada cluster ao entregador com mais afinidade e espaço
-  const clustersNaoAtribuidos = [...clusters];
+  // Junta todas as paradas de todos os clusters numa lista única
+  // ordenada: menor distância da loja primeiro (pedido mais rápido de entregar)
+  const todasParadas = clusters.flat().sort((a, b) => a.dist - b.dist);
 
-  for (const cluster of clustersNaoAtribuidos) {
-    // Encontra entregador com mais espaço e maior compatibilidade de bairros
+  // Distribui: para cada parada, tenta encaixar no entregador que:
+  //   1. Ainda tem espaço (totalParadas < limite)
+  //   2. Tem o maior score de compatibilidade de bairro
+  //   3. Se empate, prefere o que já tem mais paradas (consolida antes de abrir novo entregador)
+  for (const parada of todasParadas) {
+    // Filtra entregadores com espaço
+    const comEspaco = grupos_ent.filter(g => g.totalParadas < limite);
+    if (!comEspaco.length) break; // todos lotados
+
     let melhorEnt = null;
     let melhorScore = -1;
 
-    for (const g of grupos_ent) {
-      if (g.totalParadas >= limite) continue;
-      // Score = espaço disponível + afinidade de bairros já atribuídos
-      const espaco = (limite - g.totalParadas) / limite;
-      let afinidade = 1.0; // se vazio, aceita qualquer cluster
-      if (g.bairros.size > 0) {
-        let totalAfin = 0;
-        let pares = 0;
-        for (const p of cluster) {
-          for (const bairroExistente of g.bairros) {
-            // Pega coordenada de uma parada já atribuída com esse bairro
-            const pExist = g.paradas.find(x => x.bairro === bairroExistente);
-            totalAfin += compatBairros(p.bairro, bairroExistente, p.lat, p.lng, pExist?.lat, pExist?.lng);
-            pares++;
-          }
+    for (const g of comEspaco) {
+      // Afinidade de bairro com as paradas já atribuídas (peso 85%)
+      let afinidade;
+      if (g.paradas.length === 0) {
+        afinidade = 0.05; // entregador vazio = baixíssima prioridade
+      } else {
+        let soma = 0;
+        for (const gp of g.paradas) {
+          soma += compatBairros(parada.bairro, gp.bairro, parada.lat, parada.lng, gp.lat, gp.lng);
         }
-        afinidade = pares > 0 ? totalAfin / pares : 0;
+        afinidade = soma / g.paradas.length;
       }
-      const score = espaco * 0.4 + afinidade * 0.6;
-      if (score > melhorScore) { melhorScore = score; melhorEnt = g; }
+
+      // Bonus de consolidação: leve preferência por quem já tem pedidos (peso 15%)
+      // Isso garante: preenche o entregador atual antes de acionar o próximo
+      const consolidacao = g.totalParadas > 0 ? 0.15 : 0.0;
+      const score = afinidade * 0.85 + consolidacao;
+
+      if (score > melhorScore) {
+        melhorScore = score;
+        melhorEnt = g;
+      }
     }
 
-    if (!melhorEnt) melhorEnt = grupos_ent.reduce((a, b) => a.totalParadas <= b.totalParadas ? a : b);
-
-    // Adiciona paradas do cluster ao entregador, respeitando limite
-    for (const p of cluster) {
-      if (melhorEnt.totalParadas >= limite) break;
-      melhorEnt.paradas.push(p);
-      melhorEnt.bairros.add(p.bairro);
-      melhorEnt.totalParadas++;
-      melhorEnt.totalKm += p.dist;
+    // Se nenhum entregador tem boa afinidade de bairro (bairros incompatíveis entre si),
+    // distribui para o que tem MENOS paradas — balanceia carga sem desperdiçar entregadores
+    if (melhorScore < 0.2) {
+      melhorEnt = comEspaco.reduce((a, b) => a.totalParadas <= b.totalParadas ? a : b);
     }
+
+    melhorEnt.paradas.push(parada);
+    melhorEnt.bairros.add(parada.bairro);
+    melhorEnt.totalParadas++;
+    melhorEnt.totalKm += parada.dist;
   }
 
   // ── PASSO 5: SUGESTÃO INTELIGENTE ───────────────────────────────
