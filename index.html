@@ -430,23 +430,25 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <button class="btn btn-blue" onclick="salvarTaxaLj()" style="margin-top:4px;">Salvar Configuracao de Taxa</button>
       </div>
       <div id="taxa-msg" style="font-size:12px;margin-top:5px;"></div>
+
+      <!-- Incentivos (Chuva/Domingo/Feriado) — dentro das configurações -->
+      <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e0e0e0;">
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px;">🌧️ Incentivo (Chuva · Domingo · Feriado)</div>
+        <p style="font-size:11px;color:#888;margin-bottom:8px;line-height:1.4;">Valor extra por entrega ativado manualmente quando chover, for domingo ou feriado.</p>
+        <div class="g2b" style="margin-bottom:8px;">
+          <div class="fg"><label style="font-size:11px;">Valor extra (R$)</label>
+            <input type="number" id="lj-chuva-valor" step="0.50" min="0" placeholder="Ex: 3.00" style="padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;width:100%;">
+          </div>
+          <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+            <button id="lj-chuva-btn" class="btn btn-blue" onclick="togglePromocaoChuva()" style="padding:9px;font-size:12px;">🌧️ Ativar Incentivo</button>
+          </div>
+        </div>
+        <div id="lj-chuva-status" class="hidden" style="background:#e3f2fd;border-radius:8px;padding:9px;font-size:11px;color:#004E89;font-weight:700;text-align:center;"></div>
+        <div id="lj-chuva-msg" style="font-size:11px;margin-top:4px;"></div>
+      </div>
       </div><!-- /taxa-cfg-panel -->
     </div>
-    <!-- Promoção Chuva -->
-    <div class="secao" id="lj-chuva-secao">
-      <div class="s-title">🌧️ Promoção Chuva</div>
-      <p style="font-size:12px;color:#666;margin-bottom:9px;">Ative quando chover, for domingo ou feriado. O valor extra é somado às corridas <strong>a partir do momento da ativação</strong>.</p>
-      <div class="g2b" style="margin-bottom:9px;">
-        <div class="fg"><label>Valor extra por entrega (R$)</label>
-          <input type="number" id="lj-chuva-valor" step="0.50" min="0" placeholder="Ex: 3.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;">
-        </div>
-        <div style="display:flex;flex-direction:column;justify-content:flex-end;">
-          <button id="lj-chuva-btn" class="btn btn-blue" onclick="togglePromocaoChuva()" style="padding:10px;">🌧️ Ativar Promoção</button>
-        </div>
-      </div>
-      <div id="lj-chuva-status" class="hidden" style="background:#e3f2fd;border-radius:8px;padding:10px;font-size:12px;color:#004E89;font-weight:700;text-align:center;"></div>
-      <div id="lj-chuva-msg" style="font-size:12px;margin-top:5px;"></div>
-    </div>
+    <!-- Promoção Chuva standalone — removida, agora dentro das configurações -->
 
     <!-- Mapa -->
     <div class="secao">
@@ -645,12 +647,18 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 </div></div>
 
 <!-- Relatorio Loja -->
-<div id="m-rel" class="modal"><div class="modal-box">
+<div id="m-rel" class="modal"><div class="modal-box" style="max-width:520px;">
   <button class="modal-close" onclick="closeM('rel')">&times;</button>
-  <h2 style="margin-bottom:9px;">&#128202; Relatorio Financeiro</h2>
-  <select id="rel-f" onchange="carregarRel()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:11px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <div style="width:38px;height:38px;background:linear-gradient(135deg,#004E89,#00C9A7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📊</div>
+    <div>
+      <h2 style="margin:0;font-size:17px;">Relatório Financeiro</h2>
+      <div style="font-size:11px;color:#888;margin-top:1px;">Visão completa por período</div>
+    </div>
+  </div>
+  <select id="rel-f" onchange="carregarRel()" style="width:100%;padding:10px 12px;border:2px solid #e8ecf0;border-radius:10px;margin-bottom:14px;font-size:13px;font-weight:600;color:#333;background:white;appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M6 8L0 0h12z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 12px center;">
     <option value="hoje">Hoje</option>
-    <option value="semana" selected>Esta semana (Seg-Dom)</option>
+    <option value="semana" selected>Esta semana (Seg–Dom)</option>
     <option value="semana_passada">Semana passada</option>
     <option value="mes">Este mês</option>
     <option value="mes_passado">Mês passado</option>
@@ -3478,133 +3486,210 @@ async function carregarRel(){
   const dias=Object.keys(pDia).sort();
 
   el.innerHTML=`
-  <!-- RESUMO CARDS -->
-  <div class="g2b" style="gap:8px;margin-bottom:10px;">
-    <div style="background:#fff3e0;border-radius:10px;padding:11px;text-align:center;">
-      <div style="font-size:10px;color:#888;">Total Entregas</div>
-      <div style="font-size:24px;font-weight:700;color:#FF6B35;">${ents.length}</div>
+  <style>
+    .rel-card{background:white;border-radius:14px;border:1.5px solid #eaecf0;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+    .rel-card-title{font-size:11px;font-weight:800;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+    .rel-kpi{background:white;border-radius:12px;border:1.5px solid #eaecf0;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+    .rel-kpi-val{font-size:22px;font-weight:900;line-height:1.1;margin:3px 0 1px;}
+    .rel-kpi-lbl{font-size:10px;color:#999;font-weight:600;letter-spacing:.3px;}
+    .rel-ent-card{border:1.5px solid #eaecf0;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+    .rel-ent-header{padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;}
+    .rel-ent-body{padding:0 14px 12px;}
+    .rel-pill{display:inline-flex;align-items:center;gap:4px;background:#f0f4ff;border:1px solid #d0daf5;border-radius:20px;padding:3px 9px;font-size:10px;font-weight:700;color:#004E89;}
+    .rel-divider{border:none;border-top:1.5px solid #eaecf0;margin:10px 0;}
+    .rel-action-btn{width:100%;border:none;border-radius:9px;padding:10px;font-size:12px;font-weight:800;cursor:pointer;transition:opacity .2s;}
+    .rel-action-btn:hover{opacity:.85;}
+  </style>
+
+  <!-- KPIs PRINCIPAIS -->
+  <div class="rel-card">
+    <div class="rel-card-title">📦 Resumo do Período</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+      <div class="rel-kpi" style="border-color:#ffe0b2;">
+        <div class="rel-kpi-val" style="color:#FF6B35;">${ents.length}</div>
+        <div class="rel-kpi-lbl">Entregas</div>
+      </div>
+      <div class="rel-kpi" style="border-color:#c8e6c9;">
+        <div class="rel-kpi-val" style="color:#2e7d32;">${taxaConc}%</div>
+        <div class="rel-kpi-lbl">Conclusão</div>
+      </div>
+      <div class="rel-kpi" style="border-color:#bbdefb;">
+        <div class="rel-kpi-val" style="color:#004E89;font-size:16px;">${fR(tS)}</div>
+        <div class="rel-kpi-lbl">Taxa Sist.</div>
+      </div>
+      <div class="rel-kpi" style="border-color:#e1bee7;">
+        <div class="rel-kpi-val" style="color:#6a1b9a;font-size:16px;">${fR(tE)}</div>
+        <div class="rel-kpi-lbl">Custo Ent.</div>
+      </div>
     </div>
-    <div style="background:#e8f5e9;border-radius:10px;padding:11px;text-align:center;">
-      <div style="font-size:10px;color:#888;">Concluídas</div>
-      <div style="font-size:24px;font-weight:700;color:#2e7d32;">${taxaConc}%</div>
-    </div>
-    <div style="background:#e3f2fd;border-radius:10px;padding:11px;text-align:center;">
-      <div style="font-size:10px;color:#888;">Taxa Sistema</div>
-      <div style="font-size:16px;font-weight:700;color:#004E89;">${fR(tS)}</div>
-    </div>
-    <div style="background:#f3e5f5;border-radius:10px;padding:11px;text-align:center;">
-      <div style="font-size:10px;color:#888;">Custo Entregad.</div>
-      <div style="font-size:16px;font-weight:700;color:#8e44ad;">${fR(tE)}</div>
-    </div>
+
+    ${(()=>{
+      const totalLiq=entArr.reduce((s,e)=>s+e.liquido,0);
+      const totalKm=entArr.reduce((s,e)=>s+e.kmTotal,0);
+      const mediaCorr=ents.length>0?tE/ents.length:0;
+      return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
+        <div class="rel-kpi" style="border-color:#c8e6c9;">
+          <div class="rel-kpi-val" style="color:#1b5e20;font-size:16px;">${fR(totalLiq)}</div>
+          <div class="rel-kpi-lbl">Total a Pagar</div>
+        </div>
+        <div class="rel-kpi">
+          <div class="rel-kpi-val" style="color:#555;font-size:16px;">${totalKm.toFixed(0)}km</div>
+          <div class="rel-kpi-lbl">KM Rodados</div>
+        </div>
+        <div class="rel-kpi">
+          <div class="rel-kpi-val" style="color:#555;font-size:16px;">${fR(mediaCorr)}</div>
+          <div class="rel-kpi-lbl">Média/Corrida</div>
+        </div>
+      </div>`;
+    })()}
   </div>
 
   <!-- MELHOR / PIOR -->
-  ${entArr.length>1?`<div class="g2b" style="gap:8px;margin-bottom:10px;">
-    <div style="background:#e8f5e9;border-radius:10px;padding:11px;border-left:4px solid #27ae60;">
-      <div style="font-size:10px;color:#27ae60;font-weight:700;">🏆 MAIS ENTREGAS</div>
-      <div style="font-weight:700;font-size:14px;margin-top:4px;">${melhor.nome}</div>
-      <div style="font-size:12px;color:#555;">${melhor.lista.length} corridas • ${fR(melhor.total)}</div>
-    </div>
-    <div style="background:#fce4ec;border-radius:10px;padding:11px;border-left:4px solid #e74c3c;">
-      <div style="font-size:10px;color:#e74c3c;font-weight:700;">📉 MENOS ENTREGAS</div>
-      <div style="font-weight:700;font-size:14px;margin-top:4px;">${pior.nome}</div>
-      <div style="font-size:12px;color:#555;">${pior.lista.length} corridas • ${fR(pior.total)}</div>
+  ${entArr.length>1?`<div class="rel-card" style="padding:0;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;">
+      <div style="padding:12px 14px;border-right:1.5px solid #eaecf0;">
+        <div style="font-size:10px;font-weight:800;color:#27ae60;letter-spacing:.5px;margin-bottom:5px;">🏆 MAIS ENTREGAS</div>
+        <div style="font-size:14px;font-weight:800;color:#222;">${melhor.nome.split(' ')[0]}</div>
+        <div style="font-size:12px;color:#555;margin-top:2px;">${melhor.lista.length} corridas</div>
+        <div style="font-size:13px;font-weight:700;color:#2e7d32;margin-top:2px;">${fR(melhor.liquido)}</div>
+      </div>
+      <div style="padding:12px 14px;">
+        <div style="font-size:10px;font-weight:800;color:#e74c3c;letter-spacing:.5px;margin-bottom:5px;">📉 MENOS ENTREGAS</div>
+        <div style="font-size:14px;font-weight:800;color:#222;">${pior.nome.split(' ')[0]}</div>
+        <div style="font-size:12px;color:#555;margin-top:2px;">${pior.lista.length} corridas</div>
+        <div style="font-size:13px;font-weight:700;color:#e74c3c;margin-top:2px;">${fR(pior.liquido)}</div>
+      </div>
     </div>
   </div>`:''}
 
-  <!-- GRÁFICO BARRAS POR ENTREGADOR -->
-  ${entArr.length>0?`<div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
-    <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">🛵 Corridas por Entregador</div>
-    <canvas id="lj-chart-bar" height="160"></canvas>
+  <!-- GRÁFICO BARRAS -->
+  ${entArr.length>0?`<div class="rel-card">
+    <div class="rel-card-title">🛵 Corridas por Entregador</div>
+    <canvas id="lj-chart-bar" height="150"></canvas>
   </div>`:''}
 
-  <!-- GRÁFICO BAIRROS -->
-  ${topBairros.length>0?`<div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
-    <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">📍 Regiões com mais entregas (Top ${topBairros.length})</div>
-    <canvas id="lj-chart-bairros" height="160"></canvas>
-    <div style="margin-top:8px;">
-      ${bairrosArr.map((b,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid #f5f5f5;">
-        <span>${i===0?'🔴':i===1?'🟠':i===2?'🟡':'⚪'} ${b[0]}</span>
-        <strong>${b[1]} entrega${b[1]>1?'s':''}</strong>
+  <!-- CUSTO POR ENTREGADOR — cards premium -->
+  <div class="rel-card">
+    <div class="rel-card-title">💰 Detalhamento por Entregador</div>
+    ${entArr.map((ent,i)=>{
+      const cor=cores[i%cores.length];
+      const initials=ent.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
+      return `<div class="rel-ent-card">
+        <!-- Header do card -->
+        <div class="rel-ent-header" style="background:linear-gradient(135deg,${cor}15,${cor}05);border-bottom:1.5px solid #eaecf0;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:42px;height:42px;border-radius:12px;background:${cor}22;border:2px solid ${cor}44;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:${cor};flex-shrink:0;">${initials}</div>
+            <div>
+              <div style="font-size:15px;font-weight:800;color:#222;">${ent.nome}</div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;">
+                <span class="rel-pill">✅ ${ent.entregues} entregues</span>
+                <span class="rel-pill">📏 ${ent.kmTotal.toFixed(1)}km</span>
+                <span class="rel-pill">📊 ${fR(ent.lista.length>0?ent.total/ent.lista.length:0)}/corrida</span>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            ${(ent.totalVales>0||ent.totalCombustivel>0)?`<div style="font-size:10px;color:#bbb;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
+            <div style="font-size:20px;font-weight:900;color:${ent.liquido>0?'#2e7d32':'#e74c3c'};">${fR(ent.liquido)}</div>
+            <div style="font-size:9px;color:#999;">a pagar</div>
+          </div>
+        </div>
+
+        <div class="rel-ent-body" style="padding-top:10px;">
+          <!-- Discriminação financeira -->
+          <div style="background:#f8fafc;border-radius:9px;padding:10px;border:1px solid #eaecf0;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#555;">
+              <span>🛵 Corridas (${ent.lista.length}x)</span><strong>${fR(ent.total)}</strong>
+            </div>
+            ${ent.totalCombustivel>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e65100;">
+              <span>⛽ Combustível</span><strong>+${fR(ent.totalCombustivel)}</strong>
+            </div>`:''}
+            ${ent.totalVales>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e74c3c;border-top:1px dashed #eee;margin-top:2px;padding-top:5px;">
+              <span>💸 Vales</span><strong>-${fR(ent.totalVales)}</strong>
+            </div>`:''}
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:5px 0 0;border-top:2px solid #eaecf0;margin-top:4px;color:${ent.liquido>=0?'#1b5e20':'#c62828'};">
+              <span>💰 Total a pagar</span><span>${fR(ent.liquido)}</span>
+            </div>
+          </div>
+
+          <!-- PIX -->
+          <div style="background:${ent.chave_pix?'#f0faf4':'#fffbf0'};border:1.5px solid ${ent.chave_pix?'#a5d6a7':'#ffe082'};border-radius:9px;padding:9px 11px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:9px;font-weight:800;color:${ent.chave_pix?'#2e7d32':'#e65100'};letter-spacing:.5px;">💰 PIX PAGAMENTO</div>
+              <div style="font-size:13px;font-weight:700;color:${ent.chave_pix?'#1b5e20':'#bf360c'};margin-top:2px;">${ent.chave_pix||'⚠️ Chave Pix não cadastrada'}</div>
+              ${ent.telefone?`<div style="font-size:10px;color:#888;margin-top:1px;">📞 ${ent.telefone}</div>`:''}
+            </div>
+            ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>{this.innerHTML='📋 Copiar'},2000)})" style="background:#27ae60;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
+          </div>
+
+          <!-- Vales -->
+          ${ent.vales.length>0?`<div style="background:#fffbf0;border:1.5px solid #ffe082;border-radius:9px;padding:9px 11px;margin-bottom:10px;">
+            <div style="font-size:9px;font-weight:800;color:#e65100;letter-spacing:.5px;margin-bottom:5px;">💸 VALES NO PERÍODO</div>
+            ${ent.vales.map(v=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
+              <span style="color:#555;">${v.observacao||'Vale'} <span style="color:#bbb;">· ${new Date(v.created_at).toLocaleDateString('pt-BR')}</span></span>
+              <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
+            </div>`).join('')}
+          </div>`:''}
+
+          <!-- Ações -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px;">
+            <button class="rel-action-btn" onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#fff3e0;color:#e65100;border:1.5px solid #ffcc80;">💸 Registrar Vale</button>
+            <button class="rel-action-btn" onclick="abrirHistCorridas('${ent._id}','${ent.nome.replace(/'/g,"\\'")}','${p}')" style="background:#f0f4ff;color:#004E89;border:1.5px solid #c5d5f5;">📋 Ver Corridas</button>
+          </div>
+          <button class="rel-action-btn" onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;">✅ Ver Extrato Completo / Pagar</button>
+          <div style="text-align:center;margin-top:6px;">
+            <button onclick="abrirHistPagamentos('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#004E89;font-size:11px;cursor:pointer;text-decoration:underline;">📜 Histórico de pagamentos anteriores</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <!-- REGIÕES -->
+  ${bairrosArr.length>0?`<div class="rel-card">
+    <div class="rel-card-title">📍 Regiões com Mais Entregas</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+      ${bairrosArr.slice(0,4).map((b,i)=>{
+        const pct=Math.round(b[1]/ents.length*100);
+        const bgCors=['#fff3e0','#e8f5e9','#e3f2fd','#f3e5f5'];
+        const txtCors=['#e65100','#2e7d32','#1565C0','#6a1b9a'];
+        return `<div style="background:${bgCors[i]};border:1.5px solid ${txtCors[i]}22;border-radius:10px;padding:10px;">
+          <div style="font-size:18px;font-weight:900;color:${txtCors[i]};">${b[1]}</div>
+          <div style="font-size:11px;font-weight:700;color:${txtCors[i]};margin:1px 0;">${b[0].length>18?b[0].substring(0,18)+'…':b[0]}</div>
+          <div style="font-size:10px;color:#999;">${pct}% das entregas</div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${bairrosArr.length>4?`<div style="border-top:1.5px solid #eaecf0;padding-top:8px;">
+      ${bairrosArr.slice(4).map(b=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #f5f5f5;">
+        <span style="color:#555;">📍 ${b[0]}</span>
+        <strong style="color:#333;">${b[1]} entrega${b[1]>1?'s':''}</strong>
       </div>`).join('')}
-    </div>
+    </div>`:''}
+    ${topBairros.length>0?`<canvas id="lj-chart-bairros" height="140" style="margin-top:10px;"></canvas>`:''}
   </div>`:''}
 
   <!-- GRÁFICO LINHA DIAS -->
-  ${dias.length>1?`<div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
-    <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">📈 Entregas por Dia</div>
-    <canvas id="lj-chart-dias" height="140"></canvas>
+  ${dias.length>1?`<div class="rel-card">
+    <div class="rel-card-title">📈 Entregas por Dia</div>
+    <canvas id="lj-chart-dias" height="130"></canvas>
   </div>`:''}
 
-  <!-- CUSTO POR ENTREGADOR -->
-  <div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
-    <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">💰 Custo Detalhado por Entregador</div>
-    ${entArr.map((ent,i)=>`
-    <div style="padding:12px 0;border-bottom:1px solid #f0f0f0;">
-
-      <!-- Linha principal: nome + valor a pagar -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div style="display:flex;align-items:center;gap:7px;cursor:pointer;" onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')">
-          <div style="width:10px;height:10px;border-radius:50%;background:${cores[i%cores.length]};flex-shrink:0;"></div>
-          <strong style="font-size:14px;color:#004E89;text-decoration:underline;">${ent.nome}</strong>
-        </div>
-        <div style="text-align:right;">
-          ${(ent.totalVales>0||ent.totalCombustivel>0)?`<div style="font-size:11px;color:#999;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
-          <div style="font-size:16px;font-weight:900;color:${ent.liquido>0?'#2e7d32':'#e74c3c'};">${fR(ent.liquido)}</div>
-          ${ent.totalCombustivel>0?`<div style="font-size:10px;color:#e65100;">+${fR(ent.totalCombustivel)} combustível</div>`:''}
-          ${ent.totalVales>0?`<div style="font-size:10px;color:#e74c3c;">-${fR(ent.totalVales)} em vales</div>`:''}
-        </div>
-      </div>
-
-      <!-- Resumo rápido -->
-      <div style="font-size:11px;color:#777;margin-bottom:8px;">
-        ✅ ${ent.entregues} entregues · 📏 ${ent.kmTotal.toFixed(1)}km · 📊 média ${fR(ent.lista.length>0?ent.total/ent.lista.length:0)}/corrida
-      </div>
-
-      <!-- PIX -->
-      <div style="background:${ent.chave_pix?'#e8f5e9':'#fff3e0'};border:1px solid ${ent.chave_pix?'#a5d6a7':'#ffcc02'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-        <div>
-          <div style="font-size:10px;font-weight:700;color:${ent.chave_pix?'#2e7d32':'#e65100'};">💰 PIX PAGAMENTO</div>
-          <div style="font-size:13px;font-weight:700;color:${ent.chave_pix?'#1b5e20':'#bf360c'};">${ent.chave_pix||'⚠️ Chave Pix não cadastrada'}</div>
-          ${ent.telefone?`<div style="font-size:10px;color:#888;">📞 ${ent.telefone}</div>`:''}
-        </div>
-        ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>this.textContent='📋 Copiar',2000)})" style="background:#27ae60;color:white;border:none;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
-      </div>
-
-      <!-- Vales do período (inline, sem clicar) -->
-      ${ent.vales.length>0?`<div style="background:#fff8e1;border-radius:7px;padding:8px 10px;margin-bottom:8px;border:1px solid #ffe082;">
-        ${ent.vales.map(v=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
-          <span style="color:#555;">💸 ${v.observacao||'Vale'} · <span style="color:#aaa;">${new Date(v.created_at).toLocaleDateString('pt-BR')}</span></span>
-          <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
-        </div>`).join('')}
-      </div>`:''}
-
-      <!-- Botão registrar novo vale -->
-      <button onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#FF6B35;color:white;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-bottom:6px;">💸 Registrar Vale / Adiantamento</button>
-
-      <!-- Botão pagar -->
-      <button onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;border:none;border-radius:7px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;width:100%;margin-bottom:4px;">✅ Ver Extrato Completo / Pagar</button>
-
-      <!-- Histórico de pagamentos anteriores -->
-      <div style="text-align:center;">
-        <button onclick="abrirHistPagamentos('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#004E89;font-size:11px;cursor:pointer;text-decoration:underline;">📜 Ver histórico de pagamentos anteriores</button>
-      </div>
-
-    </div>`).join('')}
-  </div>
-
-  <!-- GRÁFICO TAXA DE CONCLUSÃO -->
-  ${entArr.length>0?`<div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
-    <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">✅ Taxa de Conclusão por Entregador (%)</div>
-    <canvas id="lj-chart-taxa" height="140"></canvas>
+  <!-- TAXA DE CONCLUSÃO -->
+  ${entArr.length>0?`<div class="rel-card">
+    <div class="rel-card-title">✅ Taxa de Conclusão por Entregador</div>
+    <canvas id="lj-chart-taxa" height="130"></canvas>
   </div>`:''}
 
-  <!-- GRÁFICO CUSTO POR KM -->
-  ${entArr.filter(e=>e.kmTotal>0).length>0?`<div style="background:white;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.06);">
-    <div style="font-size:12px;font-weight:700;color:#333;margin-bottom:8px;">📏 Custo por Km (R$/km)</div>
-    <canvas id="lj-chart-km" height="140"></canvas>
-    <p style="font-size:10px;color:#888;margin-top:6px;">Menor custo/km = entregador mais eficiente por distância percorrida</p>
+  <!-- CUSTO POR KM -->
+  ${entArr.filter(e=>e.kmTotal>0).length>0?`<div class="rel-card">
+    <div class="rel-card-title">📏 Custo por KM Rodado</div>
+    <canvas id="lj-chart-km" height="130"></canvas>
+    <div style="font-size:10px;color:#aaa;margin-top:6px;text-align:center;">Menor custo/km = entregador mais eficiente por distância</div>
   </div>`:''}
+
+  <!-- MODAL HISTÓRICO CORRIDAS (inline) -->
+  <div id="hist-corridas-box"></div>
   </div>`;
 
   // Gráficos após render
@@ -3680,7 +3765,105 @@ async function carregarRel(){
   },150);
 }
 
-async function abrirGerEnt(){openM('ger');$('ger-cod').textContent=U.codigo_loja||'------';carregarGer();}
+// ============================================================
+// HISTÓRICO DE CORRIDAS POR ENTREGADOR
+// ============================================================
+async function abrirHistCorridas(entId, entNome, periodo){
+  const box=$('hist-corridas-box');
+  if(!box)return;
+  // Toggle — fecha se já está aberto para o mesmo entregador
+  if(box.dataset.aberto===entId){
+    box.innerHTML='';box.dataset.aberto='';return;
+  }
+  box.dataset.aberto=entId;
+  box.innerHTML=`<div style="text-align:center;padding:20px;color:#888;font-size:13px;">⏳ Carregando corridas...</div>`;
+  box.scrollIntoView({behavior:'smooth',block:'nearest'});
+
+  const{ini:dtIni,fim:dtFim}=getRelPeriodoHelper(periodo||'semana');
+  const{data:corridas}=await db.from('entregas')
+    .select('id,numero_pedido,cliente_nome,endereco_entrega,endereco_bairro,valor_corrida,valor_entregador,valor_incentivo,tipo_incentivo,distancia_km,created_at,entregue_at,status,pagamento_id')
+    .eq('entregador_id',entId).eq('loja_id',U.id)
+    .gte('created_at',dtIni).lte('created_at',dtFim)
+    .order('created_at',{ascending:false});
+
+  if(!corridas||!corridas.length){
+    box.innerHTML=`<div style="background:#f8fafc;border:1.5px solid #eaecf0;border-radius:14px;padding:16px;text-align:center;color:#aaa;font-size:13px;">Nenhuma corrida neste período para ${entNome}.</div>`;
+    return;
+  }
+
+  const totalVal=corridas.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  const entregues=corridas.filter(e=>e.status==='entregue');
+  const periodoLabels={hoje:'Hoje',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'};
+
+  box.innerHTML=`
+    <div style="background:white;border:1.5px solid #eaecf0;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-top:8px;">
+      <!-- Header -->
+      <div style="background:linear-gradient(135deg,#004E89,#0066b3);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="color:white;font-weight:800;font-size:14px;">📋 ${entNome}</div>
+          <div style="color:rgba(255,255,255,.75);font-size:11px;margin-top:2px;">${periodoLabels[periodo]||periodo} · ${corridas.length} corridas</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="color:white;font-size:20px;font-weight:900;">${fR(totalVal)}</div>
+          <div style="color:rgba(255,255,255,.7);font-size:10px;">bruto (sem combustível)</div>
+        </div>
+      </div>
+
+      <!-- Stats rápidos -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1.5px solid #eaecf0;">
+        <div style="padding:10px;text-align:center;border-right:1.5px solid #eaecf0;">
+          <div style="font-size:18px;font-weight:900;color:#2e7d32;">${entregues.length}</div>
+          <div style="font-size:10px;color:#888;">Entregues</div>
+        </div>
+        <div style="padding:10px;text-align:center;border-right:1.5px solid #eaecf0;">
+          <div style="font-size:18px;font-weight:900;color:#004E89;">${corridas.reduce((s,e)=>s+parseFloat(e.distancia_km||0),0).toFixed(0)}km</div>
+          <div style="font-size:10px;color:#888;">Total KM</div>
+        </div>
+        <div style="padding:10px;text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#8e44ad;">${fR(corridas.length>0?totalVal/corridas.length:0)}</div>
+          <div style="font-size:10px;color:#888;">Média</div>
+        </div>
+      </div>
+
+      <!-- Lista de corridas -->
+      <div style="max-height:320px;overflow-y:auto;padding:8px;">
+        ${corridas.map((e,i)=>{
+          const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
+          const diaFmt=dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
+          const hrFmt=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+          const turno=dt.getHours()<16?'🌤️':'🌙';
+          const val=parseFloat(e.valor_corrida||e.valor_entregador||0);
+          const inc=parseFloat(e.valor_incentivo||0);
+          const incLabels={chuva:'🌧️',domingo:'📅','chuva+domingo':'🌧️📅',feriado:'🎉'};
+          const statusColor=e.status==='entregue'?'#2e7d32':e.status==='cancelado'?'#e74c3c':'#f39c12';
+          return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 6px;border-bottom:1px solid #f5f5f5;">
+            <!-- Número -->
+            <div style="width:24px;height:24px;border-radius:8px;background:#f0f4ff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#004E89;flex-shrink:0;margin-top:1px;">${i+1}</div>
+            <!-- Info -->
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div style="font-size:12px;font-weight:700;color:#222;">${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</div>
+                <strong style="font-size:13px;color:${val>0?'#2e7d32':'#999'};flex-shrink:0;margin-left:8px;">${fR(val)}</strong>
+              </div>
+              <div style="font-size:10px;color:#888;margin-top:1px;">${turno} ${diaFmt} · ${hrFmt}</div>
+              <div style="font-size:10px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${e.endereco_entrega||'-'}</div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">
+                <span style="background:${statusColor}15;color:${statusColor};font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;border:1px solid ${statusColor}33;">${e.status}</span>
+                ${inc>0?`<span style="background:#e3f2fd;color:#1565C0;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;">${incLabels[e.tipo_incentivo]||'⭐'} +${fR(inc)}</span>`:''}
+                ${e.distancia_km>0?`<span style="background:#f5f5f5;color:#777;font-size:9px;padding:1px 6px;border-radius:8px;">📏 ${parseFloat(e.distancia_km).toFixed(1)}km</span>`:''}
+                ${e.pagamento_id?`<span style="background:#e8f5e9;color:#2e7d32;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;">💳 PAGO</span>`:''}
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Fechar -->
+      <div style="padding:10px;border-top:1.5px solid #eaecf0;text-align:center;">
+        <button onclick="$('hist-corridas-box').innerHTML='';$('hist-corridas-box').dataset.aberto='';" style="background:none;border:1.5px solid #eaecf0;border-radius:8px;padding:7px 20px;font-size:12px;font-weight:700;color:#555;cursor:pointer;">✕ Fechar</button>
+      </div>
+    </div>`;
+}openM('ger');$('ger-cod').textContent=U.codigo_loja||'------';carregarGer();}
 async function carregarGer(){
   $('ger-lst').innerHTML='<p>Carregando...</p>';
   const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(id,nome,telefone,placa_moto,chave_pix,online)').eq('loja_id',U.id);
