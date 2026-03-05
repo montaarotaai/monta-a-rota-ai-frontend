@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
-//  MONTA ROTAÍ — API Serverless: /api/calcular-rota  v2
+//  MONTA ROTAÍ — API Serverless: /api/calcular-rota  v3
 //  © 2025 Monta Rotaí. Sistema Proprietário. Todos os direitos
 //  reservados. Leis 9.609/98 e 9.610/98.
 //  ─────────────────────────────────────────────────────────────
-//  Este arquivo roda NO SERVIDOR (Vercel Serverless Function).
-//  O algoritmo de otimização de rota nunca chega ao navegador.
-//  Qualquer tentativa de cópia ou engenharia reversa viola a lei.
+//  ALGORITMO v3: Agrupamento por bairro/distrito REAL via
+//  reverse geocode do OpenStreetMap — não mais por ângulo.
+//  Paradas do mesmo bairro ou bairros adjacentes vão juntas.
 // ═══════════════════════════════════════════════════════════════
 
 const { createClient } = require('@supabase/supabase-js');
@@ -13,7 +13,7 @@ const { createClient } = require('@supabase/supabase-js');
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
 
-// ── Funções matemáticas ──────────────────────────────────────────
+// ── Distância Haversine ──────────────────────────────────────────
 function distKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -24,44 +24,86 @@ function distKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function angleDeg(lat1, lng1, lat2, lng2) {
-  return Math.atan2(lng2 - lng1, lat2 - lat1) * 180 / Math.PI;
+// ── Normaliza nome de bairro para comparação ─────────────────────
+function normBairro(s) {
+  if (!s) return '';
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(jardim|jd|vila|vl|parque|pq|conjunto|cj|residencial|res|distrito|dt|subsetor|setor)\b/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
-// ── Determina setor geográfico (N/S/L/O/Centro) ──────────────────
-// Retorna o setor baseado no ângulo e distância da loja
-function getSetor(baseLat, baseLng, lat, lng) {
-  if (!lat || !lng) return 'sem_coords';
-  const dist = distKm(baseLat, baseLng, lat, lng);
-  // Pedidos muito próximos = centro
-  if (dist < 1.5) return 'centro';
-  const ang = ((angleDeg(baseLat, baseLng, lat, lng) % 360) + 360) % 360;
-  // Norte: 315-360 e 0-45 (cima no mapa)
-  // Leste: 45-135
-  // Sul: 135-225
-  // Oeste: 225-315
-  if (ang >= 315 || ang < 45) return 'norte';
-  if (ang >= 45 && ang < 135) return 'leste';
-  if (ang >= 135 && ang < 225) return 'sul';
-  return 'oeste';
+// ── MAPA DE ADJACÊNCIA DE BAIRROS — Ribeirão Preto ──────────────
+// Bairros que fazem sentido ir juntos na mesma rota.
+// Baseado na geografia real da cidade: eixos viários, regiões.
+// Cada bairro lista seus vizinhos diretos (quem pode ir junto).
+const ADJACENCIA_RP = {
+  // ── ZONA SUL / BONFIM ────────────────────────────────────────
+  'bonfim paulista':      ['recreio das acácias', 'parque bonfim', 'jardim paulistano', 'jardim iraja', 'campos eliseos', 'subsetor sul'],
+  'recreio das acácias':  ['bonfim paulista', 'parque bonfim', 'subsetor sul'],
+  'parque bonfim':        ['bonfim paulista', 'recreio das acácias', 'jardim iraja'],
+  'jardim iraja':         ['parque bonfim', 'bonfim paulista', 'campos eliseos', 'jardim paulistano'],
+  'subsetor sul':         ['bonfim paulista', 'recreio das acácias', 'jardim paulistano', 'ribeirao verde'],
+  'ribeirao verde':       ['subsetor sul', 'jardim paulistano'],
+
+  // ── ZONA SUL / CAMPOS ELÍSEOS e entorno ─────────────────────
+  'campos eliseos':       ['jardim iraja', 'bonfim paulista', 'jardim paulistano', 'alto da boa vista', 'jardim america'],
+  'jardim paulistano':    ['campos eliseos', 'bonfim paulista', 'subsetor sul', 'jardim iraja', 'alto da boa vista'],
+  'alto da boa vista':    ['campos eliseos', 'jardim paulistano', 'jardim america', 'jardim sumare'],
+  'jardim america':       ['alto da boa vista', 'campos eliseos', 'jardim sumare', 'centro'],
+  'jardim sumare':        ['alto da boa vista', 'jardim america', 'centro'],
+
+  // ── CENTRO ──────────────────────────────────────────────────
+  'centro':               ['jardim america', 'jardim sumare', 'republica', 'campos eliseos', 'jardim paulista', 'alto da boa vista'],
+  'republica':            ['centro', 'jardim paulista', 'jardim america'],
+  'jardim paulista':      ['centro', 'republica', 'jardim paulistano'],
+
+  // ── ZONA NORTE ───────────────────────────────────────────────
+  'jardim pauliceia':     ['nova alianca', 'parque industrial lagoinha', 'jardim botanico', 'jardim nazareth'],
+  'nova alianca':         ['jardim pauliceia', 'parque industrial lagoinha', 'jardim botânico'],
+  'jardim botanico':      ['nova alianca', 'jardim pauliceia', 'jardim nazareth'],
+  'jardim nazareth':      ['jardim botanico', 'jardim pauliceia', 'lagoinha'],
+  'lagoinha':             ['jardim nazareth', 'parque industrial lagoinha'],
+  'parque industrial lagoinha': ['nova alianca', 'jardim pauliceia', 'lagoinha'],
+
+  // ── ZONA LESTE ───────────────────────────────────────────────
+  'jardim juliana':       ['vila virginia', 'jardim zara', 'jardim pedro mello'],
+  'vila virginia':        ['jardim juliana', 'jardim zara'],
+  'jardim zara':          ['vila virginia', 'jardim juliana', 'jardim pedro mello'],
+  'jardim pedro mello':   ['jardim juliana', 'jardim zara', 'jardim brasiliano'],
+  'jardim brasiliano':    ['jardim pedro mello', 'jardim caxambu'],
+  'jardim caxambu':       ['jardim brasiliano', 'jardim pedro mello'],
+
+  // ── ZONA OESTE ───────────────────────────────────────────────
+  'jardim irajá':         ['jardim iraja', 'campos eliseos', 'bonfim paulista'],
+  'jardim abussafe':      ['jardim iraja', 'jardim pauliceia'],
+  'jardim california':    ['jardim abussafe', 'nova alianca'],
+};
+
+// ── Calcula compatibilidade entre dois bairros (0=incompatível, 1=mesmo, 0.7=adjacente) ──
+function compatBairros(b1, b2) {
+  if (!b1 || !b2) return 0.3; // sem info = tenta junto
+  const n1 = normBairro(b1);
+  const n2 = normBairro(b2);
+  if (n1 === n2) return 1.0;
+
+  // Verifica adjacência no mapa
+  const vizinhos1 = ADJACENCIA_RP[n1] || [];
+  const vizinhos2 = ADJACENCIA_RP[n2] || [];
+  if (vizinhos1.some(v => normBairro(v) === n2)) return 0.75;
+  if (vizinhos2.some(v => normBairro(v) === n1)) return 0.75;
+
+  // Verifica vizinhos de vizinhos (2 graus de separação = ainda aceitável)
+  for (const v of vizinhos1) {
+    const vizinhosV = ADJACENCIA_RP[normBairro(v)] || [];
+    if (vizinhosV.some(vv => normBairro(vv) === n2)) return 0.4;
+  }
+
+  return 0.0; // bairros distantes — não agrupar
 }
 
-// ── Calcula compatibilidade de rota (setores similares = alta) ────
-function compatibilidadeRota(setor1, setor2) {
-  if (setor1 === setor2) return 1.0;
-  // Setores adjacentes têm compatibilidade média
-  const adjacentes = {
-    'norte': ['leste', 'oeste', 'centro'],
-    'sul': ['leste', 'oeste', 'centro'],
-    'leste': ['norte', 'sul', 'centro'],
-    'oeste': ['norte', 'sul', 'centro'],
-    'centro': ['norte', 'sul', 'leste', 'oeste']
-  };
-  if (adjacentes[setor1]?.includes(setor2)) return 0.5;
-  return 0.0; // setores opostos (N↔S, L↔O)
-}
-
-// ── Normaliza endereço ───────────────────────────────────────────
+// ── Normaliza chave de endereço para deduplicar paradas ─────────
 function chaveEnd(end) {
   if (!end || !end.trim()) return '_sem_' + Math.random();
   let s = end.toLowerCase()
@@ -80,20 +122,45 @@ function chaveEnd(end) {
   return s.substring(0, 40);
 }
 
-// ── Geocode via Nominatim ────────────────────────────────────────
+// ── Geocode: lat/lng via Nominatim ──────────────────────────────
 async function geocode(endereco) {
   if (!endereco) return null;
   try {
     const q = encodeURIComponent(endereco + ', Ribeirao Preto, SP, Brasil');
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
-      { headers: { 'User-Agent': 'MontaRotai/1.0 (admin@montarotai.com)' } });
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
+      { headers: { 'User-Agent': 'MontaRotai/1.0 (admin@montarotai.com)' } }
+    );
     const d = await r.json();
     if (d && d[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-  } catch (e) { /* falha silenciosa */ }
+  } catch (e) {}
   return null;
 }
 
-// ── Calcular valor da corrida ────────────────────────────────────
+// ── Reverse geocode: descobre o BAIRRO REAL a partir de lat/lng ──
+// Usa Nominatim /reverse com zoom=16 (nível de bairro)
+async function reverseGeocodeBairro(lat, lng) {
+  if (!lat || !lng) return null;
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`,
+      { headers: { 'User-Agent': 'MontaRotai/1.0 (admin@montarotai.com)' } }
+    );
+    const d = await r.json();
+    if (!d || !d.address) return null;
+    // Prioridade: suburb > neighbourhood > quarter > city_district
+    const bairro = d.address.suburb
+      || d.address.neighbourhood
+      || d.address.quarter
+      || d.address.city_district
+      || d.address.county
+      || null;
+    return bairro;
+  } catch (e) {}
+  return null;
+}
+
+// ── Calcula valor da corrida ─────────────────────────────────────
 function calcularValorCorrida(distancia, taxaTipo, taxaBase, kmLimite, taxaExcedente, taxaFixoBase) {
   if (taxaTipo === 'por_km') {
     if (distancia <= kmLimite) return taxaBase;
@@ -105,25 +172,27 @@ function calcularValorCorrida(distancia, taxaTipo, taxaBase, kmLimite, taxaExced
   return taxaBase;
 }
 
+// ── Pausa mínima entre requests ao Nominatim (respeita rate limit) ──
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 // ══════════════════════════════════════════════════════════════════
-//  ALGORITMO PRINCIPAL v2 — Roteamento por Setor Geográfico
+//  ALGORITMO PRINCIPAL v3 — Cluster por Bairro Real (OSM)
 //
-//  Lógica:
-//  1. Agrupa pedidos por endereço normalizado (paradas únicas)
-//  2. Geocodifica cada parada
-//  3. Classifica cada parada em SETOR (N/S/L/O/Centro)
-//  4. Para cada entregador, atribui paradas do MESMO setor (máxima
-//     eficiência logística — sem mandar 2 entregadores pro mesmo lado)
-//  5. Ordena por distância (mais próximo da loja primeiro)
-//  6. SUGESTÃO INTELIGENTE: Identifica pedidos extras no mesmo setor
-//     que "caberiam na rota" mesmo acima do limite configurado
+//  1. Geocodifica cada parada (lat/lng)
+//  2. Faz REVERSE GEOCODE → descobre o BAIRRO REAL no OSM
+//  3. Agrupa paradas por bairro (usando mapa de adjacência RP)
+//  4. Atribui clusters de bairros a entregadores (sem dividir
+//     bairros entre entregadores — máxima eficiência)
+//  5. Dentro de cada rota, ordena por distância da loja
+//  6. Sinaliza pedidos extras do mesmo cluster que cabem na rota
 // ══════════════════════════════════════════════════════════════════
 async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlobal, taxaConfig }) {
   const RP_LAT = -21.1775, RP_LNG = -47.8103;
   const baseLat = lojaLat || RP_LAT;
   const baseLng = lojaLng || RP_LNG;
+  const db = createClient(SB_URL, SB_KEY);
 
-  // PASSO 1: Agrupar por endereço
+  // ── PASSO 1: Agrupar por endereço (deduplicar paradas) ──────────
   const mapaEnds = {};
   pedidos.forEach(p => {
     const k = chaveEnd(p.endereco_entrega);
@@ -132,15 +201,18 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
   });
   const paradaList = Object.values(mapaEnds);
 
-  // PASSO 2: Geocode + calcular setor para cada parada
-  const db = createClient(SB_URL, SB_KEY);
+  // ── PASSO 2: Geocode + Reverse Geocode de cada parada ───────────
   const paradasGeo = [];
   for (const grupo of paradaList) {
     const rep = grupo[0];
     let lat = parseFloat(rep.lat_entrega || 0);
     let lng = parseFloat(rep.lng_entrega || 0);
+    let bairro = rep.bairro_geocodificado || null;
     let geocodeFailed = false;
+
+    // 2a. Geocode se não tiver coordenadas
     if (!lat || !lng) {
+      await sleep(300); // respeita rate limit Nominatim
       const g = await geocode(rep.endereco_entrega);
       if (g) {
         lat = g.lat; lng = g.lng;
@@ -149,155 +221,169 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
         }
       } else { geocodeFailed = true; lat = 0; lng = 0; }
     }
+
+    // 2b. Reverse geocode → bairro real do OSM
+    if (!geocodeFailed && !bairro) {
+      await sleep(300);
+      bairro = await reverseGeocodeBairro(lat, lng);
+      // Persiste o bairro para não consultar de novo
+      if (bairro) {
+        for (const p of grupo) {
+          await db.from('entregas').update({ bairro_geocodificado: bairro }).eq('id', p.id).catch(() => {});
+        }
+      }
+    }
+
     const dist = geocodeFailed ? 0 : distKm(baseLat, baseLng, lat, lng);
-    const ang = geocodeFailed ? 0 : ((angleDeg(baseLat, baseLng, lat, lng) % 360 + 360) % 360);
-    const setor = geocodeFailed ? 'centro' : getSetor(baseLat, baseLng, lat, lng);
     paradasGeo.push({
       ids: grupo.map(p => p.id),
       labels: grupo.map(p => p.numero_pedido ? '#' + p.numero_pedido : p.cliente_nome || 'Entrega'),
       end: rep.endereco_entrega || '',
-      lat, lng, dist, ang, geocodeFailed,
-      qtdPeds: grupo.length,
-      setor
+      lat, lng, dist, geocodeFailed,
+      bairro: bairro || 'Sem bairro',
+      bairroNorm: normBairro(bairro || ''),
+      qtdPeds: grupo.length
     });
   }
-  // Ordena por distância (mais próximo primeiro — menor tempo de entrega)
-  paradasGeo.sort((a, b) => a.dist - b.dist);
 
+  // Ordena por distância (mais próximo primeiro)
+  paradasGeo.sort((a, b) => a.dist - b.dist);
   const limite = limiteGlobal || 10;
 
-  // PASSO 3: Distribuição por setor geográfico
-  // Agrupa paradas por setor
-  const setores = {};
-  paradasGeo.forEach(p => {
-    if (!setores[p.setor]) setores[p.setor] = [];
-    setores[p.setor].push(p);
-  });
+  // ── PASSO 3: Clustering por bairro ──────────────────────────────
+  // Agrupa paradas cujos bairros são compatíveis (mesmo ou adjacente)
+  // Algoritmo Union-Find simplificado
+  const clusters = []; // array de arrays de paradas
 
-  // Ordena setores por quantidade de pedidos (maior primeiro)
-  const setoresOrdenados = Object.entries(setores)
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([setor, paradas]) => ({ setor, paradas }));
+  for (const parada of paradasGeo) {
+    // Tenta encaixar em cluster existente compatível
+    let melhorCluster = null;
+    let melhorScore = 0;
 
-  // Atribui um setor principal para cada entregador (greedy por volume)
+    for (const cluster of clusters) {
+      // Compatibilidade = média com todos os bairros do cluster
+      let totalScore = 0;
+      for (const p of cluster) {
+        totalScore += compatBairros(parada.bairro, p.bairro);
+      }
+      const avgScore = totalScore / cluster.length;
+      if (avgScore > 0.5 && avgScore > melhorScore) {
+        melhorScore = avgScore;
+        melhorCluster = cluster;
+      }
+    }
+
+    if (melhorCluster) {
+      melhorCluster.push(parada);
+    } else {
+      clusters.push([parada]); // novo cluster
+    }
+  }
+
+  // ── PASSO 4: Distribui clusters entre entregadores ───────────────
+  // Ordena clusters por tamanho (maior primeiro = mais eficiente)
+  clusters.sort((a, b) => b.length - a.length);
+
   const grupos_ent = entregadores.map(ent => ({
     entId: ent.id,
     entNome: ent.nome,
-    limite,
     paradas: [],
+    bairros: new Set(),
     totalParadas: 0,
-    setor: null,
     totalKm: 0
   }));
 
-  const naoAtribuidas = [...paradasGeo];
-  const setoresUsados = new Set();
+  // Atribui cada cluster ao entregador com mais afinidade e espaço
+  const clustersNaoAtribuidos = [...clusters];
 
-  // Primeira passagem: atribui setores únicos a cada entregador
-  // Entregadores recebem setores em ordem de volume (mais pedidos = setor prioritário)
-  grupos_ent.forEach((g, gi) => {
-    // Tenta pegar um setor não usado ainda
-    for (const { setor, paradas } of setoresOrdenados) {
-      if (!setoresUsados.has(setor) && paradas.length > 0) {
-        setoresUsados.add(setor);
-        g.setor = setor;
-        break;
+  for (const cluster of clustersNaoAtribuidos) {
+    // Encontra entregador com mais espaço e maior compatibilidade de bairros
+    let melhorEnt = null;
+    let melhorScore = -1;
+
+    for (const g of grupos_ent) {
+      if (g.totalParadas >= limite) continue;
+      // Score = espaço disponível + afinidade de bairros já atribuídos
+      const espaco = (limite - g.totalParadas) / limite;
+      let afinidade = 1.0; // se vazio, aceita qualquer cluster
+      if (g.bairros.size > 0) {
+        let totalAfin = 0;
+        let pares = 0;
+        for (const p of cluster) {
+          for (const bairroExistente of g.bairros) {
+            totalAfin += compatBairros(p.bairro, bairroExistente);
+            pares++;
+          }
+        }
+        afinidade = pares > 0 ? totalAfin / pares : 0;
       }
+      const score = espaco * 0.4 + afinidade * 0.6;
+      if (score > melhorScore) { melhorScore = score; melhorEnt = g; }
     }
-    // Se não achou setor livre, pega qualquer um com mais paradas
-    if (!g.setor && setoresOrdenados.length > 0) {
-      g.setor = setoresOrdenados[gi % setoresOrdenados.length].setor;
-    }
-  });
 
-  // Segunda passagem: distribui paradas respeitando setor do entregador
-  // Ordena paradas por distância (mais próximo primeiro = menor tempo)
-  for (const g of grupos_ent) {
-    if (!g.setor) continue;
-    // Pega paradas do setor principal, ordenadas por distância
-    const paradasSetor = naoAtribuidas
-      .filter(p => p.setor === g.setor)
-      .sort((a, b) => a.dist - b.dist);
+    if (!melhorEnt) melhorEnt = grupos_ent.reduce((a, b) => a.totalParadas <= b.totalParadas ? a : b);
 
-    for (const p of paradasSetor) {
-      if (g.totalParadas >= g.limite) break;
-      const idx = naoAtribuidas.indexOf(p);
-      if (idx >= 0) {
-        naoAtribuidas.splice(idx, 1);
-        g.paradas.push(p);
-        g.totalParadas++;
-        g.totalKm += p.dist;
-      }
+    // Adiciona paradas do cluster ao entregador, respeitando limite
+    for (const p of cluster) {
+      if (melhorEnt.totalParadas >= limite) break;
+      melhorEnt.paradas.push(p);
+      melhorEnt.bairros.add(p.bairro);
+      melhorEnt.totalParadas++;
+      melhorEnt.totalKm += p.dist;
     }
   }
 
-  // Terceira passagem: paradas de setores adjacentes (se entregador tem espaço)
-  for (const g of grupos_ent) {
-    if (g.totalParadas >= g.limite || !naoAtribuidas.length) continue;
-    const sobras = [...naoAtribuidas].sort((a, b) => {
-      const compA = compatibilidadeRota(g.setor, a.setor);
-      const compB = compatibilidadeRota(g.setor, b.setor);
-      if (compB !== compA) return compB - compA;
-      return a.dist - b.dist;
-    });
-    for (const p of sobras) {
-      if (g.totalParadas >= g.limite) break;
-      const idx = naoAtribuidas.indexOf(p);
-      if (idx >= 0) {
-        naoAtribuidas.splice(idx, 1);
-        g.paradas.push(p);
-        g.totalParadas++;
-        g.totalKm += p.dist;
-      }
-    }
-  }
-
-  // Quarta passagem: paradas restantes → entregador com menos carga
-  naoAtribuidas.forEach(p => {
-    const comEspaco = [...grupos_ent].sort((a, b) => a.totalParadas - b.totalParadas);
-    comEspaco[0].paradas.push(p);
-    comEspaco[0].totalParadas++;
-    comEspaco[0].totalKm += p.dist;
-  });
-
-  // PASSO 4: SUGESTÃO INTELIGENTE de pedidos extras
-  // Para cada entregador, verifica se há pedidos do mesmo setor
-  // que foram para outro entregador e poderiam estar nessa rota
+  // ── PASSO 5: SUGESTÃO INTELIGENTE ───────────────────────────────
+  // Detecta paradas que ficaram em outro entregador mas são do mesmo
+  // bairro/cluster de um entregador — e sugere realocação
   const sugestoesExtras = {};
   grupos_ent.forEach(g => {
-    if (!g.setor || !g.paradas.length) return;
-    // Verifica outros grupos se têm paradas do mesmo setor deste entregador
+    if (!g.paradas.length) return;
     const extras = [];
     grupos_ent.forEach(outro => {
       if (outro.entId === g.entId) return;
       outro.paradas.forEach(p => {
-        if (p.setor === g.setor) {
-          extras.push({ end: p.end, labels: p.labels, dist: p.dist });
+        // Verifica se p tem bairro compatível com este entregador
+        let afin = 0;
+        g.bairros.forEach(b => { afin = Math.max(afin, compatBairros(p.bairro, b)); });
+        if (afin >= 0.75) { // mesmo bairro ou adjacente direto
+          extras.push({ end: p.end, labels: p.labels, dist: p.dist, bairro: p.bairro });
         }
       });
     });
-    if (extras.length > 0) {
-      sugestoesExtras[g.entId] = extras;
-    }
+    if (extras.length > 0) sugestoesExtras[g.entId] = extras;
   });
 
-  // PASSO 5: Montar resultado final
+  // ── PASSO 6: Monta resultado ─────────────────────────────────────
   const resultado = grupos_ent
     .filter(g => g.paradas.length > 0)
     .map(g => {
-      // Ordena paradas por distância (mais próximo da loja primeiro)
+      // Ordena paradas dentro da rota: mais próximo da loja primeiro
       g.paradas.sort((a, b) => a.dist - b.dist);
 
-      const setorNome = {
-        'norte': '🔵 Norte', 'sul': '🔴 Sul', 'leste': '🟢 Leste',
-        'oeste': '🟠 Oeste', 'centro': '🟡 Centro', 'sem_coords': '📍 Sem localização'
-      };
+      // Rota sequencial: ordena por proximidade encadeada (nearest neighbor dentro do grupo)
+      const rotaOrdenada = [];
+      const naoVisitadas = [...g.paradas];
+      let ultimaLat = baseLat, ultimaLng = baseLng;
+      while (naoVisitadas.length) {
+        let melhorIdx = 0, melhorD = Infinity;
+        naoVisitadas.forEach((p, i) => {
+          const d = distKm(ultimaLat, ultimaLng, p.lat || ultimaLat, p.lng || ultimaLng);
+          if (d < melhorD) { melhorD = d; melhorIdx = i; }
+        });
+        const prox = naoVisitadas.splice(melhorIdx, 1)[0];
+        rotaOrdenada.push(prox);
+        ultimaLat = prox.lat || ultimaLat;
+        ultimaLng = prox.lng || ultimaLng;
+      }
 
-      const pedidosFlat = g.paradas.flatMap(parada =>
+      const bairrosUnicos = [...new Set(rotaOrdenada.map(p => p.bairro).filter(Boolean))];
+      const descricao = bairrosUnicos.slice(0, 3).join(' → ');
+
+      const pedidosFlat = rotaOrdenada.flatMap(parada =>
         parada.ids.map((id, idx) => {
-          const dist = parada.dist;
           const valor = taxaConfig ? calcularValorCorrida(
-            dist,
+            parada.dist,
             taxaConfig.taxa_tipo,
             taxaConfig.taxa_entrega,
             taxaConfig.taxa_km_limite,
@@ -308,9 +394,9 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
             id,
             num: (parada.labels[idx] || '').replace(/^#/, ''),
             end: parada.end,
-            dist: parseFloat(dist.toFixed(2)),
+            dist: parseFloat(parada.dist.toFixed(2)),
             valor: parseFloat(valor.toFixed(2)),
-            setor: parada.setor,
+            bairro: parada.bairro,
             _paradaLabels: parada.labels,
             _paradaEnd: parada.end,
             _paradaQtd: parada.qtdPeds,
@@ -319,23 +405,21 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
         })
       );
 
-      const kmTotal = parseFloat(g.paradas.reduce((s, p) => s + p.dist, 0).toFixed(2));
+      const kmTotal = parseFloat(rotaOrdenada.reduce((s, p) => s + p.dist, 0).toFixed(2));
       const valorTotal = parseFloat(pedidosFlat.reduce((s, p) => s + p.valor, 0).toFixed(2));
-      const extras = sugestoesExtras[g.entId] || [];
 
       return {
         entId: g.entId,
         entNome: g.entNome,
-        setor: g.setor,
-        setorNome: setorNome[g.setor] || g.setor,
-        descricao: setorNome[g.setor] || '📍 ' + g.paradas.length + ' parada(s)',
+        bairros: bairrosUnicos,
+        setorNome: '📍 ' + (bairrosUnicos[0] || 'Sem bairro'),
+        descricao,
         pedidos: pedidosFlat,
-        totalParadas: g.paradas.length,
+        totalParadas: rotaOrdenada.length,
         totalPedidos: pedidosFlat.length,
         kmTotal,
         valorTotal,
-        // Sugestão inteligente: pedidos extras que poderiam ir nessa rota
-        sugestaoExtras: extras
+        sugestaoExtras: sugestoesExtras[g.entId] || []
       };
     });
 
@@ -381,13 +465,15 @@ module.exports = async function handler(req, res) {
     if (!user) return res.status(403).json({ error: 'Loja não encontrada' });
 
     const { data: pedidos } = await db.from('entregas')
-      .select('id,numero_pedido,cliente_nome,endereco_entrega,lat_entrega,lng_entrega,distancia_km')
+      .select('id,numero_pedido,cliente_nome,endereco_entrega,lat_entrega,lng_entrega,distancia_km,bairro_geocodificado')
       .eq('loja_id', lojaId)
       .eq('status', 'pendente');
-    if (!pedidos || !pedidos.length) return res.status(200).json({ grupos: [], totalPedidos: 0, totalParadas: 0 });
+    if (!pedidos || !pedidos.length)
+      return res.status(200).json({ grupos: [], totalPedidos: 0, totalParadas: 0 });
 
     const entregadores = (distribuicao || []).map(([id, v]) => ({ id, nome: v.nome }));
-    if (!entregadores.length) return res.status(400).json({ error: 'Nenhum entregador disponível' });
+    if (!entregadores.length)
+      return res.status(400).json({ error: 'Nenhum entregador disponível' });
 
     const resultado = await otimizarRota({
       pedidos,
