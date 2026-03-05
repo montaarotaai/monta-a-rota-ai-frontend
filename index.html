@@ -2447,30 +2447,34 @@ async function salvarTaxaLj(){
 
 // Avisar pedido pronto (toca alerta em todos entregadores vinculados e online)
 async function avisarPedidoPronto(){
-  // Marca pedidos pendentes como pedido_pronto=true
-  const{data:ents}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','pendente');
-  if(!ents||!ents.length){alert('Nenhum pedido pendente para avisar.');return;}
+  const btn=document.querySelector('[onclick="avisarPedidoPronto()"]');
+  if(btn){btn.innerHTML='⏳ Enviando...';btn.disabled=true;}
+
+  // Marca TODOS os pedidos ativos desta loja como pedido_pronto=true
+  const{data:ents}=await db.from('entregas')
+    .select('id').eq('loja_id',U.id)
+    .in('status',['pendente','aceito','em_rota','chegou_loja','saiu_entrega']);
+
+  if(!ents||!ents.length){
+    if(btn){btn.innerHTML='🔔 Pedido Pronto';btn.disabled=false;}
+    alert('Nenhum pedido ativo para avisar.');return;
+  }
   for(const e of ents)await db.from('entregas').update({pedido_pronto:true}).eq('id',e.id);
 
-  // Grava alerta na tabela — o Realtime vai disparar para todos os entregadores da loja
+  // Grava alerta dedicado (dispara Realtime + polling)
   try{
     await db.from('alertas_pedido_pronto').insert([{
-      loja_id: U.id,
-      ativo: true,
-      mensagem: 'Pedido pronto para retirada!'
+      loja_id:U.id,ativo:true,mensagem:'Pedido pronto para retirada!'
     }]);
-  }catch(e){
-    // Se tabela não existir ainda, só o update acima basta
-    console.warn('[Alerta] Tabela alertas_pedido_pronto não existe ainda:',e.message);
-  }
+  }catch(e){console.warn('[Alerta] alertas_pedido_pronto:',e.message,'— fallback por polling ativo');}
 
-  // Feedback visual no botão
-  const btn=document.querySelector('[onclick="avisarPedidoPronto()"]');
   if(btn){
-    const orig=btn.innerHTML;
-    btn.innerHTML='✅ Aviso enviado!';
-    btn.style.background='#2e7d32';
-    setTimeout(()=>{btn.innerHTML=orig;btn.style.background='';},2500);
+    btn.innerHTML='✅ Aviso enviado!';btn.disabled=false;
+    btn.style.background='linear-gradient(135deg,#1b5e20,#2e7d32)';
+    setTimeout(()=>{
+      btn.innerHTML='🔔 Pedido Pronto';
+      btn.style.background='linear-gradient(135deg,#FF6B35,#e74c3c)';
+    },2500);
   }
 }
 
@@ -3831,8 +3835,8 @@ async function initEnt(){
   if(U.online)inicRast();
   // Inicia escuta de alertas se já tem loja ativa
   if(U.loja_ativa_id&&U.online)iniciarEscutaAlertas(U.loja_ativa_id);
-  // Polling alertas (fallback caso Realtime falhe)
-  ivs.alerta=setInterval(verificarAlertas,8000);
+  // Polling alertas a cada 3s (rápido + confiável)
+  ivs.alerta=setInterval(verificarAlertas,3000);
   verificarAlertas();
   // Notif rota
   verificarRotaAtiva();
@@ -3938,19 +3942,75 @@ async function confirmarLojaAtiva(){
   iniciarEscutaAlertas(lid);
 }
 
+// ============================================================
+// SISTEMA DE ALERTA PEDIDO PRONTO — polling + realtime
+// ============================================================
+let _ultimoAlertaId=null;   // último alerta processado
+let _pollingAlertaIv=null;  // intervalo de polling
+let _alertaLojaId=null;     // loja que está sendo monitorada
+
 async function verificarAlertas(){
-  if(!U)return;
-  // Verificar pedido pronto para este entregador
-  const{data:peds}=await db.from('entregas').select('id').eq('entregador_id',U.id).eq('pedido_pronto',true).in('status',['aceito','em_rota']).limit(1);
-  const alerta=$('ent-pedido-alerta');
-  if(peds&&peds.length){
-    if(alerta.classList.contains('hidden')){
-      alerta.classList.remove('hidden');beepAlerta();
-      $('rota-notif').classList.remove('hidden');
-    }
-  }else{
-    alerta.classList.add('hidden');$('rota-notif').classList.add('hidden');
+  if(!U||U.tipo!=='entregador')return;
+
+  // Descobre loja ativa
+  const lojaId=U.loja_ativa_id||null;
+  if(!lojaId||!U.online){
+    // Sem loja ativa / offline: silencia e sai
+    if(_alarmeAtivo)silenciarAlarmePedidoPronto();
+    return;
   }
+
+  // ESTRATÉGIA 1: polling na tabela alertas_pedido_pronto (mais confiável)
+  try{
+    const agora=new Date();
+    const ha2min=new Date(agora.getTime()-2*60*1000).toISOString();
+    const{data:alertas}=await db.from('alertas_pedido_pronto')
+      .select('id,criado_em')
+      .eq('loja_id',lojaId)
+      .eq('ativo',true)
+      .gte('criado_em',ha2min)
+      .order('criado_em',{ascending:false})
+      .limit(1);
+
+    if(alertas&&alertas.length){
+      const novo=alertas[0];
+      if(_ultimoAlertaId!==novo.id){
+        // Novo alerta que ainda não processamos!
+        _ultimoAlertaId=novo.id;
+        tocarAlarmePedidoPronto();
+        return;
+      }
+    }
+  }catch(e){
+    // Tabela não existe — cai no fallback abaixo
+    console.warn('[Alerta] alertas_pedido_pronto indisponível, usando fallback');
+  }
+
+  // ESTRATÉGIA 2 (fallback): verifica se há entregas pendentes com pedido_pronto=true nesta loja
+  try{
+    const{data:pends}=await db.from('entregas')
+      .select('id,criado_em')
+      .eq('loja_id',lojaId)
+      .eq('pedido_pronto',true)
+      .eq('status','pendente')
+      .is('entregador_id',null)
+      .order('created_at',{ascending:false})
+      .limit(1);
+
+    if(pends&&pends.length){
+      const chave='fallback_'+pends[0].id;
+      if(_ultimoAlertaId!==chave){
+        _ultimoAlertaId=chave;
+        tocarAlarmePedidoPronto();
+      }
+    }else{
+      // Nenhum pedido pronto pendente — para alarme se estava tocando
+      if(_alarmeAtivo&&_ultimoAlertaId){
+        // Só para se silenciou naturalmente (pedido foi aceito)
+        // Não para por polling — o usuário precisa tocar "Silenciar"
+      }
+    }
+  }catch(e){console.warn('[Alerta fallback]',e);}
 }
 
 async function verificarRotaAtiva(){
@@ -5653,4 +5713,3 @@ async function downloadPdfTermo(id,nome){
 </script>
 </body>
 </html>
-               
