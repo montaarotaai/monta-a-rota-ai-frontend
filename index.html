@@ -1000,7 +1000,47 @@ window.onload=()=>{
   const bg=$('login-bg-img');if(bg)bg.src=HEADER_BG_URL;
   const s=localStorage.getItem('u');
   if(s){U=JSON.parse(s);showPg(U.tipo);}
+  // Inicia agendador de auto-logout às 03:00h
+  agendarAutoLogout();
 };
+
+// ============================================================
+// AUTO-LOGOUT ÀS 03:00 — todos os entregadores online
+// ============================================================
+function agendarAutoLogout(){
+  const agora=new Date();
+  const prox=new Date(agora);
+  prox.setHours(3,0,0,0);
+  if(prox<=agora)prox.setDate(prox.getDate()+1); // se já passou das 03h, agenda pro dia seguinte
+  const msAte=prox-agora;
+
+  setTimeout(async()=>{
+    // Executa o logout de todos os entregadores online desta loja (roda em todo cliente logado)
+    try{
+      if(U&&U.tipo==='loja'){
+        // Lado loja: deslogar todos os entregadores vinculados que estão online
+        const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id);
+        const ids=(assoc||[]).map(a=>a.entregador_id);
+        if(ids.length){
+          await db.from('usuarios').update({online:false}).in('id',ids).eq('online',true);
+        }
+      } else if(U&&U.tipo==='entregador'&&U.online){
+        // Lado entregador: desloga a si mesmo
+        await db.from('usuarios').update({online:false}).eq('id',U.id);
+        U.online=false;salvarU(U);
+        // Atualiza UI
+        const btnOff=$('btn-offline');if(btnOff)btnOff.textContent='🔴 Ficar Offline';
+        const statusEl=$('ent-online-status');if(statusEl)statusEl.textContent='';
+      }
+    }catch(e){console.warn('[AutoLogout 03h]',e);}
+    // Agenda para o próximo dia às 03:00
+    agendarAutoLogout();
+  }, msAte);
+
+  // Log para debug (removível)
+  const minutos=Math.round(msAte/60000);
+  console.log(`[AutoLogout] Agendado em ${minutos} min (${prox.toLocaleTimeString('pt-BR')})`);
+}
 
 
 // ── GPS EM BACKGROUND: Wake Lock + Visibility API ──
@@ -2916,15 +2956,65 @@ async function carregarPedidos(){
   $('rota-lst').innerHTML='<p>Carregando...</p>';
   const{data}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',U.id).neq('status','entregue').neq('status','cancelado').order('ordem_rota');
   if(!data||!data.length){$('rota-lst').innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem pedidos. Use "Novo Pedido".</p>';return;}
-  // Buscar entregadores disponiveis
-  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(nome,online)').eq('loja_id',U.id)
-  const onlineList=(assoc||[]).filter(a=>a.e&&a.e.online);
+
+  // Busca TODOS os entregadores da loja (online e offline) + entregas ativas de cada um
+  const{data:assoc}=await db.from('loja_entregadores').select('entregador_id,e:entregador_id(id,nome,online,foto_url)').eq('loja_id',U.id);
+  const todosEnts=assoc||[];
+
+  // Contagem de entregas ativas por entregador
+  const entsComEntregas=new Set(
+    data.filter(e=>e.entregador_id&&e.status!=='pendente').map(e=>e.entregador_id)
+  );
+
   $('rota-lst').innerHTML=data.map((e,i)=>{
     const stDet=e.status_detalhado||e.status;
     const steps=['pendente','aceito','chegou_loja','saiu_entrega','entregue'];
     const curIdx=steps.indexOf(stDet);
     const stepsHtml=steps.slice(0,4).map((st,idx)=>`<div class="sf-step ${idx<curIdx?'done':idx===curIdx?'current':''}">${['Pendente','Aceito','Na Loja','A Caminho'][idx]}</div>`).join('');
-    const entOptions=onlineList.map(a=>`<option value="${a.entregador_id}" ${e.entregador_id===a.entregador_id?'selected':''}>${a.e.nome}</option>`).join('');
+
+    // Cards de entregadores (só para pedidos pendentes sem entregador)
+    const entCardsHtml = e.status==='pendente' ? `
+      <div style="margin-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;">📲 Atribuir a:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;">
+          ${todosEnts.map(a=>{
+            const ent=a.e;
+            if(!ent)return'';
+            const online=ent.online;
+            const temEntregas=entsComEntregas.has(ent.id);
+            const selecionado=e.entregador_id===ent.id;
+            // Bolinha: verde=online sem entregas, azul=online com entregas, vermelho=offline
+            const cor=!online?'#e74c3c':temEntregas?'#1565C0':'#2e7d32';
+            const statusLabel=!online?'Offline':temEntregas?'Ocupado':'Disponível';
+            const initials=ent.nome?ent.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase():'?';
+            return `<div onclick="atribuirEnt('${e.id}','${ent.id}')" style="
+              cursor:pointer;
+              background:${selecionado?'#e3f2fd':'#f8f9fa'};
+              border:2px solid ${selecionado?'#004E89':'#e0e0e0'};
+              border-radius:12px;
+              padding:8px 10px;
+              display:flex;align-items:center;gap:8px;
+              min-width:130px;
+              transition:all .2s;
+              box-shadow:${selecionado?'0 2px 8px rgba(0,78,137,.2)':'0 1px 3px rgba(0,0,0,.06)'};
+            ">
+              <!-- Avatar -->
+              <div style="position:relative;flex-shrink:0;">
+                ${ent.foto_url
+                  ?`<img src="${ent.foto_url}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid ${cor};">`
+                  :`<div style="width:36px;height:36px;border-radius:50%;background:${cor}22;border:2px solid ${cor};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${cor};">${initials}</div>`}
+                <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;border-radius:50%;background:${cor};border:2px solid white;"></div>
+              </div>
+              <!-- Info -->
+              <div style="min-width:0;">
+                <div style="font-size:12px;font-weight:700;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">${ent.nome.split(' ')[0]}</div>
+                <div style="font-size:10px;color:${cor};font-weight:600;">${statusLabel}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
     return `<div class="ecard ${e.status==='em_rota'||e.status==='aceito'?'rota':''}">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
         <strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
@@ -2935,8 +3025,8 @@ async function carregarPedidos(){
       ${e.cliente_nome?`<p style="font-size:11px;color:#888;">&#128100; ${e.cliente_nome}${e.cliente_telefone?' | '+e.cliente_telefone:''}</p>`:''}
       ${e.distancia_km>0?`<p style="font-size:11px;color:#888;">&#128205; ${parseFloat(e.distancia_km).toFixed(1)}km | ${fR(e.valor_corrida||e.valor_entregador)}</p>`:''}
       ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">&#128273; Cod. Conf: ${e.codigo_confirmacao}</p>`:''}
-      ${e.status==='pendente'?`<div style="margin-top:6px;"><label style="font-size:11px;font-weight:700;color:#555;">Atribuir a:</label><select class="ent-select" onchange="atribuirEnt('${e.id}',this.value)"><option value="">Selecione entregador...</option>${entOptions}</select></div>`:''}
-      ${e.entregador?`<p style="font-size:11px;color:#004E89;margin-top:4px;">&#128757; ${e.entregador.nome}</p>`:''}
+      ${entCardsHtml}
+      ${e.entregador&&e.status!=='pendente'?`<p style="font-size:11px;color:#004E89;margin-top:4px;">&#128757; ${e.entregador.nome}</p>`:''}
       <div class="row" style="margin-top:7px;flex-wrap:wrap;">
         <button class="btn-sm blue" onclick="abrirEditarPedido('${e.id}','${(e.numero_pedido||'').replace(/'/g,"\\'")}','${(e.cliente_nome||'').replace(/'/g,"\\'")}','${e.cliente_telefone||''}','${(e.endereco_rua||'').replace(/'/g,"\\'")}','${e.endereco_numero||''}','${(e.endereco_bairro||'').replace(/'/g,"\\'")}','${(e.endereco_cidade||'').replace(/'/g,"\\'")}','${(e.endereco_complemento||'').replace(/'/g,"\\'")}','${(e.observacoes||'').replace(/'/g,"\\'")}')">✏️ Editar</button>
         <button class="btn-sm green" onclick="ljFinalizarEntrega('${e.id}')">✅ Finalizar</button>
