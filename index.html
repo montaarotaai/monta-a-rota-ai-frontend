@@ -699,12 +699,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <div id="m-ganhos" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('ganhos')">&times;</button>
   <h2 style="margin-bottom:9px;">💰 Meus Ganhos</h2>
-  <!-- Filtros rápidos -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-    <button onclick="filtroGanhos('hoje',this)" class="btn-sm green" id="gnhf-hoje">Hoje</button>
-    <button onclick="filtroGanhos('ontem',this)" class="btn-sm gray" id="gnhf-ontem">Ontem</button>
-    <button onclick="filtroGanhos('semana',this)" class="btn-sm gray" id="gnhf-semana">Esta Semana</button>
-    <button onclick="filtroGanhos('mes',this)" class="btn-sm gray" id="gnhf-mes">Este Mês</button>
+  <!-- Filtros rápidos com scroll horizontal -->
+  <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
+    <button onclick="filtroGanhos('hoje',this)" class="btn-sm green" id="gnhf-hoje" style="white-space:nowrap;">Hoje</button>
+    <button onclick="filtroGanhos('ontem',this)" class="btn-sm gray" id="gnhf-ontem" style="white-space:nowrap;">Ontem</button>
+    <button onclick="filtroGanhos('semana',this)" class="btn-sm gray" id="gnhf-semana" style="white-space:nowrap;">Esta Semana</button>
+    <button onclick="filtroGanhos('semana_passada',this)" class="btn-sm gray" id="gnhf-semana-pass" style="white-space:nowrap;">Semana Passada</button>
+    <button onclick="filtroGanhos('mes',this)" class="btn-sm gray" id="gnhf-mes" style="white-space:nowrap;">Este Mês</button>
   </div>
   <!-- Navegação de meses -->
   <div id="gnh-nav-mes" style="display:none;align-items:center;justify-content:space-between;background:#f0f4ff;border-radius:10px;padding:8px 12px;margin-bottom:8px;">
@@ -4203,91 +4204,78 @@ function periodoRange(per,mesOffset){
     fim=new Date(agora);fim.setDate(fim.getDate()-1);fim.setHours(23,59,59,999);
   }
   else if(per==='semana'){
-    // Semana BR: Segunda a Domingo — (getDay()+6)%7 dias desde segunda
     inicio=new Date(agora);
     inicio.setDate(inicio.getDate()-((agora.getDay()+6)%7));
     inicio.setHours(0,0,0,0);
     fim=new Date(inicio);fim.setDate(fim.getDate()+6);fim.setHours(23,59,59,999);
   }
+  else if(per==='semana_passada'){
+    // Semana anterior: segunda passada até domingo passado
+    const diasDesdeSegunda=(agora.getDay()+6)%7;
+    inicio=new Date(agora);inicio.setDate(inicio.getDate()-diasDesdeSegunda-7);inicio.setHours(0,0,0,0);
+    fim=new Date(inicio);fim.setDate(fim.getDate()+6);fim.setHours(23,59,59,999);
+  }
   else{ // mes — suporta offset para meses anteriores
-    // JavaScript Date handles month underflow correctly (e.g. month -1 = December of prev year)
     const ano=agora.getFullYear();
-    const mes=agora.getMonth()+off; // off negativo = meses anteriores, JS normaliza automaticamente
+    const mes=agora.getMonth()+off;
     inicio=new Date(ano,mes,1,0,0,0,0);
-    // Último dia do mês alvo
     fim=new Date(ano,mes+1,0,23,59,59,999);
   }
   return{inicio:inicio.toISOString(),fim:fim.toISOString()};
 }
 
 // Resumo dinâmico — sempre reflete o período selecionado
+// Helper seguro para queries em tabelas que podem não existir
+async function safeQuery(fn){ try{ const r=await fn(); return r.data||[]; }catch(e){ return []; } }
+
 async function carregarResumoGanhos(){
   const el=$('gnh-resumo');
+  if(!el)return;
   el.innerHTML='<p style="text-align:center;color:#aaa;font-size:12px;padding:8px 0;">Carregando resumo...</p>';
   const per=_gnhFiltro||'hoje';
   const agora=new Date();
 
   if(per==='mes'){
-    // Mês selecionado (pode ser passado)
     const {inicio,fim}=periodoRange('mes',_gnhMesOffset);
     const alvoDate=new Date(agora.getFullYear(),agora.getMonth()+_gnhMesOffset,1);
-    const nomeMes=alvoDate.toLocaleString('pt-BR',{month:'long',year:'numeric'});
-    const nomeMesFmt=nomeMes.charAt(0).toUpperCase()+nomeMes.slice(1);
+    const nomeMesFmt=(alvoDate.toLocaleString('pt-BR',{month:'long',year:'numeric'})).replace(/^\w/,c=>c.toUpperCase());
 
-    // Busca o mês inteiro + vales do mês
-    const [rMes, rValesMes]=await Promise.all([
-      db.from('entregas').select('valor_corrida,valor_entregador,created_at,loja_id,entregue_at,l:loja_id(taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim),
-      db.from('vales_entregadores').select('valor').eq('entregador_id',U.id).gte('created_at',inicio).lte('created_at',fim).catch(()=>({data:[]}))
-    ]);
-    const dados=rMes.data||[];
+    const dados = await safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador,created_at,loja_id,entregue_at,l:loja_id(taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim));
+    const valesMesArr = await safeQuery(()=>db.from('vales_entregadores').select('valor').eq('entregador_id',U.id).gte('created_at',inicio).lte('created_at',fim));
+
     const totalBrutoMes=dados.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-
-    // Combustível do mês (mesmo cálculo do carregarGanhos)
-    let totalCombMes=0;
-    const combCtrlMes={};
+    let totalCombMes=0; const combCtrl={};
     dados.forEach(e=>{
       if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
       const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
       const chave=`${e.loja_id}_${dt.toISOString().split('T')[0]}_${dt.getHours()<16?'a':'j'}`;
-      if(!combCtrlMes[chave]){combCtrlMes[chave]=true;totalCombMes+=parseFloat(e.l.taxa_fixo_base);}
+      if(!combCtrl[chave]){combCtrl[chave]=true;totalCombMes+=parseFloat(e.l.taxa_fixo_base);}
     });
-
-    const totalValesMes=(rValesMes.data||[]).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const totalValesMes=valesMesArr.reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const liquidoMes=totalBrutoMes+totalCombMes-totalValesMes;
 
-    // Divide por semana do mês (S1=dias 1-7, S2=8-14, S3=15-21, S4=22-fim)
-    const semanas=[0,0,0,0];const cntSem=[0,0,0,0];
-    dados.forEach(e=>{
-      const dia=new Date(e.created_at).getDate();
-      const si=dia<=7?0:dia<=14?1:dia<=21?2:3;
-      semanas[si]+=parseFloat(e.valor_corrida||e.valor_entregador||0);
-      cntSem[si]++;
-    });
+    const semanas=[0,0,0,0],cntSem=[0,0,0,0];
+    dados.forEach(e=>{const dia=new Date(e.created_at).getDate();const si=dia<=7?0:dia<=14?1:dia<=21?2:3;semanas[si]+=parseFloat(e.valor_corrida||e.valor_entregador||0);cntSem[si]++;});
     const semLabels=['1ª sem','2ª sem','3ª sem','4ª sem'];
+
     el.innerHTML=`
       <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:12px;padding:14px;text-align:center;margin-bottom:8px;color:white;">
-        <p style="font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">${nomeMesFmt}</p>
+        <p style="font-size:11px;opacity:.85;font-weight:600;text-transform:uppercase;">${nomeMesFmt}</p>
         <p style="font-size:32px;font-weight:900;margin:4px 0;">${fR(liquidoMes)}</p>
         <p style="font-size:12px;opacity:.85;">${dados.length} corrida${dados.length!==1?'s':''}</p>
-        ${totalValesMes>0?`<p style="font-size:11px;opacity:.9;margin-top:2px;">✅ já descontado R$${totalValesMes.toFixed(2)} em vales</p>`:''}
-        ${totalCombMes>0?`<p style="font-size:11px;opacity:.9;">⛽ inclui R$${totalCombMes.toFixed(2)} combustível</p>`:''}
+        ${totalValesMes>0?`<p style="font-size:11px;opacity:.9;margin-top:2px;">💸 descontado ${fR(totalValesMes)} em vales</p>`:''}
+        ${totalCombMes>0?`<p style="font-size:11px;opacity:.9;">⛽ inclui ${fR(totalCombMes)} combustível</p>`:''}
       </div>
-      ${dados.length>0?`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px;">
-        ${semanas.map((v,i)=>v>0||cntSem[i]>0?`<div style="background:#f5f5f5;border-radius:8px;padding:7px 4px;text-align:center;">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px;">
+        ${semanas.map((v,i)=>`<div style="background:${cntSem[i]>0?'#f5f5f5':'#f9f9f9'};border-radius:8px;padding:7px 4px;text-align:center;${cntSem[i]===0?'opacity:.35':''}">
           <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">${semLabels[i]}</p>
-          <p style="font-size:13px;font-weight:800;color:#2e7d32;">${fR(v)}</p>
-          <p style="font-size:10px;color:#777;">${cntSem[i]}x</p>
-        </div>`:`<div style="background:#f9f9f9;border-radius:8px;padding:7px 4px;text-align:center;opacity:.4;">
-          <p style="font-size:9px;color:#bbb;font-weight:700;">${semLabels[i]}</p>
-          <p style="font-size:12px;color:#ccc;">—</p>
+          <p style="font-size:13px;font-weight:800;color:#2e7d32;">${cntSem[i]>0?fR(v):'—'}</p>
+          ${cntSem[i]>0?`<p style="font-size:10px;color:#777;">${cntSem[i]}x</p>`:''}
         </div>`).join('')}
-      </div>`:''}`;
+      </div>`;
 
   } else {
-    // Para hoje/ontem/semana: mostra o período selecionado + comparativo
-    const {inicio,fim}=periodoRange(per,0);
-
-    // Sempre busca todos os 4 para os cards de contexto (período atual)
+    // Hoje / Ontem / Esta Semana — mostra os 4 cards comparativos
     const inicioHoje=new Date(agora);inicioHoje.setHours(0,0,0,0);
     const inicioOntem=new Date(agora);inicioOntem.setDate(inicioOntem.getDate()-1);inicioOntem.setHours(0,0,0,0);
     const fimOntem=new Date(agora);fimOntem.setDate(fimOntem.getDate()-1);fimOntem.setHours(23,59,59,999);
@@ -4296,25 +4284,27 @@ async function carregarResumoGanhos(){
     const inicioMes=new Date(agora.getFullYear(),agora.getMonth(),1);
     const fimMes=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);
 
-    const[rH,rO,rS,rM,rVales]=await Promise.all([
-      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()).lte('created_at',new Date().toISOString()),
-      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString()),
-      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()).lte('created_at',fimSem.toISOString()),
-      db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()),
-      db.from('vales_entregadores').select('valor,created_at').eq('entregador_id',U.id).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()).catch(()=>({data:[]}))
+    // Queries de corridas — sempre seguras (tabela entregas sempre existe)
+    const [dH,dO,dS,dM] = await Promise.all([
+      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioHoje.toISOString()).lte('created_at',new Date().toISOString())),
+      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioOntem.toISOString()).lte('created_at',fimOntem.toISOString())),
+      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioSem.toISOString()).lte('created_at',fimSem.toISOString())),
+      safeQuery(()=>db.from('entregas').select('valor_corrida,valor_entregador').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString())),
     ]);
-    const soma=arr=>(arr||[]).reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-    const dH=rH.data||[],dO=rO.data||[],dS=rS.data||[],dM=rM.data||[];
-    const valesHoje=(rVales.data||[]).filter(v=>new Date(v.created_at)>=inicioHoje).reduce((s,v)=>s+parseFloat(v.valor||0),0);
-    const valesOntem=(rVales.data||[]).filter(v=>{const d=new Date(v.created_at);return d>=inicioOntem&&d<=fimOntem;}).reduce((s,v)=>s+parseFloat(v.valor||0),0);
-    const valesSem=(rVales.data||[]).filter(v=>new Date(v.created_at)>=inicioSem).reduce((s,v)=>s+parseFloat(v.valor||0),0);
-    const valesMes=(rVales.data||[]).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    // Vales — tabela pode não existir, isolado em try/catch próprio
+    const valesArr = await safeQuery(()=>db.from('vales_entregadores').select('valor,created_at').eq('entregador_id',U.id).gte('created_at',inicioMes.toISOString()).lte('created_at',fimMes.toISOString()));
+
+    const soma=arr=>arr.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+    const valesHoje=valesArr.filter(v=>new Date(v.created_at)>=inicioHoje).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const valesOntem=valesArr.filter(v=>{const d=new Date(v.created_at);return d>=inicioOntem&&d<=fimOntem;}).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const valesSem=valesArr.filter(v=>new Date(v.created_at)>=inicioSem).reduce((s,v)=>s+parseFloat(v.valor||0),0);
+    const valesMes=valesArr.reduce((s,v)=>s+parseFloat(v.valor||0),0);
 
     const cards=[
-      {label:'Hoje',val:soma(dH)-valesHoje,cnt:dH.length,bg:'#e8f5e9',cor:'#2e7d32',per:'hoje',id:'gnhf-hoje'},
-      {label:'Ontem',val:soma(dO)-valesOntem,cnt:dO.length,bg:'#fff3e0',cor:'#e65100',per:'ontem',id:'gnhf-ontem'},
-      {label:'Esta Semana',val:soma(dS)-valesSem,cnt:dS.length,bg:'#e3f2fd',cor:'#1565C0',per:'semana',id:'gnhf-semana'},
-      {label:'Este Mês',val:soma(dM)-valesMes,cnt:dM.length,bg:'#f3e5f5',cor:'#6a1b9a',per:'mes',id:'gnhf-mes'},
+      {label:'Hoje',      val:soma(dH)-valesHoje,  cnt:dH.length, bg:'#e8f5e9',cor:'#2e7d32',per:'hoje',  id:'gnhf-hoje'},
+      {label:'Ontem',     val:soma(dO)-valesOntem, cnt:dO.length, bg:'#fff3e0',cor:'#e65100',per:'ontem', id:'gnhf-ontem'},
+      {label:'Esta Sem.', val:soma(dS)-valesSem,   cnt:dS.length, bg:'#e3f2fd',cor:'#1565C0',per:'semana',id:'gnhf-semana'},
+      {label:'Este Mês',  val:soma(dM)-valesMes,   cnt:dM.length, bg:'#f3e5f5',cor:'#6a1b9a',per:'mes',   id:'gnhf-mes'},
     ];
     el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">
       ${cards.map(c=>`<div style="background:${c.bg};border-radius:10px;padding:12px;text-align:center;cursor:pointer;${per===c.per?'border:2px solid '+c.cor+';':''}" onclick="filtroGanhos('${c.per}',$('${c.id}'))">
@@ -4330,22 +4320,11 @@ async function carregarGanhos(){
   const per=_gnhFiltro||'hoje';
   const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
   const{inicio,fim}=periodoRange(per,per==='mes'?_gnhMesOffset:0);
-  const{data}=await db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false});
 
-  // Busca vales do mesmo período (de todas as lojas vinculadas)
-  let valesData=[];
-  try{
-    const{data:vd}=await db.from('vales_entregadores')
-      .select('valor,observacao,created_at,loja:loja_id(nome_loja,nome)')
-      .eq('entregador_id',U.id)
-      .gte('created_at',inicio)
-      .lte('created_at',fim)
-      .order('created_at',{ascending:false});
-    valesData=vd||[];
-  }catch(e){}
+  const data = await safeQuery(()=>db.from('entregas').select('*,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false}));
+  const valesData = await safeQuery(()=>db.from('vales_entregadores').select('valor,observacao,created_at,loja:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false}));
 
-  if(!data||!data.length){
-    const totalVales=valesData.reduce((s,v)=>s+parseFloat(v.valor||0),0);
+  if(!data.length){
     el.innerHTML=`
       <p style="color:#999;text-align:center;padding:10px">Nenhuma entrega no período.</p>
       ${totalVales>0?`
@@ -4398,7 +4377,7 @@ async function carregarGanhos(){
     labelPer=alvo.toLocaleString('pt-BR',{month:'long',year:'numeric'});
     labelPer=labelPer.charAt(0).toUpperCase()+labelPer.slice(1);
   }else{
-    const labels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',mes:'Este Mês'};
+    const labels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês'};
     labelPer=labels[per]||per;
   }
   el.innerHTML=`
@@ -4822,29 +4801,27 @@ async function abrirPagamento(entId, entNome) {
   const {ini: dtIni, fim: dtFim} = getRelPeriodoHelper($('rel-f')?.value || 'semana');
 
   // Busca corridas não pagas do entregador
-  const [{data: corridas}, {data: vales}, {data: pgtosPeriodo}] = await Promise.all([
-    db.from('entregas')
-      .select('id,numero_pedido,cliente_nome,endereco_entrega,valor_corrida,valor_entregador,created_at,distancia_km')
-      .eq('entregador_id', entId).eq('loja_id', U.id)
-      .eq('status', 'entregue').is('pagamento_id', null)
-      .gte('created_at', dtIni).lte('created_at', dtFim),
-    db.from('vales_entregadores')
-      .select('id,valor,observacao,created_at')
-      .eq('entregador_id', entId).eq('loja_id', U.id)
-      .is('pagamento_id', null)
-      .gte('created_at', dtIni).lte('created_at', dtFim)
-      .catch(() => ({data: []})),
-    db.from('pagamentos_entregadores')
-      .select('id,valor_pago,pago_em,qtd_corridas')
-      .eq('entregador_id', entId).eq('loja_id', U.id)
-      .gte('pago_em', dtIni).lte('pago_em', dtFim)
-      .order('pago_em', {ascending: false}).limit(5)
-      .catch(() => ({data: []}))
-  ]);
+  const corridas = await safeQuery(()=>db.from('entregas')
+    .select('id,numero_pedido,cliente_nome,endereco_entrega,valor_corrida,valor_entregador,created_at,distancia_km')
+    .eq('entregador_id', entId).eq('loja_id', U.id)
+    .eq('status', 'entregue').is('pagamento_id', null)
+    .gte('created_at', dtIni).lte('created_at', dtFim));
 
-  const listaCorridas = corridas || [];
-  const listaVales = vales || [];
-  const pgtos = pgtosPeriodo || [];
+  const vales = await safeQuery(()=>db.from('vales_entregadores')
+    .select('id,valor,observacao,created_at')
+    .eq('entregador_id', entId).eq('loja_id', U.id)
+    .is('pagamento_id', null)
+    .gte('created_at', dtIni).lte('created_at', dtFim));
+
+  const pgtosPeriodo = await safeQuery(()=>db.from('pagamentos_entregadores')
+    .select('id,valor_pago,pago_em,qtd_corridas')
+    .eq('entregador_id', entId).eq('loja_id', U.id)
+    .gte('pago_em', dtIni).lte('pago_em', dtFim)
+    .order('pago_em', {ascending: false}).limit(5));
+
+  const listaCorridas = corridas;
+  const listaVales = vales;
+  const pgtos = pgtosPeriodo;
 
   const totalBruto = listaCorridas.reduce((s, e) => s + parseFloat(e.valor_corrida || e.valor_entregador || 0), 0);
   const totalVales = listaVales.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
