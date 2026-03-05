@@ -897,6 +897,23 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <button class="btn btn-orange" onclick="confirmarVale()">✅ Registrar Vale e Descontar</button>
 </div></div>
 
+<!-- Modal Pagamento ao Entregador -->
+<div id="m-pgto" class="modal"><div class="modal-box" style="max-height:90vh;overflow-y:auto;">
+  <button class="modal-close" onclick="closeM('pgto')">&times;</button>
+  <h2 style="margin-bottom:4px;">💳 Efetuar Pagamento</h2>
+  <p style="font-size:12px;color:#888;margin-bottom:12px;">Revise e confirme o pagamento ao entregador</p>
+  <div id="pgto-conteudo"></div>
+  <div id="pgto-msg" style="margin-bottom:8px;"></div>
+  <button class="btn btn-primary" id="pgto-btn-confirmar" onclick="confirmarPagamento()" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);">✅ Confirmar Pagamento</button>
+</div></div>
+
+<!-- Modal Histórico de Pagamentos -->
+<div id="m-hist-pgto" class="modal"><div class="modal-box" style="max-height:90vh;overflow-y:auto;">
+  <button class="modal-close" onclick="closeM('hist-pgto')">&times;</button>
+  <h2 style="margin-bottom:4px;">📜 Histórico de Pagamentos</h2>
+  <div id="hist-pgto-conteudo"><p style="color:#999;text-align:center;padding:20px;">Carregando...</p></div>
+</div></div>
+
 <!-- Termos de Uso -->
 <div id="m-termos" class="modal"><div class="modal-box" style="max-height:90vh;overflow-y:auto;padding:20px;">
   <button class="modal-close" onclick="closeM('termos')">&times;</button>
@@ -3258,9 +3275,9 @@ async function carregarRel(){
 
       <!-- Linha principal: nome + valor a pagar -->
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div style="display:flex;align-items:center;gap:7px;">
+        <div style="display:flex;align-items:center;gap:7px;cursor:pointer;" onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')">
           <div style="width:10px;height:10px;border-radius:50%;background:${cores[i%cores.length]};flex-shrink:0;"></div>
-          <strong style="font-size:14px;">${ent.nome}</strong>
+          <strong style="font-size:14px;color:#004E89;text-decoration:underline;">${ent.nome}</strong>
         </div>
         <div style="text-align:right;">
           ${ent.totalVales>0?`<div style="font-size:11px;color:#999;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
@@ -3293,7 +3310,15 @@ async function carregarRel(){
       </div>`:''}
 
       <!-- Botão registrar novo vale -->
-      <button onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#FF6B35;color:white;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">💸 Registrar Vale / Adiantamento</button>
+      <button onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#FF6B35;color:white;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-bottom:6px;">💸 Registrar Vale / Adiantamento</button>
+
+      <!-- Botão pagar -->
+      <button onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;border:none;border-radius:7px;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer;width:100%;margin-bottom:4px;">✅ Ver Extrato Completo / Pagar</button>
+
+      <!-- Histórico de pagamentos anteriores -->
+      <div style="text-align:center;">
+        <button onclick="abrirHistPagamentos('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#004E89;font-size:11px;cursor:pointer;text-decoration:underline;">📜 Ver histórico de pagamentos anteriores</button>
+      </div>
 
     </div>`).join('')}
   </div>
@@ -4418,8 +4443,45 @@ async function carregarGanhos(){
         <p style="font-size:11px;color:#555;margin:2px 0;">📍 Entrega: ${e.endereco_entrega||'-'}</p>
         ${e.distancia_km>0?`<p style="font-size:11px;color:#888;margin:2px 0;">📏 ${parseFloat(e.distancia_km).toFixed(1)} km</p>`:''}
         <span class="badge b-entregue" style="margin-top:4px;display:inline-block;">✅ Entregue</span>
+        ${e.pagamento_id?`<span style="background:#e3f2fd;color:#1565C0;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:5px;">💳 PAGO</span>`:''}
       </div>`;
-    }).join('')}`;
+    }).join('')}
+    <!-- Histórico de pagamentos recebidos -->
+    <div id="ent-hist-pgto-box"></div>
+    <button onclick="carregarHistPgtoEnt()" style="background:none;border:1px solid #004E89;color:#004E89;border-radius:7px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">📜 Ver histórico de pagamentos recebidos</button>
+    `;
+}
+
+async function carregarHistPgtoEnt(){
+  const el=$('ent-hist-pgto-box');
+  if(!el)return;
+  el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;padding:10px;">⏳ Carregando...</p>';
+  try{
+    const{data:hist}=await db.from('pagamentos_entregadores')
+      .select('valor_pago,valor_bruto,total_vales,qtd_corridas,pago_em,periodo_ini,periodo_fim,loja:loja_id(nome_loja,nome)')
+      .eq('entregador_id',U.id)
+      .order('pago_em',{ascending:false}).limit(30);
+    if(!hist||!hist.length){el.innerHTML='<p style="color:#999;text-align:center;font-size:12px;padding:10px;">Nenhum pagamento recebido ainda.</p>';return;}
+    const totalRecebido=hist.reduce((s,p)=>s+parseFloat(p.valor_pago||0),0);
+    el.innerHTML=`
+      <div style="background:#1b5e20;color:white;border-radius:10px;padding:10px;text-align:center;margin:10px 0 8px;">
+        <div style="font-size:11px;opacity:.8;">Total já recebido</div>
+        <div style="font-size:22px;font-weight:900;">${fR(totalRecebido)}</div>
+        <div style="font-size:10px;opacity:.7;">${hist.length} pagamentos</div>
+      </div>
+      ${hist.map(p=>`<div style="background:white;border:1px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#2e7d32;">✅ RECEBIDO</div>
+            <div style="font-size:10px;color:#888;">${new Date(p.pago_em).toLocaleDateString('pt-BR')} · ${p.loja?.nome_loja||p.loja?.nome||'Loja'}</div>
+          </div>
+          <strong style="font-size:16px;color:#2e7d32;">${fR(p.valor_pago)}</strong>
+        </div>
+        <div style="font-size:10px;color:#999;margin-top:4px;">
+          🛵 ${p.qtd_corridas} corridas · Bruto: ${fR(p.valor_bruto)}${p.total_vales>0?' · Vales: -'+fR(p.total_vales):''}
+        </div>
+      </div>`).join('')}`;
+  }catch(e){el.innerHTML=`<p style="color:#e74c3c;font-size:12px;padding:10px;">Erro: ${e.message}</p>`;}
 }
 
 function renderValesEnt(vales,total){
@@ -4742,6 +4804,219 @@ async function carregarValesParaEnt(entId){
         </div>
       </div>`;
   }catch(e){el.innerHTML='';}
+}
+
+
+// ============================================================
+// PAGAMENTOS A ENTREGADORES
+// ============================================================
+let _pgtoAtual = null; // dados do pagamento em andamento
+
+async function abrirPagamento(entId, entNome) {
+  openM('pgto');
+  const el = $('pgto-conteudo');
+  clearM('pgto-msg');
+  el.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">⏳ Carregando extrato...</p>';
+
+  // Período: usa o filtro atual do relatório
+  const {ini: dtIni, fim: dtFim} = getRelPeriodoHelper($('rel-f')?.value || 'semana');
+
+  // Busca corridas não pagas do entregador
+  const [{data: corridas}, {data: vales}, {data: pgtosPeriodo}] = await Promise.all([
+    db.from('entregas')
+      .select('id,numero_pedido,cliente_nome,endereco_entrega,valor_corrida,valor_entregador,created_at,distancia_km')
+      .eq('entregador_id', entId).eq('loja_id', U.id)
+      .eq('status', 'entregue').is('pagamento_id', null)
+      .gte('created_at', dtIni).lte('created_at', dtFim),
+    db.from('vales_entregadores')
+      .select('id,valor,observacao,created_at')
+      .eq('entregador_id', entId).eq('loja_id', U.id)
+      .is('pagamento_id', null)
+      .gte('created_at', dtIni).lte('created_at', dtFim)
+      .catch(() => ({data: []})),
+    db.from('pagamentos_entregadores')
+      .select('id,valor_pago,pago_em,qtd_corridas')
+      .eq('entregador_id', entId).eq('loja_id', U.id)
+      .gte('pago_em', dtIni).lte('pago_em', dtFim)
+      .order('pago_em', {ascending: false}).limit(5)
+      .catch(() => ({data: []}))
+  ]);
+
+  const listaCorridas = corridas || [];
+  const listaVales = vales || [];
+  const pgtos = pgtosPeriodo || [];
+
+  const totalBruto = listaCorridas.reduce((s, e) => s + parseFloat(e.valor_corrida || e.valor_entregador || 0), 0);
+  const totalVales = listaVales.reduce((s, v) => s + parseFloat(v.valor || 0), 0);
+  const totalPago = pgtos.reduce((s, p) => s + parseFloat(p.valor_pago || 0), 0);
+  const liquido = totalBruto - totalVales;
+
+  // Salva para confirmarPagamento usar
+  _pgtoAtual = {entId, entNome, listaCorridas, listaVales, totalBruto, totalVales, liquido, dtIni, dtFim};
+
+  const periodoLabel = $('rel-f') ? {hoje:'Hoje',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'}[$('rel-f').value] || 'Período' : 'Período';
+
+  el.innerHTML = `
+    <!-- Cabeçalho -->
+    <div style="background:#004E89;color:white;border-radius:10px;padding:12px;text-align:center;margin-bottom:12px;">
+      <div style="font-size:13px;opacity:.85;">${entNome} · ${periodoLabel}</div>
+      <div style="font-size:11px;opacity:.7;margin-top:2px;">${listaCorridas.length} corrida(s) pendentes de pagamento</div>
+    </div>
+
+    <!-- Resumo financeiro -->
+    <div style="background:#f8f9fa;border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;">
+        <span style="color:#555;">🛵 Corridas (bruto)</span>
+        <strong>${fR(totalBruto)}</strong>
+      </div>
+      ${totalVales > 0 ? `<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-top:1px solid #eee;">
+        <span style="color:#e74c3c;">💸 Vales a descontar</span>
+        <strong style="color:#e74c3c;">-${fR(totalVales)}</strong>
+      </div>` : ''}
+      <div style="display:flex;justify-content:space-between;padding:8px 0 4px;border-top:2px solid #004E89;margin-top:4px;">
+        <strong style="font-size:15px;">💰 A PAGAR AGORA</strong>
+        <strong style="font-size:20px;color:${liquido >= 0 ? '#2e7d32' : '#e74c3c'};">${fR(liquido)}</strong>
+      </div>
+    </div>
+
+    <!-- Vales do período -->
+    ${listaVales.length > 0 ? `<div style="margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:5px;">💸 VALES QUE SERÃO BAIXADOS:</div>
+      ${listaVales.map(v => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 8px;background:#fff3e0;border-radius:6px;margin-bottom:3px;">
+        <span>${v.observacao || 'Vale'} · ${new Date(v.created_at).toLocaleDateString('pt-BR')}</span>
+        <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
+      </div>`).join('')}
+    </div>` : ''}
+
+    <!-- Lista de corridas -->
+    <div style="font-size:11px;font-weight:700;color:#444;margin-bottom:6px;">📋 CORRIDAS DO PERÍODO (${listaCorridas.length}):</div>
+    <div style="max-height:200px;overflow-y:auto;margin-bottom:12px;">
+      ${listaCorridas.length === 0 ? '<p style="color:#999;text-align:center;padding:10px;font-size:12px;">Nenhuma corrida pendente neste período.</p>' :
+        listaCorridas.map((e, i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:12px;">
+          <div>
+            <strong>${i + 1}. ${e.numero_pedido ? '#' + e.numero_pedido : e.cliente_nome || 'Entrega'}</strong>
+            <div style="color:#888;font-size:10px;">${e.endereco_entrega?.substring(0, 40) || ''}${e.distancia_km > 0 ? ' · ' + parseFloat(e.distancia_km).toFixed(1) + 'km' : ''}</div>
+          </div>
+          <strong style="color:#2e7d32;">${fR(e.valor_corrida || e.valor_entregador)}</strong>
+        </div>`).join('')}
+    </div>
+
+    <!-- Pagamentos já feitos no período -->
+    ${pgtos.length > 0 ? `<div style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:#2e7d32;margin-bottom:5px;">✅ PAGAMENTOS JÁ EFETUADOS NO PERÍODO:</div>
+      ${pgtos.map(p => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;">
+        <span style="color:#555;">${new Date(p.pago_em).toLocaleDateString('pt-BR')} · ${p.qtd_corridas} corrida(s)</span>
+        <strong style="color:#2e7d32;">${fR(p.valor_pago)}</strong>
+      </div>`).join('')}
+      <div style="font-size:11px;color:#666;border-top:1px solid #c8e6c9;margin-top:5px;padding-top:5px;">Total já pago no período: <strong>${fR(totalPago)}</strong></div>
+    </div>` : ''}
+
+    ${liquido <= 0 && listaCorridas.length === 0 ? '<p style="color:#2e7d32;text-align:center;font-weight:700;padding:10px;">✅ Tudo em dia! Nenhum pagamento pendente.</p>' : ''}
+  `;
+
+  // Esconde botão se não tem nada a pagar
+  $('pgto-btn-confirmar').style.display = liquido > 0 && listaCorridas.length > 0 ? 'block' : 'none';
+}
+
+async function confirmarPagamento() {
+  if (!_pgtoAtual) return;
+  const {entId, entNome, listaCorridas, listaVales, totalBruto, totalVales, liquido, dtIni, dtFim} = _pgtoAtual;
+  if (listaCorridas.length === 0) return;
+
+  const btn = $('pgto-btn-confirmar');
+  btn.disabled = true; btn.textContent = '⏳ Registrando...';
+
+  try {
+    // 1. Cria o registro de pagamento
+    const {data: pgto, error: errPgto} = await db.from('pagamentos_entregadores').insert([{
+      entregador_id: entId,
+      loja_id: U.id,
+      valor_bruto: totalBruto,
+      total_vales: totalVales,
+      valor_pago: liquido,
+      periodo_ini: dtIni,
+      periodo_fim: dtFim,
+      qtd_corridas: listaCorridas.length,
+      observacao: `Pagamento via sistema · ${listaCorridas.length} corridas`,
+      criado_por: U.id
+    }]).select().single();
+
+    if (errPgto) throw errPgto;
+    const pgtoId = pgto.id;
+
+    // 2. Marca todas as corridas com pagamento_id
+    const corridasIds = listaCorridas.map(e => e.id);
+    await db.from('entregas').update({pagamento_id: pgtoId}).in('id', corridasIds);
+
+    // 3. Marca todos os vales com pagamento_id
+    if (listaVales.length > 0) {
+      const valesIds = listaVales.map(v => v.id);
+      await db.from('vales_entregadores').update({pagamento_id: pgtoId}).in('id', valesIds);
+    }
+
+    $('pgto-conteudo').innerHTML = `
+      <div style="text-align:center;padding:20px;">
+        <div style="font-size:48px;margin-bottom:10px;">✅</div>
+        <h3 style="color:#2e7d32;margin-bottom:6px;">Pagamento Registrado!</h3>
+        <p style="font-size:14px;color:#555;">${entNome}</p>
+        <p style="font-size:28px;font-weight:900;color:#2e7d32;margin:10px 0;">${fR(liquido)}</p>
+        <p style="font-size:12px;color:#888;">${listaCorridas.length} corridas · ${new Date().toLocaleDateString('pt-BR')}</p>
+        <p style="font-size:12px;color:#004E89;margin-top:10px;">O saldo do entregador foi zerado.<br>Um novo ciclo começa agora.</p>
+      </div>`;
+    btn.style.display = 'none';
+    setTimeout(() => { closeM('pgto'); carregarRel(); }, 2500);
+
+  } catch(e) {
+    showM('pgto-msg', '❌ Erro ao registrar: ' + e.message, false);
+    btn.disabled = false; btn.textContent = '✅ Confirmar Pagamento';
+  }
+}
+
+async function abrirHistPagamentos(entId, entNome) {
+  openM('hist-pgto');
+  const el = $('hist-pgto-conteudo');
+  el.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">⏳ Carregando...</p>';
+
+  try {
+    const {data: hist} = await db.from('pagamentos_entregadores')
+      .select('*')
+      .eq('entregador_id', entId).eq('loja_id', U.id)
+      .order('pago_em', {ascending: false})
+      .limit(50);
+
+    if (!hist || !hist.length) {
+      el.innerHTML = `<p style="color:#999;text-align:center;padding:30px;">Nenhum pagamento registrado para ${entNome}.</p>`;
+      return;
+    }
+
+    const totalHistorico = hist.reduce((s, p) => s + parseFloat(p.valor_pago || 0), 0);
+    el.innerHTML = `
+      <div style="background:#004E89;color:white;border-radius:10px;padding:10px;text-align:center;margin-bottom:12px;">
+        <div style="font-size:13px;">${entNome}</div>
+        <div style="font-size:20px;font-weight:900;margin:4px 0;">${fR(totalHistorico)}</div>
+        <div style="font-size:11px;opacity:.8;">Total pago em ${hist.length} pagamentos</div>
+      </div>
+      ${hist.map(p => `
+        <div style="background:white;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#2e7d32;">✅ PAGO</div>
+              <div style="font-size:11px;color:#888;">${new Date(p.pago_em).toLocaleDateString('pt-BR')} ${new Date(p.pago_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+            <strong style="font-size:18px;color:#2e7d32;">${fR(p.valor_pago)}</strong>
+          </div>
+          <div style="font-size:11px;color:#666;display:flex;gap:10px;flex-wrap:wrap;">
+            <span>🛵 ${p.qtd_corridas} corridas</span>
+            <span>💰 Bruto: ${fR(p.valor_bruto)}</span>
+            ${p.total_vales > 0 ? `<span style="color:#e74c3c;">💸 Vales: -${fR(p.total_vales)}</span>` : ''}
+          </div>
+          <div style="font-size:10px;color:#aaa;margin-top:4px;">
+            Período: ${new Date(p.periodo_ini).toLocaleDateString('pt-BR')} → ${new Date(p.periodo_fim).toLocaleDateString('pt-BR')}
+          </div>
+        </div>`).join('')}`;
+  } catch(e) {
+    el.innerHTML = `<p style="color:#e74c3c;text-align:center;padding:20px;">Erro: ${e.message}</p>`;
+  }
 }
 
 async function abrirCfgEnt(){
