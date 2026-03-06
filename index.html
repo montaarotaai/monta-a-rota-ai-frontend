@@ -3786,14 +3786,29 @@ async function carregarHistoricoTurno(){
   const el=document.getElementById('hist-turno-lst');
   if(!el)return;
   el.innerHTML='<p style="text-align:center;color:#999;padding:20px;">Carregando histórico...</p>';
-  const ini=iDia(), fim=fDia();
-  // Query simples sem join para não travar
-  const res=await db.from('entregas')
-    .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,lat_entrega,lng_entrega,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo')
-    .eq('loja_id',U.id)
-    .in('status',['entregue','cancelado'])
-    .gte('created_at',ini).lte('created_at',fim)
-    .order('created_at',{ascending:false});
+
+  // Usa range de 24h atrás até agora para garantir que pega todos pedidos do dia
+  // independente de fuso horário
+  const agora=new Date();
+  const ini=new Date(agora); ini.setHours(0,0,0,0);
+  // Subtrai 3h para compensar UTC-3 (pega desde meia-noite horário BR)
+  ini.setHours(ini.getHours()-3);
+  const iniISO=ini.toISOString();
+  const fimISO=agora.toISOString();
+
+  let res;
+  try{
+    res=await db.from('entregas')
+      .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,lat_entrega,lng_entrega,created_at,entregue_at,aceito_at,entregador_id')
+      .eq('loja_id',U.id)
+      .in('status',['entregue','cancelado'])
+      .gte('created_at',iniISO)
+      .lte('created_at',fimISO)
+      .order('created_at',{ascending:false});
+  }catch(e){
+    el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">❌ Erro de conexão: '+e+'</p>';
+    return;
+  }
   if(res.error){
     el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">❌ Erro: '+res.error.message+'</p>';
     return;
@@ -3803,14 +3818,18 @@ async function carregarHistoricoTurno(){
     el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
     return;
   }
-  // Busca nomes dos entregadores separadamente
+
+  // Busca nomes dos entregadores separadamente (sem join que pode travar)
   const entIds=[...new Set(data.filter(e=>e.entregador_id).map(e=>e.entregador_id))];
   const entMap={};
   if(entIds.length){
-    const{data:ents}=await db.from('usuarios').select('id,nome,taxa_fixo_base,taxa_tipo').in('id',entIds);
-    (ents||[]).forEach(e=>entMap[e.id]=e);
+    try{
+      const{data:ents,error:eErr}=await db.from('usuarios')
+        .select('id,nome,taxa_fixo_base,taxa_tipo')
+        .in('id',entIds);
+      if(!eErr)(ents||[]).forEach(e=>entMap[e.id]=e);
+    }catch(e){}
   }
-  // Injeta dados do entregador em cada pedido
   data.forEach(e=>{ e.entregador=entMap[e.entregador_id]||null; });
   // ── Preenche distância faltante com linha reta (instantâneo, sem API externa) ──
   {
