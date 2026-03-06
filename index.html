@@ -4650,7 +4650,7 @@ async function abrirRelLj(){openM('rel');if(!$('rel-f')?._cselValue){_buildCusto
 async function carregarRel(){
   const p=_cselVal('rel-f'),el=$('rel-dados');
   el.innerHTML='<p style="text-align:center;padding:20px;color:#888;">⏳ Carregando...</p>';
-  // Calcula período com início e fim corretos usando BR timezone
+
   function getRelPeriodo(per){
     const agora=new Date();
     let ini,fim=new Date(agora);fim.setHours(23,59,59,999);
@@ -4666,264 +4666,320 @@ async function carregarRel(){
     else if(per==='mes'){ini=new Date(agora.getFullYear(),agora.getMonth(),1,0,0,0,0);fim=new Date(agora.getFullYear(),agora.getMonth()+1,0,23,59,59,999);}
     else if(per==='mes_passado'){ini=new Date(agora.getFullYear(),agora.getMonth()-1,1,0,0,0,0);fim=new Date(agora.getFullYear(),agora.getMonth(),0,23,59,59,999);}
     else{ini=new Date(agora);ini.setHours(0,0,0,0);}
-    return{ini:ini.toISOString(),fim:fim.toISOString()};
+    // Ajusta UTC-3
+    return{ini:new Date(ini.getTime()-3*60*60*1000).toISOString(),fim:new Date(fim.getTime()-3*60*60*1000).toISOString()};
   }
   const{ini:dtIni,fim:dtFim}=getRelPeriodo(p);
-  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome,telefone,chave_pix,placa_moto)').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',dtIni).lte('created_at',dtFim);
-  if(!ents||!ents.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no período.</p>';return;}
-  // Busca pagamentos já realizados no período para calcular o que realmente falta pagar
-  const entIds2=[...new Set((ents||[]).map(e=>e.entregador_id).filter(Boolean))];
-  let pgtosPorEnt={};
+
+  // Busca dados em paralelo para ser mais rápido
+  const [resEnts, resCancelados] = await Promise.all([
+    db.from('entregas')
+      .select('id,numero_pedido,cliente_nome,endereco_entrega,endereco_bairro,status,valor_corrida,valor_entregador,valor_sistema,distancia_km,lat_entrega,lng_entrega,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo,forma_pagamento')
+      .eq('loja_id',U.id).eq('status','entregue')
+      .gte('created_at',dtIni).lte('created_at',dtFim),
+    db.from('entregas').select('id,created_at,entregador_id')
+      .eq('loja_id',U.id).eq('status','cancelado')
+      .gte('created_at',dtIni).lte('created_at',dtFim)
+  ]);
+
+  const ents = resEnts.data||[];
+  const cancelados = resCancelados.data||[];
+
+  if(!ents.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no período.</p>';return;}
+
+  const entIds2=[...new Set(ents.map(e=>e.entregador_id).filter(Boolean))];
+
+  // Busca pagamentos e vales em paralelo
+  let pgtosPorEnt={}, valesPorEntRaw=[];
   if(entIds2.length){
-    try{
-      const{data:pgtosPer}=await db.from('pagamentos_entregadores')
-        .select('entregador_id,valor_pago,pago_em')
-        .eq('loja_id',U.id)
-        .in('entregador_id',entIds2)
-        .gte('pago_em',dtIni).lte('pago_em',dtFim);
-      (pgtosPer||[]).forEach(p=>{
-        if(!pgtosPorEnt[p.entregador_id])pgtosPorEnt[p.entregador_id]=0;
-        pgtosPorEnt[p.entregador_id]+=parseFloat(p.valor_pago||0);
-      });
-    }catch(e){}
+    const [resPgtos,resVales] = await Promise.all([
+      db.from('pagamentos_entregadores').select('entregador_id,valor_pago,pago_em')
+        .eq('loja_id',U.id).in('entregador_id',entIds2).gte('pago_em',dtIni).lte('pago_em',dtFim),
+      db.from('vales_entregadores').select('entregador_id,valor,observacao,created_at')
+        .eq('loja_id',U.id).in('entregador_id',entIds2).gte('created_at',dtIni).lte('created_at',dtFim)
+    ]);
+    (resPgtos.data||[]).forEach(p=>{
+      if(!pgtosPorEnt[p.entregador_id])pgtosPorEnt[p.entregador_id]=0;
+      pgtosPorEnt[p.entregador_id]+=parseFloat(p.valor_pago||0);
+    });
+    valesPorEntRaw = resVales.data||[];
   }
 
-  const tS=ents.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
-  const tE=ents.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-  const entregues=ents.filter(e=>e.status==='entregue');
-  const taxaConc=ents.length>0?Math.round(entregues.length/ents.length*100):0;
-  // Pré-calcula combustível total para KPIs (calculado depois em entArr, mas precisamos antes para o resumo)
-  // Usa mesma lógica: 1 turno por dia por entregador
-  let _tCombGeral=0;
-  if(U.taxa_tipo==='fixo_mais_km'&&parseFloat(U.taxa_fixo_base||0)>0){
-    const _combCtrl={};
-    ents.forEach(e=>{
-      if(!e.entregador_id)return;
+  // Monta grupos por entregador
+  const pE={};
+  ents.forEach(e=>{
+    const k=e.entregador_id||'sem'; if(k==='sem')return;
+    if(!pE[k]){pE[k]={_id:k,nome:null,lista:[],total:0,entregues:0,kmTotal:0,tempos:[],turnos:new Set()};}
+    pE[k].lista.push(e);
+    pE[k].total+=parseFloat(e.valor_corrida||e.valor_entregador||0);
+    if(e.status==='entregue'){
+      pE[k].entregues++;
+      pE[k].kmTotal+=parseFloat(e.distancia_km||0);
+      if(e.entregue_at&&e.aceito_at){
+        const min=Math.round((new Date(e.entregue_at)-new Date(e.aceito_at))/60000);
+        if(min>0&&min<120)pE[k].tempos.push(min);
+      }
       const dt=new Date(e.entregue_at||e.created_at);
       const dtBR=new Date(dt.getTime()-3*60*60*1000);
       const diaKey=dtBR.toISOString().split('T')[0];
       const turno=(dtBR.getUTCHours()*60+dtBR.getUTCMinutes())<1020?'a':'j';
-      const chave=`${e.entregador_id}_${diaKey}_${turno}`;
-      if(!_combCtrl[chave]){_combCtrl[chave]=true;_tCombGeral+=parseFloat(U.taxa_fixo_base);}
-    });
-  }
-  const tETotal=tE+_tCombGeral; // custo real total = corridas + combustível
-
-  // Dados por entregador — ignora pedidos sem entregador no detalhamento
-  const pE={};
-  ents.forEach(e=>{
-    // Pedidos sem entregador atribuído: conta nos totais gerais mas não cria card individual
-    const k=e.entregador_id||'sem';
-    const nome=e.entregador?.nome||null;
-    if(k==='sem')return; // pula — não cria grupo "Sem entregador"
-    if(!pE[k]){
-      pE[k]={
-        _id:k,
-        nome,
-        telefone:e.entregador?.telefone||null,
-        chave_pix:e.entregador?.chave_pix||null,
-        placa_moto:e.entregador?.placa_moto||null,
-        lista:[],total:0,entregues:0,kmTotal:0
-      };
+      pE[k].turnos.add(`${diaKey}_${turno}`);
     }
-    const v=parseFloat(e.valor_corrida||e.valor_entregador||0);
-    pE[k].lista.push(e);
-    pE[k].total+=v;
-    if(e.status==='entregue')pE[k].entregues++;
-    pE[k].kmTotal+=parseFloat(e.distancia_km||0);
   });
-  const entArr=Object.values(pE).sort((a,b)=>b.lista.length-a.lista.length);
 
-  // Busca vales de todos os entregadores do período de uma vez
-  const entIds=entArr.map(e=>e._id).filter(Boolean);
-  let valesPorEnt={};
-  if(entIds.length){
+  // Busca nomes dos entregadores
+  if(entIds2.length){
     try{
-      const{data:vd}=await db.from('vales_entregadores')
-        .select('entregador_id,valor,observacao,created_at')
-        .eq('loja_id',U.id)
-        .in('entregador_id',entIds)
-        .gte('created_at',dtIni).lte('created_at',dtFim);
-      (vd||[]).forEach(v=>{
-        if(!valesPorEnt[v.entregador_id])valesPorEnt[v.entregador_id]=[];
-        valesPorEnt[v.entregador_id].push(v);
-      });
+      const{data:nomes}=await db.from('usuarios').select('id,nome,telefone,chave_pix,placa_moto').in('id',entIds2);
+      (nomes||[]).forEach(n=>{if(pE[n.id]){pE[n.id].nome=n.nome;pE[n.id].telefone=n.telefone;pE[n.id].chave_pix=n.chave_pix;pE[n.id].placa_moto=n.placa_moto;}});
     }catch(e){}
   }
-  // Adiciona totalVales, combustível e liquido a cada entregador
+
+  const entArr=Object.values(pE).filter(e=>e.nome).sort((a,b)=>b.lista.length-a.lista.length);
+  const valesPorEnt={};
+  valesPorEntRaw.forEach(v=>{if(!valesPorEnt[v.entregador_id])valesPorEnt[v.entregador_id]=[];valesPorEnt[v.entregador_id].push(v);});
+
+  // Calcula combustível e financeiro de cada entregador
   entArr.forEach(ent=>{
     ent.vales=valesPorEnt[ent._id]||[];
     ent.totalVales=ent.vales.reduce((s,v)=>s+parseFloat(v.valor||0),0);
-
-    // Calcula combustível por turno (só se loja usa taxa fixo_mais_km)
-    let combEnt=0;
-    if(U.taxa_tipo==='fixo_mais_km'&&parseFloat(U.taxa_fixo_base||0)>0){
-      const combCtrlEnt={};
-      ent.lista.forEach(e=>{
-        const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
-        // Converte para horário BR (UTC-3) para calcular turno corretamente
-        const dtBR=new Date(dt.getTime()-3*60*60*1000);
-        const diaKey=dtBR.toISOString().split('T')[0];
-        const turno=(dtBR.getUTCHours()*60+dtBR.getUTCMinutes())<1020?'almoco':'jantar';
-        const chave=`${diaKey}_${turno}`;
-        if(!combCtrlEnt[chave]){combCtrlEnt[chave]=true;combEnt+=parseFloat(U.taxa_fixo_base);}
-      });
-    }
-    ent.totalCombustivel=combEnt;
+    ent.nTurnos=ent.turnos.size;
+    const combBase=(U.taxa_tipo==='fixo_mais_km'||U.taxa_tipo==='por_km')?parseFloat(U.taxa_fixo_base||0):0;
+    ent.totalCombustivel=(combBase>0&&U.taxa_tipo==='fixo_mais_km')?combBase*ent.nTurnos:0;
     ent.totalJaPago=pgtosPorEnt[ent._id]||0;
-    const bruto=ent.total+combEnt-ent.totalVales;
+    ent.custoTotal=ent.total+ent.totalCombustivel;
+    const bruto=ent.custoTotal-ent.totalVales;
     ent.liquido=Math.max(0,bruto-ent.totalJaPago);
+    ent.tempoMedio=ent.tempos.length>0?Math.round(ent.tempos.reduce((s,t)=>s+t,0)/ent.tempos.length):null;
+    ent.custoPorKm=ent.kmTotal>0?ent.custoTotal/ent.kmTotal:0;
+    ent.ticketMedio=ent.entregues>0?ent.custoTotal/ent.entregues:0;
   });
 
+  // KPIs gerais
+  const tS=ents.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
+  const tECorrect=entArr.reduce((s,e)=>s+e.custoTotal,0);
+  const totalLiq=entArr.reduce((s,e)=>s+e.liquido,0);
+  const totalKm=entArr.reduce((s,e)=>s+e.kmTotal,0);
+  const totalComb=entArr.reduce((s,e)=>s+e.totalCombustivel,0);
+  const mediaCorr=ents.length>0?tECorrect/ents.length:0;
+  const taxaConc=ents.length>0?Math.round(ents.length/(ents.length+cancelados.length)*100):100;
+  const todosTempos=entArr.flatMap(e=>e.tempos);
+  const tempoGeral=todosTempos.length>0?Math.round(todosTempos.reduce((s,t)=>s+t,0)/todosTempos.length):null;
+
+  // Dados por hora do dia
+  const pHora=Array(24).fill(0);
+  ents.forEach(e=>{const h=new Date(new Date(e.created_at).getTime()-3*60*60*1000).getUTCHours();pHora[h]++;});
+
+  // Dados por dia
+  const pDia={};
+  ents.forEach(e=>{const d=new Date(new Date(e.created_at).getTime()-3*60*60*1000).toISOString().split('T')[0];if(!pDia[d])pDia[d]={n:0,custo:0};pDia[d].n++;pDia[d].custo+=parseFloat(e.valor_corrida||0);});
+  const dias=Object.keys(pDia).sort();
+
+  // Por bairro
+  const pB={};
+  ents.forEach(e=>{const b=(e.endereco_bairro||'Sem bairro').trim();if(!pB[b])pB[b]=0;pB[b]++;});
+  const bairrosArr=Object.entries(pB).sort((a,b)=>b[1]-a[1]);
+
+  // Forma de pagamento
+  const pgtoContagem={pago:0,dinheiro:0,cartao:0};
+  ents.forEach(e=>{ const fp=e.forma_pagamento||'pago'; pgtoContagem[fp]=(pgtoContagem[fp]||0)+1; });
+
+  const cores=['#FF6B35','#004E89','#00C9A7','#8e44ad','#e74c3c','#f39c12','#27ae60'];
   const melhor=entArr[0];
   const pior=entArr[entArr.length-1];
-  const cores=['#FF6B35','#004E89','#00C9A7','#8e44ad','#e74c3c','#f39c12','#27ae60'];
-
-  // Dados por bairro/região
-  const pB={};
-  ents.forEach(e=>{
-    const b=(e.endereco_bairro||'Sem bairro').trim();
-    if(!pB[b])pB[b]=0;
-    pB[b]++;
-  });
-  const bairrosArr=Object.entries(pB).sort((a,b)=>b[1]-a[1]);
-  const topBairros=bairrosArr.slice(0,6);
-
-  // Entregas por dia
-  const pDia={};
-  ents.forEach(e=>{const d=e.created_at?.split('T')[0]||'?';if(!pDia[d])pDia[d]=0;pDia[d]++;});
-  const dias=Object.keys(pDia).sort();
 
   el.innerHTML=`
   <style>
-    .rel-card{background:white;border-radius:14px;border:1.5px solid #eaecf0;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);}
-    .rel-card-title{font-size:11px;font-weight:800;color:#888;letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
-    .rel-kpi{background:white;border-radius:12px;border:1.5px solid #eaecf0;padding:12px 10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.04);}
-    .rel-kpi-val{font-size:22px;font-weight:900;line-height:1.1;margin:3px 0 1px;}
-    .rel-kpi-lbl{font-size:10px;color:#999;font-weight:600;letter-spacing:.3px;}
+    .rel-card{background:white;border-radius:16px;border:1.5px solid #eaecf0;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);}
+    .rel-card-title{font-size:10px;font-weight:800;color:#94a3b8;letter-spacing:.9px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+    .rel-kpi{background:#fafbfc;border-radius:12px;border:1.5px solid #eaecf0;padding:12px 8px;text-align:center;}
+    .rel-kpi-val{font-size:20px;font-weight:900;line-height:1.1;margin:3px 0 1px;}
+    .rel-kpi-val.sm{font-size:15px;}
+    .rel-kpi-lbl{font-size:9px;color:#94a3b8;font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+    .rel-kpi-sub{font-size:9px;color:#cbd5e1;margin-top:2px;}
+    .rel-g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .rel-g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+    .rel-g4{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;}
     .rel-ent-card{border:1.5px solid #eaecf0;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.04);}
-    .rel-ent-header{padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;}
+    .rel-ent-header{padding:13px 14px;display:flex;justify-content:space-between;align-items:flex-start;}
     .rel-ent-body{padding:0 14px 12px;}
-    .rel-pill{display:inline-flex;align-items:center;gap:4px;background:#f0f4ff;border:1px solid #d0daf5;border-radius:20px;padding:3px 9px;font-size:10px;font-weight:700;color:#004E89;}
-    .rel-divider{border:none;border-top:1.5px solid #eaecf0;margin:10px 0;}
+    .rel-pill{display:inline-flex;align-items:center;gap:3px;background:#f0f4ff;border:1px solid #d0daf5;border-radius:20px;padding:3px 8px;font-size:9px;font-weight:700;color:#004E89;}
+    .rel-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f5f7fa;font-size:12px;}
+    .rel-row:last-child{border-bottom:none;}
     .rel-action-btn{width:100%;border:none;border-radius:9px;padding:10px;font-size:12px;font-weight:800;cursor:pointer;transition:opacity .2s;}
     .rel-action-btn:hover{opacity:.85;}
+    .kpi-destaque{background:linear-gradient(135deg,#004E89,#0077cc);border-radius:14px;padding:16px;color:white;text-align:center;margin-bottom:8px;}
+    .kpi-destaque .val{font-size:28px;font-weight:900;letter-spacing:-.5px;}
+    .kpi-destaque .lbl{font-size:10px;opacity:.75;text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
+    .kpi-destaque .sub{font-size:11px;opacity:.6;margin-top:4px;}
+    .alerta-card{border-radius:12px;padding:10px 13px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
   </style>
 
-  <!-- KPIs PRINCIPAIS -->
+  <!-- ── KPI DESTAQUE: TOTAL A PAGAR ── -->
+  <div class="kpi-destaque">
+    <div class="val">${fR(totalLiq)}</div>
+    <div class="lbl">Total a Pagar aos Entregadores</div>
+    <div class="sub">${fR(tECorrect)} custo bruto · ${fR(totalComb>0?totalComb:0)} combustível incluído</div>
+  </div>
+
+  <!-- ── LINHA 1: OPERACIONAL ── -->
   <div class="rel-card">
-    <div class="rel-card-title">📦 Resumo do Período</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+    <div class="rel-card-title">📦 Operacional</div>
+    <div class="rel-g4" style="margin-bottom:8px;">
       <div class="rel-kpi" style="border-color:#ffe0b2;">
         <div class="rel-kpi-val" style="color:#FF6B35;">${ents.length}</div>
-        <div class="rel-kpi-lbl">Entregas</div>
+        <div class="rel-kpi-lbl">Entregues</div>
+      </div>
+      <div class="rel-kpi" style="border-color:#ffcdd2;">
+        <div class="rel-kpi-val sm" style="color:#c62828;">${cancelados.length}</div>
+        <div class="rel-kpi-lbl">Cancelados</div>
       </div>
       <div class="rel-kpi" style="border-color:#c8e6c9;">
-        <div class="rel-kpi-val" style="color:#2e7d32;">${taxaConc}%</div>
+        <div class="rel-kpi-val sm" style="color:#2e7d32;">${taxaConc}%</div>
         <div class="rel-kpi-lbl">Conclusão</div>
       </div>
       <div class="rel-kpi" style="border-color:#bbdefb;">
-        <div class="rel-kpi-val" style="color:#004E89;font-size:16px;">${fR(tS)}</div>
-        <div class="rel-kpi-lbl">Taxa Sist.</div>
-      </div>
-      <div class="rel-kpi" style="border-color:#e1bee7;">
-        <div class="rel-kpi-val" style="color:#6a1b9a;font-size:16px;">${fR(tETotal)}</div>
-        <div class="rel-kpi-lbl">Custo Ent.</div>
+        <div class="rel-kpi-val sm" style="color:#004E89;">${tempoGeral!=null?tempoGeral+'min':'—'}</div>
+        <div class="rel-kpi-lbl">Tempo Médio</div>
       </div>
     </div>
-
-    ${(()=>{
-      const totalLiq=entArr.reduce((s,e)=>s+e.liquido,0);
-      const totalKm=entArr.reduce((s,e)=>s+e.kmTotal,0);
-      const mediaCorr=ents.length>0?tETotal/ents.length:0;
-      return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
-        <div class="rel-kpi" style="border-color:#c8e6c9;">
-          <div class="rel-kpi-val" style="color:#1b5e20;font-size:16px;">${fR(totalLiq)}</div>
-          <div class="rel-kpi-lbl">Total a Pagar</div>
-        </div>
-        <div class="rel-kpi">
-          <div class="rel-kpi-val" style="color:#555;font-size:16px;">${totalKm.toFixed(0)}km</div>
-          <div class="rel-kpi-lbl">KM Rodados</div>
-        </div>
-        <div class="rel-kpi">
-          <div class="rel-kpi-val" style="color:#555;font-size:16px;">${fR(mediaCorr)}</div>
-          <div class="rel-kpi-lbl">Média/Corrida</div>
-        </div>
-      </div>`;
-    })()}
+    <div class="rel-g3">
+      <div class="rel-kpi" style="border-color:#e1bee7;">
+        <div class="rel-kpi-val sm" style="color:#6a1b9a;">${totalKm.toFixed(1)}km</div>
+        <div class="rel-kpi-lbl">KM Total</div>
+      </div>
+      <div class="rel-kpi">
+        <div class="rel-kpi-val sm" style="color:#333;">${fR(mediaCorr)}</div>
+        <div class="rel-kpi-lbl">Custo/Entrega</div>
+      </div>
+      <div class="rel-kpi" style="border-color:#b2dfdb;">
+        <div class="rel-kpi-val sm" style="color:#00695c;">${totalKm>0?fR(tECorrect/totalKm)+'/km':'—'}</div>
+        <div class="rel-kpi-lbl">Custo/km</div>
+      </div>
+    </div>
   </div>
 
-  <!-- MELHOR / PIOR -->
+  <!-- ── LINHA 2: FINANCEIRO ── -->
+  <div class="rel-card">
+    <div class="rel-card-title">💰 Financeiro</div>
+    <div class="rel-g3" style="margin-bottom:8px;">
+      <div class="rel-kpi" style="border-color:#e1bee7;">
+        <div class="rel-kpi-val sm" style="color:#6a1b9a;">${fR(tECorrect)}</div>
+        <div class="rel-kpi-lbl">Custo Total Ent.</div>
+        <div class="rel-kpi-sub">corridas + combustível</div>
+      </div>
+      <div class="rel-kpi" style="border-color:#bbdefb;">
+        <div class="rel-kpi-val sm" style="color:#004E89;">${fR(tS)}</div>
+        <div class="rel-kpi-lbl">Taxa Sistema</div>
+      </div>
+      ${totalComb>0?`<div class="rel-kpi" style="border-color:#ffe0cc;">
+        <div class="rel-kpi-val sm" style="color:#e65100;">${fR(totalComb)}</div>
+        <div class="rel-kpi-lbl">⛽ Combustível</div>
+        <div class="rel-kpi-sub">${entArr.reduce((s,e)=>s+e.nTurnos,0)} turnos</div>
+      </div>`:`<div class="rel-kpi">
+        <div class="rel-kpi-val sm" style="color:#1b5e20;">${fR(totalLiq)}</div>
+        <div class="rel-kpi-lbl">A Pagar</div>
+      </div>`}
+    </div>
+    <!-- Formas de pagamento -->
+    <div style="background:#f8fafc;border-radius:10px;padding:10px 12px;">
+      <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Formas de pagamento recebidas</div>
+      <div class="rel-g3">
+        <div style="text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#27ae60;">${pgtoContagem.pago}</div>
+          <div style="font-size:9px;color:#94a3b8;font-weight:700;">✅ Já Pago</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#1565C0;">${pgtoContagem.cartao||0}</div>
+          <div style="font-size:9px;color:#94a3b8;font-weight:700;">💳 Cartão</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#e65100;">${pgtoContagem.dinheiro||0}</div>
+          <div style="font-size:9px;color:#94a3b8;font-weight:700;">💵 Dinheiro</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MELHOR / PIOR ── -->
   ${entArr.length>1?`<div class="rel-card" style="padding:0;overflow:hidden;">
     <div style="display:grid;grid-template-columns:1fr 1fr;">
-      <div style="padding:12px 14px;border-right:1.5px solid #eaecf0;">
-        <div style="font-size:10px;font-weight:800;color:#27ae60;letter-spacing:.5px;margin-bottom:5px;">🏆 MAIS ENTREGAS</div>
+      <div style="padding:13px 14px;border-right:1.5px solid #eaecf0;">
+        <div style="font-size:9px;font-weight:800;color:#27ae60;letter-spacing:.5px;margin-bottom:5px;">🏆 MAIS ENTREGAS</div>
         <div style="font-size:14px;font-weight:800;color:#222;">${melhor.nome.split(' ')[0]}</div>
-        <div style="font-size:12px;color:#555;margin-top:2px;">${melhor.lista.length} corridas</div>
-        <div style="font-size:13px;font-weight:700;color:#2e7d32;margin-top:2px;">${fR(melhor.liquido)}</div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">${melhor.lista.length} corridas · ${melhor.kmTotal.toFixed(1)}km</div>
+        <div style="font-size:13px;font-weight:700;color:#2e7d32;margin-top:3px;">${melhor.tempoMedio?melhor.tempoMedio+'min médio':''}</div>
       </div>
-      <div style="padding:12px 14px;">
-        <div style="font-size:10px;font-weight:800;color:#e74c3c;letter-spacing:.5px;margin-bottom:5px;">📉 MENOS ENTREGAS</div>
-        <div style="font-size:14px;font-weight:800;color:#222;">${pior.nome.split(' ')[0]}</div>
-        <div style="font-size:12px;color:#555;margin-top:2px;">${pior.lista.length} corridas</div>
-        <div style="font-size:13px;font-weight:700;color:#e74c3c;margin-top:2px;">${fR(pior.liquido)}</div>
+      <div style="padding:13px 14px;">
+        <div style="font-size:9px;font-weight:800;color:#94a3b8;letter-spacing:.5px;margin-bottom:5px;">⚡ MAIS RÁPIDO</div>
+        ${(()=>{const comTempo=entArr.filter(e=>e.tempoMedio!=null);if(!comTempo.length)return '<div style="font-size:12px;color:#bbb;">Sem dados de tempo</div>';const r=comTempo.reduce((a,b)=>a.tempoMedio<b.tempoMedio?a:b);return `<div style="font-size:14px;font-weight:800;color:#222;">${r.nome.split(' ')[0]}</div><div style="font-size:11px;color:#555;margin-top:2px;">${r.lista.length} corridas</div><div style="font-size:13px;font-weight:700;color:#004E89;margin-top:3px;">${r.tempoMedio}min médio</div>`;})()}
       </div>
     </div>
   </div>`:''}
 
-  <!-- GRÁFICO BARRAS -->
+  <!-- ── GRÁFICO BARRAS ── -->
   ${entArr.length>0?`<div class="rel-card">
     <div class="rel-card-title">🛵 Corridas por Entregador</div>
-    <canvas id="lj-chart-bar" height="150"></canvas>
+    <canvas id="lj-chart-bar" height="140"></canvas>
   </div>`:''}
 
-  <!-- CUSTO POR ENTREGADOR — cards premium -->
+  <!-- ── MAPA DE CALOR POR HORÁRIO ── -->
   <div class="rel-card">
-    <div class="rel-card-title">💰 Detalhamento por Entregador</div>
+    <div class="rel-card-title">🕐 Pico de Demanda por Horário</div>
+    <canvas id="lj-chart-hora" height="110"></canvas>
+  </div>
+
+  <!-- ── DETALHAMENTO POR ENTREGADOR ── -->
+  <div class="rel-card">
+    <div class="rel-card-title">💳 Detalhamento por Entregador</div>
     ${entArr.map((ent,i)=>{
       const cor=cores[i%cores.length];
       const initials=ent.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();
       return `<div class="rel-ent-card">
-        <!-- Header do card -->
         <div class="rel-ent-header" style="background:linear-gradient(135deg,${cor}15,${cor}05);border-bottom:1.5px solid #eaecf0;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:42px;height:42px;border-radius:12px;background:${cor}22;border:2px solid ${cor}44;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:${cor};flex-shrink:0;">${initials}</div>
             <div>
               <div style="font-size:15px;font-weight:800;color:#222;">${ent.nome}</div>
-              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;">
-                <span class="rel-pill">✅ ${ent.entregues} entregues</span>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">
+                <span class="rel-pill">✅ ${ent.entregues}</span>
                 <span class="rel-pill">📏 ${ent.kmTotal.toFixed(1)}km</span>
-                <span class="rel-pill">📊 ${fR(ent.lista.length>0?ent.total/ent.lista.length:0)}/corrida</span>
+                ${ent.tempoMedio?`<span class="rel-pill">⏱️ ${ent.tempoMedio}min</span>`:''}
+                <span class="rel-pill">🔄 ${ent.nTurnos} turno${ent.nTurnos>1?'s':''}</span>
               </div>
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            ${(ent.totalVales>0||ent.totalCombustivel>0||ent.totalJaPago>0)?`<div style="font-size:10px;color:#bbb;text-decoration:line-through;">${fR(ent.total+ent.totalCombustivel-ent.totalVales)}</div>`:''}
             <div style="font-size:20px;font-weight:900;color:${ent.liquido<=0?'#2e7d32':'#e65100'};">${ent.liquido<=0?'✅ Em dia':fR(ent.liquido)}</div>
             <div style="font-size:9px;color:${ent.liquido<=0?'#2e7d32':'#999'};">${ent.liquido<=0?'pago':'a pagar'}</div>
           </div>
         </div>
-
         <div class="rel-ent-body" style="padding-top:10px;">
-          <!-- Discriminação financeira -->
-          <div style="background:#f8fafc;border-radius:9px;padding:10px;border:1px solid #eaecf0;margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#555;">
-              <span>🛵 Corridas (${ent.lista.length}x)</span><strong>${fR(ent.total)}</strong>
+          <!-- Grade de métricas do entregador -->
+          <div class="rel-g3" style="margin-bottom:10px;">
+            <div class="rel-kpi">
+              <div style="font-size:15px;font-weight:900;color:#c62828;">${fR(ent.custoTotal)}</div>
+              <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;">Custo Total</div>
             </div>
-            ${ent.totalCombustivel>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e65100;">
-              <span>⛽ Combustível</span><strong>+${fR(ent.totalCombustivel)}</strong>
-            </div>`:''}
-            ${ent.totalVales>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e74c3c;border-top:1px dashed #eee;margin-top:2px;padding-top:5px;">
-              <span>💸 Vales</span><strong>-${fR(ent.totalVales)}</strong>
-            </div>`:''}
-            ${ent.totalJaPago>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#1565C0;border-top:1px dashed #eee;margin-top:2px;padding-top:5px;">
-              <span>✅ Já pago</span><strong>-${fR(ent.totalJaPago)}</strong>
-            </div>`:''}
-            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:5px 0 0;border-top:2px solid #eaecf0;margin-top:4px;color:${ent.liquido<=0?'#1b5e20':'#c62828'};">
-              <span>${ent.liquido<=0?'✅ Tudo pago':'💰 Restante a pagar'}</span><span>${ent.liquido<=0?'R$ 0,00':fR(ent.liquido)}</span>
+            <div class="rel-kpi">
+              <div style="font-size:15px;font-weight:900;color:#555;">${fR(ent.ticketMedio)}</div>
+              <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;">Custo/Entrega</div>
+            </div>
+            <div class="rel-kpi">
+              <div style="font-size:15px;font-weight:900;color:#00695c;">${ent.kmTotal>0?fR(ent.custoPorKm)+'/km':'—'}</div>
+              <div style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;">Custo/km</div>
             </div>
           </div>
-
+          <!-- Discriminação financeira -->
+          <div style="background:#f8fafc;border-radius:9px;padding:10px;border:1px solid #eaecf0;margin-bottom:10px;">
+            <div class="rel-row"><span style="color:#555;">🛵 Corridas (${ent.lista.length}×)</span><strong>${fR(ent.total)}</strong></div>
+            ${ent.totalCombustivel>0?`<div class="rel-row"><span style="color:#e65100;">⛽ Combustível (${ent.nTurnos} turno${ent.nTurnos>1?'s':''})</span><strong style="color:#e65100;">+${fR(ent.totalCombustivel)}</strong></div>`:''}
+            ${ent.totalVales>0?`<div class="rel-row"><span style="color:#e74c3c;">💸 Vales</span><strong style="color:#e74c3c;">-${fR(ent.totalVales)}</strong></div>`:''}
+            ${ent.totalJaPago>0?`<div class="rel-row"><span style="color:#1565C0;">✅ Já pago</span><strong style="color:#1565C0;">-${fR(ent.totalJaPago)}</strong></div>`:''}
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:900;padding-top:8px;border-top:2px solid #eaecf0;color:${ent.liquido<=0?'#1b5e20':'#c62828'};">
+              <span>${ent.liquido<=0?'✅ Quitado':'💰 Restante'}</span><span>${ent.liquido<=0?'R$ 0,00':fR(ent.liquido)}</span>
+            </div>
+          </div>
           <!-- PIX -->
           <div style="background:${ent.chave_pix?'#f0faf4':'#fffbf0'};border:1.5px solid ${ent.chave_pix?'#a5d6a7':'#ffe082'};border-radius:9px;padding:9px 11px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
             <div>
@@ -4933,78 +4989,39 @@ async function carregarRel(){
             </div>
             ${ent.chave_pix?`<button onclick="navigator.clipboard.writeText('${ent.chave_pix}').then(()=>{this.textContent='✅';setTimeout(()=>{this.innerHTML='📋 Copiar'},2000)})" style="background:#27ae60;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">📋 Copiar</button>`:''}
           </div>
-
-          <!-- Vales -->
-          ${ent.vales.length>0?`<div style="background:#fffbf0;border:1.5px solid #ffe082;border-radius:9px;padding:9px 11px;margin-bottom:10px;">
-            <div style="font-size:9px;font-weight:800;color:#e65100;letter-spacing:.5px;margin-bottom:5px;">💸 VALES NO PERÍODO</div>
-            ${ent.vales.map(v=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
-              <span style="color:#555;">${v.observacao||'Vale'} <span style="color:#bbb;">· ${new Date(v.created_at).toLocaleDateString('pt-BR')}</span></span>
-              <strong style="color:#e74c3c;">-${fR(v.valor)}</strong>
-            </div>`).join('')}
-          </div>`:''}
-
           <!-- Ações -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px;">
-            <button class="rel-action-btn" onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:#fff3e0;color:#e65100;border:1.5px solid #ffcc80;">💸 Registrar Vale</button>
-            <button class="rel-action-btn" onclick="abrirHistCorridas('${ent._id}','${ent.nome.replace(/'/g,"\\'")}','${p}')" style="background:#f0f4ff;color:#004E89;border:1.5px solid #c5d5f5;">📋 Ver Corridas</button>
+          <div class="rel-g2" style="margin-bottom:7px;">
+            <button class="rel-action-btn" onclick="abrirValeEnt('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')}" style="background:#fff3e0;color:#e65100;border:1.5px solid #ffcc80;">💸 Vale</button>
+            <button class="rel-action-btn" onclick="abrirHistCorridas('${ent._id}','${ent.nome.replace(/'/g,"\\'")}','${p}')" style="background:#f0f4ff;color:#004E89;border:1.5px solid #c5d5f5;">📋 Corridas</button>
           </div>
-          <button class="rel-action-btn" onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;">✅ Ver Extrato Completo / Pagar</button>
+          <button class="rel-action-btn" onclick="abrirPagamento('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')}" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;">✅ Ver Extrato / Pagar</button>
           <div style="text-align:center;margin-top:6px;">
-            <button onclick="abrirHistPagamentos('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#004E89;font-size:11px;cursor:pointer;text-decoration:underline;">📜 Histórico de pagamentos anteriores</button>
+            <button onclick="abrirHistPagamentos('${ent._id}','${ent.nome.replace(/'/g,"\\'")}')}" style="background:none;border:none;color:#004E89;font-size:11px;cursor:pointer;text-decoration:underline;">📜 Histórico de pagamentos</button>
           </div>
         </div>
       </div>`;
     }).join('')}
   </div>
 
-  <!-- REGIÕES -->
+  <!-- ── REGIÕES ── -->
   ${bairrosArr.length>0?`<div class="rel-card">
     <div class="rel-card-title">📍 Regiões com Mais Entregas</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
-      ${bairrosArr.slice(0,4).map((b,i)=>{
-        const pct=Math.round(b[1]/ents.length*100);
-        const bgCors=['#fff3e0','#e8f5e9','#e3f2fd','#f3e5f5'];
-        const txtCors=['#e65100','#2e7d32','#1565C0','#6a1b9a'];
-        return `<div style="background:${bgCors[i]};border:1.5px solid ${txtCors[i]}22;border-radius:10px;padding:10px;">
-          <div style="font-size:18px;font-weight:900;color:${txtCors[i]};">${b[1]}</div>
-          <div style="font-size:11px;font-weight:700;color:${txtCors[i]};margin:1px 0;">${b[0].length>18?b[0].substring(0,18)+'…':b[0]}</div>
-          <div style="font-size:10px;color:#999;">${pct}% das entregas</div>
-        </div>`;
-      }).join('')}
+    <div class="rel-g2" style="margin-bottom:10px;">
+      ${bairrosArr.slice(0,4).map((b,i)=>{const pct=Math.round(b[1]/ents.length*100);const bgC=['#fff3e0','#e8f5e9','#e3f2fd','#f3e5f5'];const txC=['#e65100','#2e7d32','#1565C0','#6a1b9a'];return `<div style="background:${bgC[i]};border-radius:10px;padding:10px;border:1.5px solid ${txC[i]}22;"><div style="font-size:20px;font-weight:900;color:${txC[i]};">${b[1]}</div><div style="font-size:11px;font-weight:700;color:${txC[i]};margin:1px 0;">${b[0].length>16?b[0].substring(0,16)+'…':b[0]}</div><div style="font-size:10px;color:#999;">${pct}% das entregas</div></div>`;}).join('')}
     </div>
-    ${bairrosArr.length>4?`<div style="border-top:1.5px solid #eaecf0;padding-top:8px;">
-      ${bairrosArr.slice(4).map(b=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #f5f5f5;">
-        <span style="color:#555;">📍 ${b[0]}</span>
-        <strong style="color:#333;">${b[1]} entrega${b[1]>1?'s':''}</strong>
-      </div>`).join('')}
-    </div>`:''}
-    ${topBairros.length>0?`<canvas id="lj-chart-bairros" height="140" style="margin-top:10px;"></canvas>`:''}
+    ${bairrosArr.length>4?bairrosArr.slice(4).map(b=>`<div class="rel-row"><span style="color:#555;">📍 ${b[0]}</span><strong>${b[1]}</strong></div>`).join(''):''}
+    <canvas id="lj-chart-bairros" height="130" style="margin-top:10px;"></canvas>
   </div>`:''}
 
-  <!-- GRÁFICO LINHA DIAS -->
+  <!-- ── ENTREGAS POR DIA ── -->
   ${dias.length>1?`<div class="rel-card">
-    <div class="rel-card-title">📈 Entregas por Dia</div>
+    <div class="rel-card-title">📈 Desempenho por Dia</div>
     <canvas id="lj-chart-dias" height="130"></canvas>
   </div>`:''}
 
-  <!-- TAXA DE CONCLUSÃO -->
-  ${entArr.length>0?`<div class="rel-card">
-    <div class="rel-card-title">✅ Taxa de Conclusão por Entregador</div>
-    <canvas id="lj-chart-taxa" height="130"></canvas>
-  </div>`:''}
-
-  <!-- CUSTO POR KM -->
-  ${entArr.filter(e=>e.kmTotal>0).length>0?`<div class="rel-card">
-    <div class="rel-card-title">📏 Custo por KM Rodado</div>
-    <canvas id="lj-chart-km" height="130"></canvas>
-    <div style="font-size:10px;color:#aaa;margin-top:6px;text-align:center;">Menor custo/km = entregador mais eficiente por distância</div>
-  </div>`:''}
-
-  <!-- MODAL HISTÓRICO CORRIDAS (inline) -->
   <div id="hist-corridas-box"></div>
-  </div>`;
+  `;
 
-  // Gráficos após render
   setTimeout(()=>{
     // Barras por entregador
     const c1=document.getElementById('lj-chart-bar');
@@ -5014,71 +5031,59 @@ async function carregarRel(){
         labels:entArr.map(e=>e.nome.split(' ')[0]),
         datasets:[
           {label:'Corridas',data:entArr.map(e=>e.lista.length),backgroundColor:entArr.map((_,i)=>cores[i%cores.length]),borderRadius:6},
-          {label:'Custo (R$)',data:entArr.map(e=>e.total),backgroundColor:'rgba(0,78,137,.2)',borderColor:'#004E89',type:'line',yAxisID:'y2'}
+          {label:'Custo (R$)',data:entArr.map(e=>e.custoTotal),backgroundColor:'rgba(0,78,137,.15)',borderColor:'#004E89',type:'line',yAxisID:'y2',tension:.3}
         ]
       },options:{responsive:true,plugins:{legend:{labels:{font:{size:10}}}},scales:{
-        y:{ticks:{font:{size:10}}},
+        y:{ticks:{font:{size:10},stepSize:1}},
         y2:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10},callback:v=>'R$'+v.toFixed(0)}}
+      }}});
+    }
+    // Mapa de calor por horário
+    const cHora=document.getElementById('lj-chart-hora');
+    if(cHora){
+      if(cHora._ch)cHora._ch.destroy();
+      const hLabels=Array.from({length:24},(_,i)=>i<10?'0'+i+'h':i+'h');
+      const hMax=Math.max(...pHora,1);
+      cHora._ch=new Chart(cHora,{type:'bar',data:{
+        labels:hLabels,
+        datasets:[{
+          label:'Pedidos',
+          data:pHora,
+          backgroundColor:pHora.map(v=>{const int=v/hMax;return `rgba(${Math.round(255*(1-int))},${Math.round(100+100*int)},${Math.round(53+100*(1-int))},0.85)`;}),
+          borderRadius:4
+        }]
+      },options:{responsive:true,plugins:{legend:{display:false}},scales:{
+        x:{ticks:{font:{size:9},maxRotation:0}},
+        y:{ticks:{font:{size:10},stepSize:1},beginAtZero:true}
       }}});
     }
     // Bairros
     const c2=document.getElementById('lj-chart-bairros');
     if(c2){
       if(c2._ch)c2._ch.destroy();
+      const top=bairrosArr.slice(0,6);
       c2._ch=new Chart(c2,{type:'bar',data:{
-        labels:topBairros.map(b=>b[0].length>15?b[0].substring(0,15)+'…':b[0]),
-        datasets:[{label:'Entregas',data:topBairros.map(b=>b[1]),backgroundColor:topBairros.map((_,i)=>cores[i%cores.length]),borderRadius:5}]
-      },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10}}}}}});
+        labels:top.map(b=>b[0].length>14?b[0].substring(0,14)+'…':b[0]),
+        datasets:[{label:'Entregas',data:top.map(b=>b[1]),backgroundColor:top.map((_,i)=>cores[i%cores.length]),borderRadius:5}]
+      },options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:9}}}}}});
     }
-    // Taxa de conclusão por entregador
-    const c4=document.getElementById('lj-chart-taxa');
-    if(c4){
-      if(c4._ch)c4._ch.destroy();
-      c4._ch=new Chart(c4,{type:'bar',data:{
-        labels:entArr.map(e=>e.nome.split(' ')[0]),
-        datasets:[{
-          label:'Taxa de conclusão (%)',
-          data:entArr.map(e=>e.lista.length>0?Math.round(e.entregues/e.lista.length*100):0),
-          backgroundColor:entArr.map(e=>{const t=e.lista.length>0?e.entregues/e.lista.length:0;return t>=0.8?'#27ae60':t>=0.5?'#f39c12':'#e74c3c';}),
-          borderRadius:6
-        }]
-      },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{font:{size:10},callback:v=>v+'%'}},x:{ticks:{font:{size:10}}}}}});
-    }
-    // Custo por km
-    const c5=document.getElementById('lj-chart-km');
-    if(c5){
-      const comKm=entArr.filter(e=>e.kmTotal>0);
-      if(comKm.length>0){
-        if(c5._ch)c5._ch.destroy();
-        c5._ch=new Chart(c5,{type:'bar',data:{
-          labels:comKm.map(e=>e.nome.split(' ')[0]),
-          datasets:[{
-            label:'R$/km',
-            data:comKm.map(e=>parseFloat((e.total/e.kmTotal).toFixed(2))),
-            backgroundColor:comKm.map((_,i)=>cores[i%cores.length]),
-            borderRadius:6
-          }]
-        },options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{font:{size:10},callback:v=>'R$'+v.toFixed(2)}},x:{ticks:{font:{size:10}}}}}});
-      }
-    }
-    // Entregas por dia
+    // Dias
     const c3=document.getElementById('lj-chart-dias');
     if(c3&&dias.length>1){
       if(c3._ch)c3._ch.destroy();
       c3._ch=new Chart(c3,{type:'line',data:{
         labels:dias.map(d=>{const[,m,dd]=d.split('-');return`${dd}/${m}`;}),
-        datasets:[{label:'Entregas/dia',data:dias.map(d=>pDia[d]),borderColor:'#FF6B35',backgroundColor:'rgba(255,107,53,.1)',tension:.3,fill:true}]
-      },options:{responsive:true,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10},stepSize:1}}}}});
+        datasets:[
+          {label:'Entregas',data:dias.map(d=>pDia[d].n),borderColor:'#FF6B35',backgroundColor:'rgba(255,107,53,.1)',tension:.3,fill:true,yAxisID:'y'},
+          {label:'Custo (R$)',data:dias.map(d=>pDia[d].custo),borderColor:'#004E89',backgroundColor:'transparent',tension:.3,yAxisID:'y2',borderDash:[4,3]}
+        ]
+      },options:{responsive:true,plugins:{legend:{labels:{font:{size:10}}}},scales:{
+        y:{beginAtZero:true,ticks:{font:{size:10},stepSize:1}},
+        y2:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10},callback:v=>'R$'+v.toFixed(0)}}
+      }}});
     }
-    // Carregar vales de cada entregador
-    entArr.forEach(ent=>{
-      if(ent._id&&ent._id!=='sem'){
-        carregarValesParaEnt(ent._id);
-      }
-    });
   },150);
 }
-
 // ============================================================
 // HISTÓRICO DE CORRIDAS POR ENTREGADOR
 // ============================================================
