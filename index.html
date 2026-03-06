@@ -2278,12 +2278,13 @@ async function admVerLoja(){
   const el=$('adm-loja-view');el.innerHTML='<p>Carregando...</p>';
   const{data:lj}=await db.from('usuarios').select('*').eq('id',id).single();
   if(!lj){el.innerHTML='<p>Erro ao carregar</p>';return;}
-  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).neq('status','entregue').order('ordem_rota');
+  // Apenas pedidos realmente ativos (exclui entregue E cancelado)
+  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).in('status',['pendente','aceito','chegou_loja','saiu_entrega','em_rota']).order('ordem_rota');
   const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(nome,online,status)').eq('loja_id',id);
   const{data:rel}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).gte('created_at',iDia()).lte('created_at',fDia());
-  const totH=rel?rel.length:0;
-  const totSis=rel?rel.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0):0;
-  const totEnt=rel?rel.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
+  const totH=rel?rel.filter(e=>e.status==='entregue').length:0;
+  const totSis=rel?rel.filter(e=>e.status==='entregue').reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0):0;
+  const totEnt=rel?rel.filter(e=>e.status==='entregue').reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
   el.innerHTML=`
     <div style="background:#e3f2fd;border-radius:10px;padding:12px;margin-bottom:10px;">
       <strong>${lj.nome_loja||lj.nome}</strong> | Codigo: <strong>${lj.codigo_loja||'---'}</strong><br>
@@ -2296,14 +2297,41 @@ async function admVerLoja(){
       <div style="text-align:center;padding:8px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888;">Entregad.</p><p style="font-size:13px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p></div>
     </div>
     <div style="margin-bottom:8px;"><strong>Entregadores vinculados:</strong><br>${(assoc||[]).map(a=>`<span class="badge ${a.e&&a.e.online?'b-online':'b-offline'}" style="margin:2px;">${a.e?a.e.nome:'?'}</span>`).join('')||'Nenhum'}</div>
-    <div><strong>Pedidos ativos:</strong><br>${(!ents||!ents.length)?'<p style="color:#999;font-size:12px;">Nenhum pedido ativo</p>':ents.map(e=>`
+    <div style="margin-bottom:10px;"><strong>🚴 Pedidos ativos:</strong><br>${(!ents||!ents.length)?'<p style="color:#999;font-size:12px;">Nenhum pedido ativo</p>':ents.map(e=>`
       <div class="ecard ${e.status==='em_rota'?'rota':''}">
         <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${e.status_detalhado||e.status}">${e.status_detalhado||e.status}</span></div>
         <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
         ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
         ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
       </div>`).join('')}
-    </div>`;
+    </div>
+    ${(()=>{
+      const entregues=(rel||[]).filter(e=>e.status==='entregue');
+      const cancelados=(rel||[]).filter(e=>e.status==='cancelado');
+      let html='';
+      if(entregues.length){
+        html+=`<div style="margin-bottom:10px;"><strong style="color:#2e7d32;">✅ Entregues hoje (${entregues.length}):</strong><br>`;
+        html+=entregues.map(e=>`
+          <div class="ecard entregue-card">
+            <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-entregue">entregue</span></div>
+            <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
+            ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
+            ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
+          </div>`).join('');
+        html+='</div>';
+      }
+      if(cancelados.length){
+        html+=`<div><strong style="color:#c62828;">✖ Cancelados hoje (${cancelados.length}):</strong><br>`;
+        html+=cancelados.map(e=>`
+          <div class="ecard" style="opacity:.65;border-left-color:#c62828;">
+            <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-cancelado">cancelado</span></div>
+            <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
+            ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
+          </div>`).join('');
+        html+='</div>';
+      }
+      return html;
+    })()}`;
 }
 
 async function admVerEnt(){
