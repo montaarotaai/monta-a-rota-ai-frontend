@@ -3087,14 +3087,17 @@ async function atualizarValorCorrida(){
   const geo=await geocode(endFull);
   if(!geo){$('p-valor-corrida').classList.add('hidden');return;}
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
-  const dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);
+  // OSRM: distância real por estradas (fallback linha reta)
+  let dist,usouOSRM=false;
+  const rotaOSRM=await calcularRotaOSRM(lojaLat,lojaLng,geo.lat,geo.lng);
+  if(rotaOSRM&&rotaOSRM.distanciaKm>0){dist=rotaOSRM.distanciaKm;usouOSRM=true;}
+  else{dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);}
   const valorBase=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0,U.taxa_fixo_base||0);
   const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
   const valor=valorBase+chuvaBonus;
-  const distLabel=dist>0?` · ${dist.toFixed(1)} km`:'';
   const chuvaLabel=chuvaBonus>0?` <span style="color:#1565C0;font-size:11px;">(+${fR(chuvaBonus)} 🌧️)</span>`:'';
   $('p-valor-txt').innerHTML=fR(valor)+chuvaLabel;
-  $('p-dist-txt').textContent='Distância estimada: '+dist.toFixed(1)+' km';
+  $('p-dist-txt').textContent=(usouOSRM?'Rota real: ':'Estimado: ')+dist.toFixed(1)+' km'+(usouOSRM?' 🗺️':' 📐');
   $('p-valor-corrida').classList.remove('hidden');
   window._pedidoGeo={lat:geo.lat,lng:geo.lng,dist,valor:valorBase};
 }
@@ -4163,15 +4166,20 @@ async function recalcEditarDist(){
     window._editGeo=null; return;
   }
   const lojaLat=lojaGeoCache.lat||RP_LAT, lojaLng=lojaGeoCache.lng||RP_LNG;
-  const dist=distKm(lojaLat, lojaLng, geo.lat, geo.lng);
+  // OSRM: distância real por estradas (fallback linha reta)
+  let dist, usouOSRM=false;
+  const rotaOSRM=await calcularRotaOSRM(lojaLat,lojaLng,geo.lat,geo.lng);
+  if(rotaOSRM&&rotaOSRM.distanciaKm>0){dist=rotaOSRM.distanciaKm;usouOSRM=true;}
+  else{dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);}
   const valorBase=calcularValorCorrida(dist, U.taxa_tipo||'fixo', U.taxa_entrega||0, U.taxa_km_limite||5, U.taxa_km_excedente||0, U.taxa_fixo_base||0);
   const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
   const valor=valorBase+chuvaBonus;
   window._editGeo={lat:geo.lat, lng:geo.lng, dist, valorBase, valor};
   const chuvaStr=chuvaBonus>0?' (+'+fR(chuvaBonus)+' 🌧️)':'';
+  const fonteStr=usouOSRM?' 🗺️':' 📐';
   if(prev){
     prev.style.display='block'; prev.style.color='#004E89';
-    prev.textContent='📏 '+dist.toFixed(1)+' km  ·  💰 '+fR(valor)+chuvaStr;
+    prev.textContent='📏 '+dist.toFixed(1)+' km'+fonteStr+'  ·  💰 '+fR(valor)+chuvaStr;
   }
 }
 
