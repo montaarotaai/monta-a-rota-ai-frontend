@@ -3018,77 +3018,102 @@ function pixQRUrl(emv) {
 }
 
 function abrirPixCobranca(cobId, nomeLoja, valor, vencimento) {
-  const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, valor, 'MontaRotai ' + nomeLoja.substring(0,10));
-  const qrUrl = pixQRUrl(emv);
-  const vencFmt = new Date(vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+  try {
+    const emv    = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, valor, 'MontaRotai');
+    const qrUrl  = pixQRUrl(emv);
+    const vencFmt = new Date((vencimento||new Date().toISOString().split('T')[0]) + 'T12:00:00').toLocaleDateString('pt-BR');
 
-  // Cria modal inline
-  let modal = document.getElementById('pix-modal-overlay');
-  if (!modal) {
-    modal = document.createElement('div');
+    const antigo = document.getElementById('pix-modal-overlay');
+    if (antigo) antigo.remove();
+
+    const modal = document.createElement('div');
     modal.id = 'pix-modal-overlay';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
     document.body.appendChild(modal);
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:white;border-radius:20px;padding:22px;max-width:340px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.3);text-align:center;max-height:90vh;overflow-y:auto;';
+
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;';
+    const hdrTxt = document.createElement('div');
+    hdrTxt.style.cssText = 'font-size:16px;font-weight:900;color:#1a2a3a;';
+    hdrTxt.textContent = '💸 Cobrar via Pix';
+    const btnX = document.createElement('button');
+    btnX.textContent = '×';
+    btnX.style.cssText = 'background:none;border:none;font-size:28px;cursor:pointer;color:#94a3b8;line-height:1;';
+    btnX.onclick = () => modal.remove();
+    hdr.appendChild(hdrTxt); hdr.appendChild(btnX);
+    box.appendChild(hdr);
+
+    const info = document.createElement('div');
+    info.style.cssText = 'background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:16px;text-align:left;';
+    info.innerHTML =
+      '<div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;">Loja</div>' +
+      '<div style="font-size:15px;font-weight:900;color:#1a2a3a;"></div>' +
+      '<div style="display:flex;justify-content:space-between;margin-top:8px;">' +
+        '<div><div style="font-size:10px;color:#94a3b8;">Valor</div>' +
+        '<div style="font-size:24px;font-weight:900;color:#004E89;"></div></div>' +
+        '<div style="text-align:right;"><div style="font-size:10px;color:#94a3b8;">Vencimento</div>' +
+        '<div style="font-size:13px;font-weight:700;color:#e65100;"></div></div>' +
+      '</div>';
+    info.querySelectorAll('div')[1].textContent = nomeLoja;
+    info.querySelectorAll('div')[4].textContent = fR(valor);
+    info.querySelectorAll('div')[7].textContent = vencFmt;
+    box.appendChild(info);
+
+    const qrBox = document.createElement('div');
+    qrBox.style.cssText = 'border:2px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:14px;display:inline-block;';
+    const img = document.createElement('img');
+    img.src = qrUrl; img.width = 200; img.height = 200; img.alt = 'QR Pix';
+    img.style.cssText = 'display:block;border-radius:6px;';
+    const erroDiv = document.createElement('div');
+    erroDiv.style.cssText = 'display:none;width:200px;padding:20px 0;color:#94a3b8;font-size:12px;';
+    erroDiv.textContent = 'Use o código abaixo';
+    img.onerror = () => { img.style.display='none'; erroDiv.style.display='block'; };
+    qrBox.appendChild(img); qrBox.appendChild(erroDiv);
+    box.appendChild(qrBox);
+
+    const emvBox = document.createElement('div');
+    emvBox.style.cssText = 'margin-bottom:14px;';
+    const emvLabel = document.createElement('div');
+    emvLabel.style.cssText = 'font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:6px;';
+    emvLabel.textContent = 'Pix Copia e Cola';
+    const emvText = document.createElement('div');
+    emvText.style.cssText = 'background:#f1f5f9;border-radius:9px;padding:10px;font-size:9px;word-break:break-all;color:#475569;font-family:monospace;max-height:64px;overflow-y:auto;text-align:left;';
+    emvText.textContent = emv;
+    const btnCopy = document.createElement('button');
+    btnCopy.textContent = '📋 Copiar código';
+    btnCopy.style.cssText = 'width:100%;margin-top:8px;background:#004E89;color:white;border:none;border-radius:9px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;';
+    btnCopy.onclick = () => {
+      navigator.clipboard.writeText(emv).then(() => {
+        btnCopy.textContent = '✅ Copiado!'; btnCopy.style.background = '#27ae60';
+        setTimeout(() => { btnCopy.textContent = '📋 Copiar código'; btnCopy.style.background = '#004E89'; }, 2500);
+      }).catch(() => { btnCopy.textContent = '⚠️ Copie manualmente acima'; });
+    };
+    emvBox.appendChild(emvLabel); emvBox.appendChild(emvText); emvBox.appendChild(btnCopy);
+    box.appendChild(emvBox);
+
+    const dica = document.createElement('div');
+    dica.style.cssText = 'background:#f0fdf4;border-radius:10px;padding:10px;font-size:11px;color:#166534;text-align:left;margin-bottom:14px;';
+    dica.innerHTML = '<strong>Como enviar:</strong> Copie o código e mande no WhatsApp da loja. Ela abre o banco → Pix → Copia e Cola.';
+    box.appendChild(dica);
+
+    const btnPago = document.createElement('button');
+    btnPago.textContent = '✅ Confirmar Pagamento Recebido';
+    btnPago.style.cssText = 'width:100%;background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;';
+    btnPago.onclick = () => { marcarPago(cobId, nomeLoja, valor); modal.remove(); };
+    box.appendChild(btnPago);
+
+    modal.appendChild(box);
+    modal.onclick = e => { if (e.target === modal) modal.remove(); };
+
+  } catch(err) {
+    console.error('abrirPixCobranca erro:', err);
+    alert('Erro: ' + err.message);
   }
-
-  modal.innerHTML = `
-    <div style="background:white;border-radius:20px;padding:22px;max-width:340px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.25);text-align:center;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div style="font-size:16px;font-weight:900;color:#1a2a3a;">💸 Cobrar via Pix</div>
-        <button onclick="document.getElementById('pix-modal-overlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">×</button>
-      </div>
-
-      <!-- Info da cobrança -->
-      <div style="background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:16px;text-align:left;">
-        <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;">Loja</div>
-        <div style="font-size:14px;font-weight:800;color:#1a2a3a;">${nomeLoja}</div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px;">
-          <div>
-            <div style="font-size:10px;color:#94a3b8;">Valor</div>
-            <div style="font-size:22px;font-weight:900;color:#004E89;">${fR(valor)}</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:10px;color:#94a3b8;">Vencimento</div>
-            <div style="font-size:13px;font-weight:700;color:#e65100;">${vencFmt}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- QR Code -->
-      <div style="background:white;border:2px solid #e2e8f0;border-radius:14px;padding:12px;margin-bottom:14px;display:inline-block;">
-        <img src="${qrUrl}" width="200" height="200" alt="QR Code Pix" style="display:block;border-radius:6px;" onerror="this.style.display='none';document.getElementById('qr-erro').style.display='block'">
-        <div id="qr-erro" style="display:none;width:200px;height:60px;color:#94a3b8;font-size:12px;padding-top:20px;">Use o código abaixo</div>
-      </div>
-
-      <!-- Copia e Cola -->
-      <div style="margin-bottom:14px;">
-        <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Pix Copia e Cola</div>
-        <div style="background:#f1f5f9;border-radius:9px;padding:10px;font-size:9px;word-break:break-all;color:#475569;font-family:monospace;max-height:64px;overflow-y:auto;text-align:left;">${emv}</div>
-        <button id="pix-copy-btn" onclick="
-          navigator.clipboard.writeText('${emv.replace(/'/g,"\\'")}').then(()=>{
-            const b=document.getElementById('pix-copy-btn');
-            b.textContent='✅ Copiado!';b.style.background='#27ae60';
-            setTimeout(()=>{b.textContent='📋 Copiar código';b.style.background='#004E89';},2500);
-          })
-        " style="width:100%;margin-top:8px;background:#004E89;color:white;border:none;border-radius:9px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;">
-          📋 Copiar código
-        </button>
-      </div>
-
-      <!-- Instruções -->
-      <div style="background:#f0fdf4;border-radius:10px;padding:10px;font-size:11px;color:#166534;text-align:left;margin-bottom:14px;">
-        <strong>Como usar:</strong> Envie este QR Code ou o código Copia e Cola para a loja pelo WhatsApp. Ela abre o app do banco → Pix → Ler QR Code ou Copia e Cola e paga.
-      </div>
-
-      <!-- Botão marcar pago -->
-      <button onclick="marcarPago('${cobId}','${nomeLoja.replace(/'/g,"\\'")}',${valor});document.getElementById('pix-modal-overlay').remove();"
-        style="width:100%;background:linear-gradient(135deg,#1b5e20,#2e7d32);color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;">
-        ✅ Confirmar Pagamento Recebido
-      </button>
-    </div>`;
-
-  modal.onclick = e => { if (e.target === modal) modal.remove(); };
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════
