@@ -2040,6 +2040,8 @@ async function carregarAdmEnt(){
           <span class="badge b-${e.status}" style="font-size:10px;">${e.status}</span>
           <button class="btn-sm orange" onclick="abrirEditEntAdm('${e.id}')">✏️ Editar</button>
           <button class="btn-sm ${e.status==='ativo'?'red':'green'}" onclick="toggleStAdm('${e.id}','${e.status}','ent')">${e.status==='ativo'?'Bloquear':'Ativar'}</button>
+          ${e.online?`<button class="btn-sm" style="background:linear-gradient(135deg,#ff6b35,#e53935);color:#fff;font-size:10px;padding:5px 8px;border-radius:8px;border:none;cursor:pointer;font-weight:700;" onclick="admForcaOffline('${e.id}','${e.nome}')">⏸ Forçar Offline</button>`:''}
+          <button class="btn-sm" style="background:linear-gradient(135deg,#7b1fa2,#4a148c);color:#fff;font-size:10px;padding:5px 8px;border-radius:8px;border:none;cursor:pointer;font-weight:700;" onclick="admForcaDesvincular('${e.id}','${e.nome}')">🔓 Desvincular</button>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
@@ -2345,6 +2347,26 @@ async function carregarFinAdm(){
   },100);
 }
 
+
+// ── Admin: Forçar Offline ──
+async function admForcaOffline(id, nome){
+  if(!confirm(`Forçar ${nome} ficar Offline agora?`)) return;
+  const{error}=await db.from('usuarios').update({online:false}).eq('id',id);
+  if(error){alert('Erro: '+error.message);return;}
+  alert(`✅ ${nome} está Offline.`);
+  carregarAdmEnt();
+}
+
+// ── Admin: Forçar Desvincular de todas as lojas ──
+async function admForcaDesvincular(id, nome){
+  if(!confirm(`Desvincular ${nome} de TODAS as lojas e forçar Offline?\n\nEle precisará inserir o código novamente para se vincular.`)) return;
+  await db.from('usuarios').update({online:false, loja_ativa_id:null}).eq('id',id);
+  const{error}=await db.from('loja_entregadores').delete().eq('entregador_id',id);
+  if(error){alert('Erro: '+error.message);return;}
+  alert(`✅ ${nome} foi desvinculado de todas as lojas e está Offline.`);
+  carregarAdmEnt();
+}
+
 async function toggleStAdm(id,st,tipo){
   const novo=st==='ativo'?'bloqueado':'ativo';
   await db.from('usuarios').update({status:novo}).eq('id',id);
@@ -2462,8 +2484,8 @@ async function carregarAdmImpersonar(){
   const{data:lojas}=await db.from('usuarios').select('id,nome_loja,nome').eq('tipo','loja');
   const{data:ents}=await db.from('usuarios').select('id,nome').eq('tipo','entregador');
   // RESET antes de popular — evita duplicatas ao recarregar
-  _buildCustomSelect('adm-sel-loja', [{value:'',label:'Selecione uma loja...'}].concat((lojas||[]).map(l=>({value:l.id,label:l.nome_loja||l.nome}))), '', admVerLoja);
-  _buildCustomSelect('adm-sel-ent', [{value:'',label:'Selecione um entregador...'}].concat((ents||[]).map(e=>({value:e.id,label:e.nome}))), '', admVerEnt);
+  _buildCustomSelect('adm-sel-loja', [{value:'',label:'Selecione uma loja...'}].concat((lojas||[]).map(l=>({value:l.id,label:l.nome_loja||l.nome}))), '', ()=>admVerLoja());
+  _buildCustomSelect('adm-sel-ent', [{value:'',label:'Selecione um entregador...'}].concat((ents||[]).map(e=>({value:e.id,label:e.nome}))), '', ()=>admVerEnt());
 }
 
 // Estado do painel admin loja
