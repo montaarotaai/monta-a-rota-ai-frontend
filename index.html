@@ -3787,50 +3787,54 @@ async function carregarHistoricoTurno(){
   if(!el)return;
   el.innerHTML='<p style="text-align:center;color:#999;padding:20px;">Carregando histórico...</p>';
 
-  // Usa range de 24h atrás até agora para garantir que pega todos pedidos do dia
-  // independente de fuso horário
-  const agora=new Date();
-  const ini=new Date(agora); ini.setHours(0,0,0,0);
-  // Subtrai 3h para compensar UTC-3 (pega desde meia-noite horário BR)
-  ini.setHours(ini.getHours()-3);
-  const iniISO=ini.toISOString();
-  const fimISO=agora.toISOString();
+  // Timeout global: se demorar mais de 8s, mostra erro em vez de travar
+  let _timedOut=false;
+  const _guardTimer=setTimeout(()=>{
+    _timedOut=true;
+    el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">⏱️ Tempo esgotado ao carregar. Verifique conexão e tente novamente.</p>';
+  },8000);
 
-  let res;
   try{
-    res=await db.from('entregas')
+    // Range do dia em horário BR (UTC-3)
+    const agora=new Date();
+    const ini=new Date(agora);
+    ini.setHours(0,0,0,0);
+    ini.setTime(ini.getTime() - 3*60*60*1000); // recua 3h para cobrir UTC-3
+    const iniISO=ini.toISOString();
+    const fimISO=agora.toISOString();
+
+    const res=await db.from('entregas')
       .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,lat_entrega,lng_entrega,created_at,entregue_at,aceito_at,entregador_id')
       .eq('loja_id',U.id)
       .in('status',['entregue','cancelado'])
       .gte('created_at',iniISO)
       .lte('created_at',fimISO)
       .order('created_at',{ascending:false});
-  }catch(e){
-    el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">❌ Erro de conexão: '+e+'</p>';
-    return;
-  }
-  if(res.error){
-    el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">❌ Erro: '+res.error.message+'</p>';
-    return;
-  }
-  const data=res.data||[];
-  if(!data.length){
-    el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
-    return;
-  }
 
-  // Busca nomes dos entregadores separadamente (sem join que pode travar)
-  const entIds=[...new Set(data.filter(e=>e.entregador_id).map(e=>e.entregador_id))];
-  const entMap={};
-  if(entIds.length){
-    try{
-      const{data:ents,error:eErr}=await db.from('usuarios')
-        .select('id,nome,taxa_fixo_base,taxa_tipo')
-        .in('id',entIds);
-      if(!eErr)(ents||[]).forEach(e=>entMap[e.id]=e);
-    }catch(e){}
-  }
-  data.forEach(e=>{ e.entregador=entMap[e.entregador_id]||null; });
+    if(_timedOut)return;
+    clearTimeout(_guardTimer);
+
+    if(res.error){
+      el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">❌ Erro: '+res.error.message+'</p>';
+      return;
+    }
+    const data=res.data||[];
+    if(!data.length){
+      el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
+      return;
+    }
+
+    // Busca entregadores separadamente
+    const entIds=[...new Set(data.filter(e=>e.entregador_id).map(e=>e.entregador_id))];
+    const entMap={};
+    if(entIds.length){
+      try{
+        const{data:ents}=await db.from('usuarios').select('id,nome,taxa_fixo_base,taxa_tipo').in('id',entIds);
+        (ents||[]).forEach(e=>entMap[e.id]=e);
+      }catch(e){}
+    }
+    if(_timedOut)return;
+    data.forEach(e=>{ e.entregador=entMap[e.entregador_id]||null; });
   // ── Preenche distância faltante com linha reta (instantâneo, sem API externa) ──
   {
     const lojaLat = lojaGeoCache.lat || RP_LAT;
@@ -3962,6 +3966,10 @@ async function carregarHistoricoTurno(){
   });
 
   el.innerHTML=html;
+  }catch(err){
+    clearTimeout(_guardTimer);
+    if(!_timedOut) el.innerHTML='<p style="text-align:center;color:#c62828;padding:20px;">❌ Erro inesperado: '+(err.message||err)+'</p>';
+  }
 }
 
 async function abrirPedidosLj(){
