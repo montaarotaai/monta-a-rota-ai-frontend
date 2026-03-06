@@ -3925,7 +3925,7 @@ async function carregarHistoricoTurno(){
       html+='</div>';
     }
     if(ent.km>0){
-      const custoPorKm=ent.km>0?(custoLiquido/ent.km):0;
+      const custoPorKm=ent.km>0?(custoTotal/ent.km):0;
       html+='<div style="font-size:11px;color:#888;text-align:right;">Custo/km: <strong style="color:#555;">'+fR(custoPorKm)+'/km</strong></div>';
     }
     html+='</div>';
