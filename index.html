@@ -1323,8 +1323,8 @@ const _CalPicker = (function(){
       ini = new Date(now); ini.setHours(0,0,0,0);
       fim = new Date(now); fim.setHours(23,59,59,999);
     }
-    // Ajusta UTC-3
-    return { ini: new Date(ini.getTime()-3*60*60*1000).toISOString(), fim: new Date(fim.getTime()-3*60*60*1000).toISOString() };
+    // Sem ajuste UTC — as funções de query (periodoRange/_carregarDadosGanhos) já lidam com timezone
+    return { ini: ini.toISOString(), fim: fim.toISOString() };
   }
 
   function init(containerId, defaultPer, callback, opts) {
@@ -1343,10 +1343,20 @@ const _CalPicker = (function(){
 
     function getLabel() { return label(state.per, state.customRange); }
     function getSub() {
-      const r = resolve(state.per, state.customRange);
-      const f = s => new Date(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'});
-      const a = f(r.ini), b = f(r.fim);
-      return a === b ? a : a + ' – ' + b;
+      // Usa datas locais para exibir (sem ajuste UTC)
+      const now = new Date();
+      let ini, fim;
+      if(state.per==='custom'&&state.customRange){ini=state.customRange.ini;fim=state.customRange.fim;}
+      else if(state.per==='hoje'){ini=fim=now;}
+      else if(state.per==='ontem'){ini=new Date(now);ini.setDate(ini.getDate()-1);fim=new Date(ini);}
+      else if(state.per==='semana'){ini=new Date(now);ini.setDate(ini.getDate()-((now.getDay()+6)%7));fim=new Date(ini);fim.setDate(fim.getDate()+6);}
+      else if(state.per==='semana_passada'){ini=new Date(now);ini.setDate(ini.getDate()-((now.getDay()+6)%7)-7);fim=new Date(ini);fim.setDate(fim.getDate()+6);}
+      else if(state.per==='mes'){ini=new Date(now.getFullYear(),now.getMonth(),1);fim=new Date(now.getFullYear(),now.getMonth()+1,0);}
+      else if(state.per==='mes_passado'){ini=new Date(now.getFullYear(),now.getMonth()-1,1);fim=new Date(now.getFullYear(),now.getMonth(),0);}
+      else{ini=fim=now;}
+      const f = d => d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+      const a=f(ini), b=f(fim);
+      return a===b ? a : a+' – '+b;
     }
 
     function render() {
@@ -3238,27 +3248,92 @@ async function notificarLoja(cobId, lojaId, nomeLoja, valor, vencimento) {
   }
 }
 
+async function gerarCobrancaLoja(lojaId, nomeLoja, qtd, taxa, valor) {
+  const { ini: sIni, fim: sFim } = semanaAtual();
+  const semRef = semanaISO(sIni);
+  const venc = proxQuarta(new Date());
+
+  // Verifica se já existe
+  let jaExiste = false;
+  try {
+    const { data: ex } = await db.from('cobrancas_lojas')
+      .select('id,status').eq('loja_id', lojaId).eq('semana_ref', semRef).limit(1);
+    if (ex && ex.length) jaExiste = true;
+  } catch(e) {}
+
+  if (jaExiste) {
+    if (!confirm('Já existe uma cobrança para ' + nomeLoja + ' nesta semana. Abrir Pix mesmo assim?')) return;
+  } else {
+    // Salva no banco
+    try {
+      await db.from('cobrancas_lojas').insert({
+        loja_id: lojaId,
+        periodo_ini: sIni.toISOString().split('T')[0],
+        periodo_fim: sFim.toISOString().split('T')[0],
+        semana_ref: semRef,
+        qtd_entregas: qtd,
+        taxa_unitaria: taxa,
+        valor_total: valor,
+        status: 'pendente',
+        vencimento: venc.toISOString().split('T')[0],
+      });
+    } catch(e) {
+      console.warn('Tabela cobrancas_lojas não existe ainda — rode o SQL primeiro.', e.message);
+    }
+  }
+
+  // Abre QR Pix direto
+  abrirPixCobranca('novo', nomeLoja, valor, venc.toISOString().split('T')[0]);
+  setTimeout(() => carregarCobrancas(), 500);
+}
+
 async function carregarCobrancas() {
   const el = $('adm-cob-dados');
   if (!el) return;
   el.innerHTML = '<p style="text-align:center;padding:24px;color:#888;">Carregando...</p>';
 
-  const [resCobs, resLojas] = await Promise.all([
-    db.from('cobrancas_lojas')
-      .select('*,loja:loja_id(nome_loja,nome,taxa_sistema_por_entrega)')
-      .order('created_at', { ascending: false }).limit(300),
-    db.from('usuarios').select('id,nome_loja,nome,taxa_sistema_por_entrega')
-      .eq('tipo','loja').eq('status','ativo')
-  ]);
+  // Busca lojas e cobranças em paralelo — tabela cobrancas_lojas pode não existir ainda
+  const resLojas = await db.from('usuarios')
+    .select('id,nome_loja,nome,taxa_sistema,taxa_sistema_por_entrega,cnpj,telefone')
+    .eq('tipo','loja');
 
-  const cobs  = resCobs.data  || [];
-  const lojas = resLojas.data || [];
+  const lojas = (resLojas.data || []);
+
+  // Busca cobranças (ignora erro se tabela não existir ainda)
+  let cobs = [];
+  try {
+    const { data: cobData } = await db.from('cobrancas_lojas')
+      .select('*,loja:loja_id(nome_loja,nome)')
+      .order('created_at', { ascending: false }).limit(300);
+    cobs = cobData || [];
+  } catch(e) { cobs = []; }
+
+  // Busca entregas da semana atual para mostrar o que cada loja vai pagar
+  const { ini: sIni, fim: sFim } = semanaAtual();
+  const { data: entsSemana } = await db.from('entregas')
+    .select('loja_id,status')
+    .eq('status','entregue')
+    .gte('created_at', sIni.toISOString())
+    .lte('created_at', sFim.toISOString());
+
+  // Conta entregas por loja nesta semana
+  const entPorLoja = {};
+  (entsSemana || []).forEach(e => {
+    entPorLoja[e.loja_id] = (entPorLoja[e.loja_id] || 0) + 1;
+  });
+
+  // Monta preview de cobrança desta semana por loja
+  lojas.forEach(l => {
+    const taxa = parseFloat(l.taxa_sistema_por_entrega || l.taxa_sistema || 0.99);
+    l._taxaEnt = taxa;
+    l._qtdSemana = entPorLoja[l.id] || 0;
+    l._valorSemana = parseFloat((l._qtdSemana * taxa).toFixed(2));
+  });
 
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const totalPendente = cobs.filter(c=>c.status==='pendente').reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
   const totalPago     = cobs.filter(c=>c.status==='pago').reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
   const vencidas      = cobs.filter(c=>c.status==='pendente' && new Date(c.vencimento+'T00:00:00') < hoje);
-  const { ini: sIni, fim: sFim } = semanaAtual();
   const semRef = semanaISO(sIni);
 
   // Resumo por loja (pendentes)
@@ -3327,13 +3402,50 @@ async function carregarCobrancas() {
   }
 
   // Taxa por loja
+  // ── Prévia da semana por loja ──
+  const lojasComEntrega = lojas.filter(l => l._qtdSemana > 0);
+  if (lojasComEntrega.length > 0) {
+    html += '<div class="cob-card" style="border-color:#ffe0b2;">' +
+      '<div class="cob-title" style="color:#e65100;">📦 Entregas desta Semana — Prévia de Cobrança</div>' +
+      '<div style="font-size:10px;color:#94a3b8;margin-bottom:10px;">' +
+      sIni.toLocaleDateString("pt-BR") + " a " + sFim.toLocaleDateString("pt-BR") + " · vence próxima quarta" +
+      '</div>';
+    let totalPrevSemana = 0;
+    lojasComEntrega.sort((a,b) => b._valorSemana - a._valorSemana).forEach(l => {
+      totalPrevSemana += l._valorSemana;
+      html += '<div style="border:1.5px solid #ffe0b2;border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div>' +
+        '<div style="font-size:13px;font-weight:800;">' + (l.nome_loja || l.nome) + '</div>' +
+        '<div style="font-size:10px;color:#94a3b8;">' + l._qtdSemana + ' entregas × R$' + l._taxaEnt.toFixed(2) + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+        '<div style="font-size:18px;font-weight:900;color:#e65100;">' + fR(l._valorSemana) + '</div>' +
+        '</div></div>' +
+        '<div style="margin-top:8px;display:flex;gap:6px;">' +
+        '<button class="cob-btn" style="flex:1;background:linear-gradient(135deg,#004E89,#0077cc);color:white;" ' +
+        'onclick="gerarCobrancaLoja(\'' + l.id + '\',\'' + (l.nome_loja||l.nome).replace(/\'/g,"\\\'") + '\',' + l._qtdSemana + ',' + l._taxaEnt + ',' + l._valorSemana + ')">' +
+        '⚡ Gerar Cobrança + Pix</button>' +
+        '</div></div>';
+    });
+    html += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:8px 4px;border-top:2px solid #ffe0b2;margin-top:4px;">' +
+      '<span>Total a cobrar esta semana</span><span style="color:#e65100;">' + fR(totalPrevSemana) + '</span></div>';
+    html += '</div>';
+  }
+
   html += '<div class="cob-card"><div class="cob-title">⚙️ Taxa por Entrega — por Loja</div>';
+  if (lojas.length === 0) {
+    html += '<p style="color:#94a3b8;font-size:12px;text-align:center;">Nenhuma loja cadastrada.</p>';
+  }
   lojas.forEach(l => {
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f7fa;font-size:12px;">' +
-      '<span style="font-weight:700;flex:1;">' + (l.nome_loja || l.nome) + '</span>' +
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f5f7fa;">' +
+      '<div style="flex:1;">' +
+      '<div style="font-size:12px;font-weight:800;">' + (l.nome_loja || l.nome) + '</div>' +
+      (l._qtdSemana > 0 ? '<div style="font-size:10px;color:#e65100;">' + l._qtdSemana + ' entregas esta semana</div>' : '<div style="font-size:10px;color:#94a3b8;">Sem entregas esta semana</div>') +
+      '</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<span style="font-size:10px;color:#94a3b8;">R$</span>' +
-      '<input type="number" id="taxa-inp-' + l.id + '" class="taxa-inp" value="' + parseFloat(l.taxa_sistema_por_entrega || 0.99).toFixed(2) + '" step="0.01" min="0">' +
+      '<input type="number" id="taxa-inp-' + l.id + '" class="taxa-inp" value="' + l._taxaEnt.toFixed(2) + '" step="0.01" min="0">' +
       '<button class="cob-btn" onclick="salvarTaxaLoja(\'' + l.id + '\')" style="background:#004E89;color:white;">💾</button>' +
       '</div></div>';
   });
@@ -6896,8 +7008,11 @@ async function carregarResumoGanhos(){
   el.innerHTML='<p style="text-align:center;color:#aaa;font-size:12px;padding:8px 0;">Carregando resumo...</p>';
   const per=_gnhFiltro||'hoje';
   const agora=new Date();
-  // Garante dados carregados (usa cache se disponível)
-  await _carregarDadosGanhos();
+  // Resolve range real (custom=CalPicker, outros=periodoRange)
+  let _rIni,_rFim;
+  if(per==='custom'&&_gnhRange){_rIni=new Date(_gnhRange.ini);_rFim=new Date(_gnhRange.fim);}
+  else{const r=periodoRange(per,per==='mes'?_gnhMesOffset:0);_rIni=new Date(r.inicio);_rFim=new Date(r.fim);}
+  await _carregarDadosGanhos(_rIni,_rFim);
   const {entregas:dadosTodos,vales:valesTodos,inicioMes}=_gnhCache;
 
   if(per==='mes'){
