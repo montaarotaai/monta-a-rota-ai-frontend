@@ -5380,10 +5380,10 @@ async function carregarGanhos(){
   const saldoFinal = Math.max(0, totPendentes + combustivelPendente - totalValesPendentes);
   const tudoPago = entregasPagas.length > 0 && entregasPendentes.length === 0;
 
-  // Agrupa combustível por dia/turno para discriminar
+  // Agrupa combustível por dia/turno para discriminar — só entregas PENDENTES
   const combustivelDetalhado=[];
   const combCtrl2={};
-  data.forEach(e=>{
+  entregasPendentes.forEach(e=>{
     if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
     const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
     const diaKey=dt.toISOString().split('T')[0];
@@ -5394,9 +5394,9 @@ async function carregarGanhos(){
       combustivelDetalhado.push({dia:diaKey,turno,valor:parseFloat(e.l.taxa_fixo_base)});
     }
   });
-  // Conta incentivos por tipo
+  // Conta incentivos por tipo — só pendentes
   const incentivosContagem={};
-  data.forEach(e=>{
+  entregasPendentes.forEach(e=>{
     if(!(parseFloat(e.valor_incentivo||0)>0))return;
     const t=e.tipo_incentivo||'incentivo';
     if(!incentivosContagem[t])incentivosContagem[t]={qtd:0,total:0};
@@ -5421,7 +5421,7 @@ async function carregarGanhos(){
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <span style="font-size:13px;color:#555;">🛵 Corridas base</span>
-        <strong style="color:#555;">${fR(totalBase)}</strong>
+        <strong style="color:#555;">${fR(totPendentes - entregasPendentes.reduce((s,e)=>s+parseFloat(e.valor_incentivo||0),0))}</strong>
       </div>
 
       ${Object.entries(incentivosContagem).map(([tipo,v])=>{
@@ -5440,9 +5440,9 @@ async function carregarGanhos(){
         </div>`).join('')}
       </div>`:''}
 
-      ${totalVales>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding-top:5px;border-top:1px dashed #ddd;">
+      ${totalValesPendentes>0?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;padding-top:5px;border-top:1px dashed #ddd;">
         <span style="font-size:13px;color:#e74c3c;">💸 Vales descontados</span>
-        <strong style="color:#e74c3c;">-${fR(totalVales)}</strong>
+        <strong style="color:#e74c3c;">-${fR(totalValesPendentes)}</strong>
       </div>`:''}
 
       <div style="border-top:2.5px solid #004E89;margin-top:10px;padding-top:10px;">
