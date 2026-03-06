@@ -3821,6 +3821,66 @@ async function carregarPedidos(){
   const kmTotalLoja = data.filter(e=>e.status!=='pendente').reduce((s,e) => s + parseFloat(e.distancia_km||0), 0);
   const minTotalLoja = data.filter(e=>e.status!=='pendente').reduce((s,e) => s + parseInt(e.tempo_estimado_min||0), 0);
   const emRotaCount = data.filter(e=>['saiu_entrega','em_rota'].includes(e.status||e.status_detalhado)).length;
+  // ── Previsão de entrega por pedido (posição GPS real do entregador + fila ordenada) ──
+  const agora = new Date();
+
+  // Pedidos em rota agrupados por entregador
+  const entregadoresEmRota = [...new Set(
+    data.filter(e => ['saiu_entrega','em_rota'].includes(e.status||e.status_detalhado) && e.entregador_id)
+        .map(e => e.entregador_id)
+  )];
+
+  if(entregadoresEmRota.length > 0){
+    // Busca posição GPS atual de todos os entregadores em rota
+    const {data:posEnt} = await db.from('usuarios')
+      .select('id,latitude,longitude')
+      .in('id', entregadoresEmRota);
+    const posMap = {}; // id → {lat, lng}
+    (posEnt||[]).forEach(e => { if(e.latitude&&e.longitude) posMap[e.id]={lat:e.latitude,lng:e.longitude}; });
+
+    // Para cada entregador: ordena fila e calcula previsão acumulada com OSRM
+    for(const entId of entregadoresEmRota){
+      const fila = data
+        .filter(e => e.entregador_id===entId && ['saiu_entrega','em_rota'].includes(e.status||e.status_detalhado))
+        .sort((a,b) => (a.ordem_rota||99)-(b.ordem_rota||99));
+
+      const posAtual = posMap[entId]; // posição GPS real do entregador agora
+      let minAcum = 0;
+      let latAtual = posAtual?.lat;
+      let lngAtual = posAtual?.lng;
+
+      for(const ped of fila){
+        const destLat = ped.lat_entrega;
+        const destLng = ped.lng_entrega;
+
+        if(latAtual && lngAtual && destLat && destLng){
+          // OSRM da posição atual (ou do destino anterior) até este destino
+          try{
+            const rota = await calcularRotaOSRM(latAtual, lngAtual, destLat, destLng);
+            if(rota && rota.duracaoMin > 0){
+              minAcum += rota.duracaoMin;
+              // Salva no banco se divergiu mais de 2min do que está salvo
+              if(Math.abs((ped.tempo_estimado_min||0) - rota.duracaoMin) > 2){
+                db.from('entregas').update({tempo_estimado_min: rota.duracaoMin}).eq('id', ped.id);
+              }
+            } else {
+              minAcum += parseInt(ped.tempo_estimado_min||15);
+            }
+          }catch(e){ minAcum += parseInt(ped.tempo_estimado_min||15); }
+          // Próximo ponto de partida é este destino
+          latAtual = destLat;
+          lngAtual = destLng;
+        } else {
+          minAcum += parseInt(ped.tempo_estimado_min||15);
+        }
+
+        ped._minutosRestantes = minAcum;
+        const previsao = new Date(agora.getTime() + minAcum * 60000);
+        ped._previsaoEntrega = previsao.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+      }
+    }
+  }
+
   $('rota-lst').innerHTML=(kmTotalLoja>0||minTotalLoja>0 ? `<div style="background:#f0f7ff;border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border:1.5px solid #bbdefb;">
     <div style="font-size:10px;font-weight:700;color:#004E89;flex-basis:100%;margin-bottom:2px;">📊 Entregas em andamento</div>
     ${kmTotalLoja>0?`<span style="font-size:13px;color:#555;">📏 <strong>${kmTotalLoja.toFixed(1)} km</strong> total</span>`:''}
@@ -3890,6 +3950,19 @@ async function carregarPedidos(){
         ${e.tempo_estimado_min?`<span>⏱️ <strong>${formatarTempo(e.tempo_estimado_min)}</strong></span>`:''}
         <span style="color:#2e7d32;">${fR(e.valor_corrida||e.valor_entregador)}</span>
       </p>`:''}
+      ${(['saiu_entrega','em_rota'].includes(e.status||e.status_detalhado))?`
+        <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:12px;padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(27,94,32,.25);">
+          <div style="font-size:26px;line-height:1;">🏠</div>
+          <div style="flex:1;">
+            <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Previsão de entrega ao cliente</div>
+            ${e._previsaoEntrega
+              ? `<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:.5px;">${e._previsaoEntrega}</div>
+                 <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:1px;">⏳ ~${e._minutosRestantes} min • via rota real 🗺️</div>`
+              : `<div style="font-size:13px;color:rgba(255,255,255,.8);">Calculando rota...</div>`
+            }
+          </div>
+        </div>`:''
+      }
       ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">&#128273; Cod. Conf: ${e.codigo_confirmacao}</p>`:''}
       ${entCardsHtml}
       ${e.entregador&&e.status!=='pendente'?`<p style="font-size:11px;color:#004E89;margin-top:4px;">&#128757; ${e.entregador.nome}</p>`:''}
