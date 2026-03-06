@@ -610,6 +610,33 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="p-bairro" oninput="atualizarValorCorrida()"></div><div class="fg"><label>Cidade</label><input type="text" id="p-cidade" value="Ribeirao Preto"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="p-comp" placeholder="Ex: Apto 12 Torre 2"></div>
   <div class="fg"><label>Observacoes</label><input type="text" id="p-obs"></div>
+
+  <!-- Pagamento -->
+  <div style="margin-bottom:12px;">
+    <label style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px;">💳 Forma de Pagamento</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;" id="p-pag-btns">
+      <button type="button" onclick="selecionarPagamento('pago')" id="ppag-pago"
+        style="padding:10px 6px;border-radius:10px;border:2px solid #e0e0e0;background:#f9f9f9;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+        ✅ Já Pago
+      </button>
+      <button type="button" onclick="selecionarPagamento('dinheiro')" id="ppag-dinheiro"
+        style="padding:10px 6px;border-radius:10px;border:2px solid #e0e0e0;background:#f9f9f9;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+        💵 Dinheiro
+      </button>
+      <button type="button" onclick="selecionarPagamento('cartao')" id="ppag-cartao"
+        style="padding:10px 6px;border-radius:10px;border:2px solid #e0e0e0;background:#f9f9f9;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;">
+        💳 Cartão
+      </button>
+    </div>
+    <div id="p-troco-area" style="display:none;margin-top:8px;">
+      <div class="fg" style="margin-bottom:0;">
+        <label>💵 Valor total do pedido (para calcular troco)</label>
+        <input type="number" id="p-troco-valor" placeholder="Ex: 52.00" step="0.01" min="0"
+          style="padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;">
+      </div>
+    </div>
+  </div>
+
   <div id="p-codconf-area" class="hidden" style="margin-bottom:11px;background:#f3e5f5;border-radius:8px;padding:10px;">
     <label style="font-size:11px;font-weight:700;color:#6a1b9a;text-transform:uppercase;letter-spacing:.5px;">&#128273; Codigo iFood detectado</label>
     <input type="text" id="p-cod-conf" placeholder="" style="width:100%;margin-top:5px;padding:9px;border:1.5px solid #ce93d8;border-radius:8px;font-size:16px;letter-spacing:4px;font-weight:700;color:#6a1b9a;">
@@ -3102,11 +3129,34 @@ async function atualizarValorCorrida(){
   window._pedidoGeo={lat:geo.lat,lng:geo.lng,dist,valor:valorBase};
 }
 
+
+// ── Seleção de pagamento no novo pedido ──
+let _pedidoPagamento = 'pago'; // default: já pago
+function selecionarPagamento(tipo){
+  _pedidoPagamento = tipo;
+  ['pago','dinheiro','cartao'].forEach(t => {
+    const btn = document.getElementById('ppag-'+t);
+    if(!btn) return;
+    if(t === tipo){
+      btn.style.border = '2px solid #004E89';
+      btn.style.background = '#e8f0fe';
+      btn.style.color = '#004E89';
+    } else {
+      btn.style.border = '2px solid #e0e0e0';
+      btn.style.background = '#f9f9f9';
+      btn.style.color = '#333';
+    }
+  });
+  const trocoArea = document.getElementById('p-troco-area');
+  if(trocoArea) trocoArea.style.display = tipo === 'dinheiro' ? 'block' : 'none';
+}
+
 function abrirCamera(){$('ocr-camera').click();}
 function abrirGaleria(){$('ocr-galeria').click();}
 
 function abrirNovoPedido(){
   openM('pedido');
+  selecionarPagamento('pago');
   ['ocr-camera','ocr-galeria'].forEach(id=>{const e=$(id);if(e)e.value='';});
   $('ocr-prev').classList.add('hidden');$('ocr-load').classList.add('hidden');
   ['p-num','p-cli','p-tel','p-rua','p-nend','p-bairro','p-obs','p-comp','p-cod-conf'].forEach(id=>{const e=$(id);if(e)e.value='';});
@@ -3453,7 +3503,9 @@ async function salvarPedido(){
     lat_entrega:geo?geo.lat:null,lng_entrega:geo?geo.lng:null,
     status:'pendente',status_detalhado:'pendente',ordem_rota:99,
     pedido_pronto:false,
-    codigo_confirmacao:window._ocrCodConf||''
+    codigo_confirmacao:window._ocrCodConf||'',
+    forma_pagamento:_pedidoPagamento||'pago',
+    troco_valor:_pedidoPagamento==='dinheiro'?parseFloat(v('p-troco-valor')||0):null
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){showM('ped-msg','Erro: '+error.message);return;}
@@ -3730,10 +3782,10 @@ function switchPedidosTab(tab){
 async function carregarHistoricoTurno(){
   const el=document.getElementById('hist-turno-lst');
   if(!el)return;
-  el.innerHTML='<p style="text-align:center;color:#999;padding:20px;">Carregando historico...</p>';
+  el.innerHTML='<p style="text-align:center;color:#999;padding:20px;">Carregando histórico...</p>';
   const ini=iDia(), fim=fDia();
   const res=await db.from('entregas')
-    .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo,entregador:entregador_id(nome)')
+    .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo,entregador:entregador_id(id,nome,taxa_fixo_base,taxa_tipo)')
     .eq('loja_id',U.id)
     .in('status',['entregue','cancelado'])
     .gte('created_at',ini).lte('created_at',fim)
@@ -3743,18 +3795,76 @@ async function carregarHistoricoTurno(){
     el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
     return;
   }
-  const entregues=data.filter(function(e){return e.status==='entregue';});
-  const cancelados=data.filter(function(e){return e.status==='cancelado';});
-  const total=entregues.reduce(function(s,e){return s+parseFloat(e.valor_corrida||0);},0);
-  var html='<div style="background:linear-gradient(135deg,#e8f5e9,#f0fdf4);border-radius:12px;padding:12px 14px;margin-bottom:12px;border:1.5px solid #c8e6c9;">';
-  html+='<div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Resumo do Turno</div>';
-  html+='<div style="display:flex;gap:12px;flex-wrap:wrap;">';
-  html+='<span style="font-size:13px;color:#2e7d32;font-weight:700;">Entregues: '+entregues.length+'</span>';
-  html+='<span style="font-size:13px;color:#c62828;font-weight:700;">Cancelados: '+cancelados.length+'</span>';
-  html+='<span style="font-size:13px;color:#004E89;font-weight:700;">Total: '+fR(total)+'</span>';
+  const entregues=data.filter(e=>e.status==='entregue');
+  const cancelados=data.filter(e=>e.status==='cancelado');
+  const totalGeral=entregues.reduce((s,e)=>s+parseFloat(e.valor_corrida||0),0);
+  const kmGeral=entregues.reduce((s,e)=>s+parseFloat(e.distancia_km||0),0);
+
+  // ── Breakdown por entregador ──
+  const porEnt={};
+  entregues.forEach(e=>{
+    const eid=e.entregador_id||'sem';
+    const nome=e.entregador?e.entregador.nome:'Sem entregador';
+    if(!porEnt[eid]) porEnt[eid]={nome,corridas:0,km:0,custoTotal:0,taxaFixoBase:parseFloat(e.entregador?.taxa_fixo_base||0),taxaTipo:e.entregador?.taxa_tipo||'fixo',turnos:new Set()};
+    porEnt[eid].corridas++;
+    porEnt[eid].km+=parseFloat(e.distancia_km||0);
+    porEnt[eid].custoTotal+=parseFloat(e.valor_corrida||0);
+    // Conta turnos distintos (para combustível)
+    const dt=new Date(e.entregue_at||e.created_at);
+    const turnoKey=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
+    porEnt[eid].turnos.add(turnoKey);
+  });
+
+  // ── Resumo geral ──
+  var html='<div style="background:#f8f9fa;border-radius:14px;padding:14px 16px;margin-bottom:14px;border:1.5px solid #e8e8e8;">';
+  html+='<div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">Resumo do Turno</div>';
+  html+='<div style="display:flex;gap:0;flex-wrap:wrap;">';
+  html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;"><div style="font-size:20px;font-weight:900;color:#2e7d32;">'+entregues.length+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Entregues</div></div>';
+  html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#c62828;">'+cancelados.length+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Cancelados</div></div>';
+  html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#004E89;">'+(kmGeral>0?kmGeral.toFixed(1)+'km':'—')+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">KM Total</div></div>';
+  html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#004E89;">'+fR(totalGeral)+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Custo</div></div>';
   html+='</div></div>';
-  for(var i=0;i<data.length;i++){
-    var e=data[i];
+
+  // ── Cards por entregador ──
+  Object.values(porEnt).forEach(ent=>{
+    const nTurnos=ent.turnos.size;
+    const custoCombustivel=ent.taxaTipo==='fixo_mais_km'?ent.taxaFixoBase*nTurnos:0;
+    const custoLiquido=ent.custoTotal; // valor pago ao entregador
+    const custoTotal=custoLiquido+custoCombustivel;
+    const ticketMedio=ent.corridas>0?custoLiquido/ent.corridas:0;
+    // Se pagou: custo < receita estimada (usa taxa sistema como proxy)
+    const receitaSistema=entregues.filter(e=>(e.entregador?.nome||'')===ent.nome).reduce((s,e)=>s+parseFloat(e.valor_sistema||U.taxa_sistema||0),0);
+
+    html+='<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1.5px solid #e8e8e8;box-shadow:0 2px 12px rgba(0,0,0,.04);">';
+    html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">';
+    html+='<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#004E89,#1a237e);display:flex;align-items:center;justify-content:center;font-size:16px;">🛵</div>';
+    html+='<div><div style="font-size:14px;font-weight:800;color:#111;">'+ent.nome+'</div>';
+    html+='<div style="font-size:11px;color:#888;">'+ent.corridas+' corridas · '+nTurnos+' turno'+(nTurnos>1?'s':'')+'</div></div></div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">';
+    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">KM Rodados</div><div style="font-size:16px;font-weight:900;color:#004E89;">'+(ent.km>0?ent.km.toFixed(1):'—')+'<span style="font-size:10px;font-weight:400;"> km</span></div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Custo Corridas</div><div style="font-size:16px;font-weight:900;color:#c62828;">'+fR(custoLiquido)+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Ticket Médio</div><div style="font-size:16px;font-weight:900;color:#555;">'+fR(ticketMedio)+'</div></div>';
+    html+='</div>';
+    if(custoCombustivel>0){
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;background:#fff8e1;border-radius:9px;padding:8px 12px;margin-bottom:8px;">';
+      html+='<span style="font-size:12px;color:#e65100;">⛽ Combustível ('+nTurnos+' turno'+(nTurnos>1?'s':'')+')</span>';
+      html+='<span style="font-size:13px;font-weight:800;color:#e65100;">'+fR(custoCombustivel)+'</span>';
+      html+='</div>';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 4px 8px 4px;border-bottom:1px solid #f0f0f0;margin-bottom:8px;">';
+      html+='<span style="font-size:12px;font-weight:700;color:#333;">💰 Custo total c/ combustível</span>';
+      html+='<span style="font-size:14px;font-weight:900;color:#c62828;">'+fR(custoTotal)+'</span>';
+      html+='</div>';
+    }
+    if(ent.km>0){
+      const custoPorKm=ent.km>0?(custoLiquido/ent.km):0;
+      html+='<div style="font-size:11px;color:#888;text-align:right;">Custo/km: <strong style="color:#555;">'+fR(custoPorKm)+'/km</strong></div>';
+    }
+    html+='</div>';
+  });
+
+  // ── Pedidos individuais ──
+  html+='<div style="font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px;">Pedidos do Turno</div>';
+  data.forEach(function(e){
     var isEnt=e.status==='entregue';
     var criadoAt=new Date(e.created_at);
     var entregueAt=e.entregue_at?new Date(e.entregue_at):null;
@@ -3764,29 +3874,28 @@ async function carregarHistoricoTurno(){
     var hrFim=entregueAt?entregueAt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--';
     var durMin=(entregueAt&&coletaAt)?Math.round((entregueAt-coletaAt)/60000):null;
     var durStr=durMin!=null?(durMin<60?durMin+'min':Math.floor(durMin/60)+'h'+String(durMin%60).padStart(2,'0')):'--';
-    var borderColor=isEnt?'#c8e6c9':'#ffcdd2';
-    var badgeBg=isEnt?'#e8f5e9':'#ffebee';
-    var badgeColor=isEnt?'#2e7d32':'#c62828';
-    var badgeText=isEnt?'Entregue':'Cancelado';
     var nomEnt=e.entregador?e.entregador.nome:'--';
-    html+='<div style="background:#fff;border-radius:14px;padding:13px 14px;margin-bottom:9px;border:1.5px solid '+borderColor+';box-shadow:0 2px 10px rgba(0,0,0,.05);">';
-    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">';
-    html+='<div><span style="font-size:15px;font-weight:800;color:#111;">'+(e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Pedido')+'</span>';
-    html+='<span style="margin-left:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:'+badgeBg+';color:'+badgeColor+';">'+badgeText+'</span></div>';
-    html+='<span style="font-size:14px;font-weight:800;color:'+(isEnt?'#2e7d32':'#aaa')+';">'+fR(parseFloat(e.valor_corrida||0))+'</span>';
+    html+='<div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;border:1.5px solid '+(isEnt?'#e8e8e8':'#ffcdd2')+';box-shadow:0 1px 6px rgba(0,0,0,.04);">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+    html+='<div style="display:flex;align-items:center;gap:8px;">';
+    html+='<span style="font-size:14px;font-weight:800;color:#111;">'+(e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Pedido')+'</span>';
+    html+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+(isEnt?'#f0fdf4':'#ffebee')+';color:'+(isEnt?'#2e7d32':'#c62828')+';border:1px solid '+(isEnt?'#c8e6c9':'#ffcdd2')+';">'+(isEnt?'Entregue':'Cancelado')+'</span>';
     html+='</div>';
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">';
-    html+='<div style="background:#f8f9fa;border-radius:8px;padding:6px 8px;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Criado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrCriado+'</div></div>';
-    html+='<div style="background:#f8f9fa;border-radius:8px;padding:6px 8px;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Coletado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrColeta+'</div></div>';
-    html+='<div style="background:#f8f9fa;border-radius:8px;padding:6px 8px;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Finalizado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrFim+'</div></div>';
+    html+='<span style="font-size:14px;font-weight:800;color:'+(isEnt?'#111':'#aaa')+';">'+fR(parseFloat(e.valor_corrida||0))+'</span>';
+    html+='</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;">';
+    html+='<div style="background:#f8f9fa;border-radius:7px;padding:5px 7px;"><div style="font-size:8px;color:#bbb;font-weight:700;text-transform:uppercase;">Criado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrCriado+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:7px;padding:5px 7px;"><div style="font-size:8px;color:#bbb;font-weight:700;text-transform:uppercase;">Coletado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrColeta+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:7px;padding:5px 7px;"><div style="font-size:8px;color:#bbb;font-weight:700;text-transform:uppercase;">Finalizado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrFim+'</div></div>';
     html+='</div>';
     html+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">';
-    if(nomEnt!='--') html+='<span style="font-size:11px;font-weight:700;color:#004E89;">Entregador: '+nomEnt+'</span>';
-    if(e.distancia_km>0) html+='<span style="font-size:11px;color:#777;">Dist: '+parseFloat(e.distancia_km).toFixed(1)+' km</span>';
-    if(durMin!=null) html+='<span style="font-size:11px;color:#555;">Tempo: '+durStr+'</span>';
-    if(e.endereco_entrega) html+='<span style="font-size:11px;color:#555;width:100%;margin-top:2px;">Dest: '+e.endereco_entrega+'</span>';
+    if(nomEnt!='--') html+='<span style="font-size:11px;font-weight:600;color:#004E89;">🛵 '+nomEnt+'</span>';
+    if(e.distancia_km>0) html+='<span style="font-size:11px;color:#888;">📏 '+parseFloat(e.distancia_km).toFixed(1)+' km</span>';
+    if(durMin!=null) html+='<span style="font-size:11px;color:#888;">⏱️ '+durStr+'</span>';
+    if(e.endereco_entrega) html+='<span style="font-size:10px;color:#aaa;width:100%;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 '+e.endereco_entrega+'</span>';
     html+='</div></div>';
-  }
+  });
+
   el.innerHTML=html;
 }
 
@@ -3951,14 +4060,13 @@ async function carregarPedidos(){
         <span style="color:#2e7d32;">${fR(e.valor_corrida||e.valor_entregador)}</span>
       </p>`:''}
       ${(['saiu_entrega','em_rota'].includes(e.status||e.status_detalhado))?`
-        <div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:12px;padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:12px;box-shadow:0 4px 14px rgba(27,94,32,.25);">
-          <div style="font-size:26px;line-height:1;">🏠</div>
+        <div style="border:1.5px solid #bbdefb;border-radius:10px;padding:9px 13px;margin:7px 0;display:flex;align-items:center;gap:10px;background:#f0f7ff;">
+          <span style="font-size:20px;">🏠</span>
           <div style="flex:1;">
-            <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Previsão de entrega ao cliente</div>
+            <div style="font-size:9px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.8px;">Previsão de entrega</div>
             ${e._previsaoEntrega
-              ? `<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:.5px;">${e._previsaoEntrega}</div>
-                 <div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:1px;">⏳ ~${e._minutosRestantes} min • via rota real 🗺️</div>`
-              : `<div style="font-size:13px;color:rgba(255,255,255,.8);">Calculando rota...</div>`
+              ? `<div style="font-size:18px;font-weight:900;color:#004E89;">${e._previsaoEntrega} <span style="font-size:11px;font-weight:400;color:#5c85d6;">· ~${e._minutosRestantes} min</span></div>`
+              : `<div style="font-size:12px;color:#5c85d6;">Calculando...</div>`
             }
           </div>
         </div>`:''
@@ -5450,6 +5558,20 @@ async function carregarRotaEnt(){
         ${e.tempo_estimado_min?`<span style="color:#1565C0;">⏱️ <strong>${formatarTempo(e.tempo_estimado_min)}</strong></span>`:''}
         <span style="color:#2e7d32;font-weight:700;">${fR(e.valor_corrida||e.valor_entregador)}</span>
       </div>`:(e.valor_corrida||e.valor_entregador)?`<p style="font-size:11px;color:#2e7d32;font-weight:700;margin:3px 0;">${fR(e.valor_corrida||e.valor_entregador)}</p>`:''}
+      ${(()=>{
+        const fp = e.forma_pagamento||'pago';
+        const troco = parseFloat(e.troco_valor||0);
+        if(fp==='pago') return '<div style="display:inline-flex;align-items:center;gap:5px;background:#e8f5e9;border-radius:8px;padding:5px 10px;margin-top:5px;"><span style="font-size:14px;">✅</span><span style="font-size:12px;font-weight:700;color:#2e7d32;">Já pago — não cobrar</span></div>';
+        if(fp==='cartao') return '<div style="display:inline-flex;align-items:center;gap:5px;background:#e3f2fd;border-radius:8px;padding:5px 10px;margin-top:5px;"><span style="font-size:14px;">💳</span><span style="font-size:12px;font-weight:700;color:#1565C0;">Cobrar no cartão — levar máquina</span></div>';
+        if(fp==='dinheiro'){
+          const valorPed = troco;
+          const valorEnt = parseFloat(e.valor_corrida||0);
+          const trocoVal = valorPed > valorEnt ? (valorPed - valorEnt) : 0;
+          const trocoStr = trocoVal > 0 ? ' · Troco: '+fR(trocoVal) : '';
+          return '<div style="display:inline-flex;align-items:center;gap:5px;background:#fff8e1;border:1.5px solid #ffe082;border-radius:8px;padding:5px 10px;margin-top:5px;"><span style="font-size:14px;">💵</span><span style="font-size:12px;font-weight:700;color:#e65100;">Cobrar em dinheiro'+(trocoStr?trocoStr:'')+'</span></div>';
+        }
+        return '';
+      })()}
       ${temCodIfood?`<div style="background:#fff3e0;padding:8px;border-radius:8px;margin:5px 0;border:1.5px solid #FF6B35;">
         <p style="font-size:11px;font-weight:700;color:#e65100;margin:0">⚠️ Esta entrega exige confirmação no iFood ao entregar</p>
       </div>`:''}
