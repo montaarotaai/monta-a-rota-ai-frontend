@@ -3635,6 +3635,22 @@ async function carregarRel(){
   const{ini:dtIni,fim:dtFim}=getRelPeriodo(p);
   const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome,telefone,chave_pix,placa_moto)').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',dtIni).lte('created_at',dtFim);
   if(!ents||!ents.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Sem entregas no período.</p>';return;}
+  // Busca pagamentos já realizados no período para calcular o que realmente falta pagar
+  const entIds2=[...new Set((ents||[]).map(e=>e.entregador_id).filter(Boolean))];
+  let pgtosPorEnt={};
+  if(entIds2.length){
+    try{
+      const{data:pgtosPer}=await db.from('pagamentos_entregadores')
+        .select('entregador_id,valor_pago,pago_em')
+        .eq('loja_id',U.id)
+        .in('entregador_id',entIds2)
+        .gte('pago_em',dtIni).lte('pago_em',dtFim);
+      (pgtosPer||[]).forEach(p=>{
+        if(!pgtosPorEnt[p.entregador_id])pgtosPorEnt[p.entregador_id]=0;
+        pgtosPorEnt[p.entregador_id]+=parseFloat(p.valor_pago||0);
+      });
+    }catch(e){}
+  }
 
   const tS=ents.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
   const tE=ents.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
@@ -3700,7 +3716,9 @@ async function carregarRel(){
       });
     }
     ent.totalCombustivel=combEnt;
-    ent.liquido=ent.total+combEnt-ent.totalVales;
+    ent.totalJaPago=pgtosPorEnt[ent._id]||0;
+    const bruto=ent.total+combEnt-ent.totalVales;
+    ent.liquido=Math.max(0,bruto-ent.totalJaPago);
   });
 
   const melhor=entArr[0];
@@ -3826,9 +3844,9 @@ async function carregarRel(){
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            ${(ent.totalVales>0||ent.totalCombustivel>0)?`<div style="font-size:10px;color:#bbb;text-decoration:line-through;">${fR(ent.total)}</div>`:''}
-            <div style="font-size:20px;font-weight:900;color:${ent.liquido>0?'#2e7d32':'#e74c3c'};">${fR(ent.liquido)}</div>
-            <div style="font-size:9px;color:#999;">a pagar</div>
+            ${(ent.totalVales>0||ent.totalCombustivel>0||ent.totalJaPago>0)?`<div style="font-size:10px;color:#bbb;text-decoration:line-through;">${fR(ent.total+ent.totalCombustivel-ent.totalVales)}</div>`:''}
+            <div style="font-size:20px;font-weight:900;color:${ent.liquido<=0?'#2e7d32':'#e65100'};">${ent.liquido<=0?'✅ Em dia':fR(ent.liquido)}</div>
+            <div style="font-size:9px;color:${ent.liquido<=0?'#2e7d32':'#999'};">${ent.liquido<=0?'pago':'a pagar'}</div>
           </div>
         </div>
 
@@ -3844,8 +3862,11 @@ async function carregarRel(){
             ${ent.totalVales>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e74c3c;border-top:1px dashed #eee;margin-top:2px;padding-top:5px;">
               <span>💸 Vales</span><strong>-${fR(ent.totalVales)}</strong>
             </div>`:''}
-            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:5px 0 0;border-top:2px solid #eaecf0;margin-top:4px;color:${ent.liquido>=0?'#1b5e20':'#c62828'};">
-              <span>💰 Total a pagar</span><span>${fR(ent.liquido)}</span>
+            ${ent.totalJaPago>0?`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#1565C0;border-top:1px dashed #eee;margin-top:2px;padding-top:5px;">
+              <span>✅ Já pago</span><strong>-${fR(ent.totalJaPago)}</strong>
+            </div>`:''}
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:5px 0 0;border-top:2px solid #eaecf0;margin-top:4px;color:${ent.liquido<=0?'#1b5e20':'#c62828'};">
+              <span>${ent.liquido<=0?'✅ Tudo pago':'💰 Restante a pagar'}</span><span>${ent.liquido<=0?'R$ 0,00':fR(ent.liquido)}</span>
             </div>
           </div>
 
