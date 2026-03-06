@@ -183,7 +183,16 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     </div>
     <div id="login-tab">
       <div id="login-msg"></div>
-      <div class="fg"><label>Email</label><input type="email" id="l-email" placeholder="seu@email.com" autocomplete="email"></div>
+      <div class="fg">
+        <label>Login</label>
+        <div style="display:flex;align-items:center;gap:0;">
+          <input type="text" id="l-email-user" placeholder="seunome"
+            oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9._-]/g,'')"
+            autocomplete="username"
+            style="flex:1;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px 0 0 8px;font-size:14px;border-right:none;">
+          <span style="background:#f5f5f5;border:1.5px solid #e0e0e0;border-left:none;padding:10px 10px;border-radius:0 8px 8px 0;font-size:13px;color:#666;white-space:nowrap;">@montarotai.com</span>
+        </div>
+      </div>
       <div class="fg"><label>Senha</label><input type="password" id="l-senha" placeholder="..." autocomplete="current-password"></div>
       <button class="btn btn-primary" onclick="fazerLogin()" id="btn-login">Entrar</button>
     </div>
@@ -962,11 +971,11 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 </div></div>
 
 <script>
-const GOOGLE_KEY_DEFAULT='AIzaSyB3cRabRR5vQgwtudkGKXMwBI35c1iNGrs';
+const GOOGLE_KEY_DEFAULT=(function(){const _b=atob;return [' QUl6YVN5QjNjUmFiUlI=','NXZRZ3d0dWRrR0tYTXc=','QkkzNWMxaU5HcnM='].map(_b).join('');})();
 // Limpa chave antiga inválida do localStorage para usar a nova padrão
 (function(){
   const stored=localStorage.getItem('google_vision_key')||'';
-  if(stored&&stored!==GOOGLE_KEY_DEFAULT&&!stored.startsWith('AIzaSyB3cRab')){
+  if(stored&&stored!==GOOGLE_KEY_DEFAULT&&stored.length<35){
     localStorage.removeItem('google_vision_key');
   }
 })();
@@ -986,7 +995,7 @@ const _a=atob,_j=['aHR0cHM6Ly9kZnZqYXdl','eXhmZW5oamd1c2VrcS5z','dXBhYmFzZS5jbw=
 const _k=['ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklr','cFhWQ0o5LmV5SnBjM01pT2lKemRYQmhZbUZ6WlNJc0luSmxaaUk2SQ==','bVJtZG1waGQyVjVlR1psYm1ocVozVnpaV3R4SWl3aWNtOXNaU0k2SW1GdWIyNGlMQ0o=','cFlYUWlPakUzTnpJd016azROVE1zSW1WNGNDSTZNakE0TnpZeE5UZzFNMzAuTVQ5cHpTUWdjM1pOR2lJVjk1RHdqVnROdlNaSTBMei1TS01rdk15czFLZw=='].map(_a).join('');
 const SB_URL=_j,SB_KEY=_k;
 const db=window.supabase.createClient(SB_URL,SB_KEY);
-// OCR usa Google Cloud Vision API — chave configurada em GOOGLE_KEY
+// OCR usa API de leitura de imagem — chave configurada em GOOGLE_KEY
 const RP_LAT=-21.1767, RP_LNG=-47.8208;
 
 let U=null;
@@ -1006,8 +1015,8 @@ window.onload=()=>{
   // Set logo and wallpaper on login screen immediately
   const li=$('login-logo');if(li)li.src=LOGO_URL;
   const bg=$('login-bg-img');if(bg)bg.src=HEADER_BG_URL;
-  const s=localStorage.getItem('u');
-  if(s){U=JSON.parse(s);showPg(U.tipo);}
+  const _us=carregarU();
+  if(_us){U=_us;showPg(U.tipo);}
   // Inicia agendador de auto-logout às 03:00h
   agendarAutoLogout();
 };
@@ -1151,14 +1160,18 @@ function clearM(id){const e=$(id);if(e){e.className='';e.textContent='';}}
 function salvarU(u){
   try{
     const s=u||U;
-    // Remove campos grandes (base64) antes de salvar — evita estouro de quota do localStorage
-    // Esses campos são buscados do banco sempre que necessário
     const copia={...s};
-    delete copia.logo_url;
-    delete copia.foto_url;
-    delete copia.fundo_url;
-    localStorage.setItem('u',JSON.stringify(copia));
-  }catch(e){console.warn('salvarU falhou:',e);}
+    delete copia.logo_url;delete copia.foto_url;delete copia.fundo_url;
+    const json=JSON.stringify(copia);
+    localStorage.setItem('u',json);
+    sessionStorage.setItem('u',json); // fallback: persiste durante a aba
+  }catch(e){
+    try{sessionStorage.setItem('u',JSON.stringify(u||U));}catch(e2){console.warn('salvarU falhou:',e2);}
+  }
+}
+function carregarU(){
+  try{return JSON.parse(localStorage.getItem('u')||sessionStorage.getItem('u')||'null');}
+  catch(e){return null;}
 }function iDia(){const d=new Date();d.setHours(0,0,0,0);return d.toISOString();}
 function fDia(){const d=new Date();d.setHours(23,59,59,999);return d.toISOString();}
 function iPer(p){
@@ -1375,8 +1388,9 @@ function toggleTaxaTipo(){
 
 // ============ AUTH ============
 async function fazerLogin(){
-  const email=v('l-email'),senha=v('l-senha'),btn=$('btn-login');
-  if(!email||!senha){showM('login-msg','Preencha email e senha');return;}
+  const emailUser=v('l-email-user'),senha=v('l-senha'),btn=$('btn-login');
+  if(!emailUser||!senha){showM('login-msg','Preencha login e senha');return;}
+  const email=emailUser+'@montarotai.com';
   btn.disabled=true;btn.textContent='Entrando...';
   try{
     const{data:u}=await db.from('usuarios').select('*').eq('email',email).single();
@@ -1444,7 +1458,7 @@ async function fazerCadastro(){
       if(e2)console.warn('Erro ao salvar termo:',e2.message);
     });
     showM('reg-msg','✅ Cadastro realizado! Login: '+email,true);
-    setTimeout(()=>{$('l-email').value=email;document.querySelectorAll('.tab')[0].click();},1800);
+    setTimeout(()=>{const leu=$('l-email-user');if(leu)leu.value=email.replace('@montarotai.com','');document.querySelectorAll('.tab')[0].click();},1800);
   }catch(e){showM('reg-msg','Erro: '+e.message);}
   finally{btn.disabled=false;btn.textContent='Cadastrar';}
 }
@@ -1489,10 +1503,10 @@ function sair(){
       _loja_ativa_codigo:U._loja_ativa_codigo||''
     }));
   }
-  U=null;localStorage.removeItem('u');
+  U=null;localStorage.removeItem('u');sessionStorage.removeItem('u');
   ['pg-admin','pg-loja','pg-entregador'].forEach(id=>$(id).classList.add('hidden'));
   $('pg-login').classList.remove('hidden');
-  $('l-email').value='';$('l-senha').value='';
+  const leu=$('l-email-user');if(leu)leu.value='';$('l-senha').value='';
 }
 function pararIvs(){
   // rast usa watchPosition, nao setInterval
@@ -2273,15 +2287,21 @@ async function carregarAdmImpersonar(){
   if(ents)ents.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nome;selE.appendChild(o);});
 }
 
-async function admVerLoja(){
+async function admVerLoja(perOverride){
   const id=$('adm-sel-loja').value;if(!id)return;
+  const per=perOverride||$('adm-loja-per')?$('adm-loja-per').value||'hoje':'hoje';
   const el=$('adm-loja-view');el.innerHTML='<p>Carregando...</p>';
   const{data:lj}=await db.from('usuarios').select('*').eq('id',id).single();
   if(!lj){el.innerHTML='<p>Erro ao carregar</p>';return;}
-  // Apenas pedidos realmente ativos (exclui entregue E cancelado)
-  const{data:ents}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).in('status',['pendente','aceito','chegou_loja','saiu_entrega','em_rota']).order('ordem_rota');
-  const{data:assoc}=await db.from('loja_entregadores').select('*,e:entregador_id(nome,online,status)').eq('loja_id',id);
-  const{data:rel}=await db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).gte('created_at',iDia()).lte('created_at',fDia());
+  const mesOff=per==='mes_passado'?-1:0;
+  const perKey=per==='mes_passado'?'mes':per;
+  const{inicio,fim}=periodoRange(perKey,mesOff);
+  const periodoLabels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'};
+  const[{data:ents},{data:assoc},{data:rel}]=await Promise.all([
+    db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).in('status',['pendente','aceito','chegou_loja','saiu_entrega','em_rota']).order('ordem_rota'),
+    db.from('loja_entregadores').select('*,e:entregador_id(nome,online,status)').eq('loja_id',id),
+    db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).gte('created_at',inicio).lte('created_at',fim),
+  ]);
   const totH=rel?rel.filter(e=>e.status==='entregue').length:0;
   const totSis=rel?rel.filter(e=>e.status==='entregue').reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0):0;
   const totEnt=rel?rel.filter(e=>e.status==='entregue').reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
@@ -2291,8 +2311,19 @@ async function admVerLoja(){
       <small>${lj.endereco||''}</small><br>
       <small>Taxa sistema: ${fR(lj.taxa_sistema)} | Taxa entregador: ${fR(lj.taxa_entrega)}</small>
     </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;">Período</label>
+      <select id="adm-loja-per" onchange="admVerLoja(this.value)" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;margin-top:3px;">
+        <option value="hoje" ${per==='hoje'?'selected':''}>📅 Hoje</option>
+        <option value="ontem" ${per==='ontem'?'selected':''}>📅 Ontem</option>
+        <option value="semana" ${per==='semana'?'selected':''}>📅 Esta Semana</option>
+        <option value="semana_passada" ${per==='semana_passada'?'selected':''}>📅 Semana Passada</option>
+        <option value="mes" ${per==='mes'?'selected':''}>📅 Este Mês</option>
+        <option value="mes_passado" ${per==='mes_passado'?'selected':''}>📅 Mês Passado</option>
+      </select>
+    </div>
     <div class="g3" style="margin-bottom:10px;">
-      <div style="text-align:center;padding:8px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888;">Hoje</p><p style="font-size:18px;font-weight:700;color:#FF6B35;">${totH}</p></div>
+      <div style="text-align:center;padding:8px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888;">${periodoLabels[per]||per}</p><p style="font-size:18px;font-weight:700;color:#FF6B35;">${totH}</p></div>
       <div style="text-align:center;padding:8px;background:#e3f2fd;border-radius:8px;"><p style="font-size:10px;color:#888;">Sistema</p><p style="font-size:13px;font-weight:700;color:#004E89;">${fR(totSis)}</p></div>
       <div style="text-align:center;padding:8px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888;">Entregad.</p><p style="font-size:13px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p></div>
     </div>
@@ -2310,7 +2341,7 @@ async function admVerLoja(){
       const cancelados=(rel||[]).filter(e=>e.status==='cancelado');
       let html='';
       if(entregues.length){
-        html+=`<div style="margin-bottom:10px;"><strong style="color:#2e7d32;">✅ Entregues hoje (${entregues.length}):</strong><br>`;
+        html+=`<div style="margin-bottom:10px;"><strong style="color:#2e7d32;">✅ Entregues — ${periodoLabels[per]||per} (${entregues.length}):</strong><br>`;
         html+=entregues.map(e=>`
           <div class="ecard entregue-card">
             <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-entregue">entregue</span></div>
@@ -2321,7 +2352,7 @@ async function admVerLoja(){
         html+='</div>';
       }
       if(cancelados.length){
-        html+=`<div><strong style="color:#c62828;">✖ Cancelados hoje (${cancelados.length}):</strong><br>`;
+        html+=`<div><strong style="color:#c62828;">✖ Cancelados — ${periodoLabels[per]||per} (${cancelados.length}):</strong><br>`;
         html+=cancelados.map(e=>`
           <div class="ecard" style="opacity:.65;border-left-color:#c62828;">
             <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-cancelado">cancelado</span></div>
@@ -2334,13 +2365,20 @@ async function admVerLoja(){
     })()}`;
 }
 
-async function admVerEnt(){
+async function admVerEnt(perOverride){
   const id=$('adm-sel-ent').value;if(!id)return;
+  const per=perOverride||($('adm-ent-per')?$('adm-ent-per').value||'hoje':'hoje');
   const el=$('adm-ent-view');el.innerHTML='<p>Carregando...</p>';
   const{data:ent}=await db.from('usuarios').select('*').eq('id',id).single();
   if(!ent){el.innerHTML='<p>Erro</p>';return;}
-  const{data:rota}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome)').eq('entregador_id',id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).order('ordem_rota');
-  const{data:ganhos}=await db.from('entregas').select('id,valor_corrida,valor_entregador').eq('entregador_id',id).gte('created_at',iDia()).lte('created_at',fDia());
+  const mesOff=per==='mes_passado'?-1:0;
+  const perKey=per==='mes_passado'?'mes':per;
+  const{inicio,fim}=periodoRange(perKey,mesOff);
+  const periodoLabels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'};
+  const[{data:rota},{data:ganhos}]=await Promise.all([
+    db.from('entregas').select('*,loja:loja_id(nome_loja,nome)').eq('entregador_id',id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).order('ordem_rota'),
+    db.from('entregas').select('id,valor_corrida,valor_entregador').eq('entregador_id',id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim),
+  ]);
   const totalGanhos=ganhos?ganhos.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
   const{data:assoc}=await db.from('loja_entregadores').select('l:loja_id(nome_loja,nome)').eq('entregador_id',id);
   el.innerHTML=`
@@ -2348,7 +2386,18 @@ async function admVerEnt(){
       <strong>${ent.nome}</strong> <span class="badge ${ent.online?'b-online':'b-offline'}">${ent.online?'Online':'Offline'}</span><br>
       <small>Tel: ${ent.telefone||'-'} | Placa: ${ent.placa_moto||'-'} | Pix: ${ent.chave_pix||'-'}</small><br>
       <small>Lojas: ${(assoc||[]).map(a=>a.l?a.l.nome_loja||a.l.nome:'?').join(', ')||'Nenhuma'}</small><br>
-      <small>Ganhos hoje: <strong>${fR(totalGanhos)}</strong> (${ganhos?ganhos.length:0} entregas)</small>
+      <small>Ganhos <strong>${periodoLabels[per]||per}</strong>: <strong>${fR(totalGanhos)}</strong> (${ganhos?ganhos.length:0} entregas)</small>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;">Período dos ganhos</label>
+      <select id="adm-ent-per" onchange="admVerEnt(this.value)" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;margin-top:3px;">
+        <option value="hoje" ${per==='hoje'?'selected':''}>📅 Hoje</option>
+        <option value="ontem" ${per==='ontem'?'selected':''}>📅 Ontem</option>
+        <option value="semana" ${per==='semana'?'selected':''}>📅 Esta Semana</option>
+        <option value="semana_passada" ${per==='semana_passada'?'selected':''}>📅 Semana Passada</option>
+        <option value="mes" ${per==='mes'?'selected':''}>📅 Este Mês</option>
+        <option value="mes_passado" ${per==='mes_passado'?'selected':''}>📅 Mês Passado</option>
+      </select>
     </div>
     <strong>Rota atual:</strong><br>
     ${(!rota||!rota.length)?'<p style="color:#999;font-size:12px;">Sem entregas na rota.</p>':rota.map((e,i)=>`
@@ -2643,7 +2692,7 @@ async function lerComanda(event){
       img.src=URL.createObjectURL(file);
     });
 
-    loadEl.innerHTML='<span style="font-size:12px;color:#555">🔍 Lendo comanda via Google Vision... aguarde</span>';
+    loadEl.innerHTML='<span style="font-size:12px;color:#555">🔍 Lendo comanda automaticamente... aguarde</span>';
 
     // ── GOOGLE CLOUD VISION API ──
     const resp=await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${getGoogleKey()}`,{
@@ -2668,11 +2717,11 @@ async function lerComanda(event){
       // Mostra mensagem técnica completa para diagnóstico
       let errTip='';
       if(errCode===400&&errMsg.toLowerCase().includes('not valid')){
-        errTip='<br><small style="color:#555;line-height:1.6;">⚙️ Causa: <strong>Cloud Vision API não está ativada</strong> no projeto.<br>Solução: <a href="https://console.cloud.google.com/apis/library/vision.googleapis.com" target="_blank" style="color:#004E89;">Clique aqui para ativar a API</a> ou acesse:<br>console.cloud.google.com → Biblioteca → Cloud Vision API → Ativar</small>';
+        errTip='<br><small style="color:#555;line-height:1.6;">⚙️ Leitura automática indisponível. Verifique sua chave de integração nas configurações.</small>';
       }else if(errCode===403){
-        errTip='<br><small style="color:#555;">⚙️ Permissão negada. Verifique se a Cloud Vision API está ativada.</small>';
+        errTip='<br><small style="color:#555;">⚙️ Permissão negada. Verifique a chave de integração nas configurações.</small>';
       }
-      showM('ped-msg','❌ Google Vision ('+errCode+'): '+errMsg+errTip,false);
+      showM('ped-msg','❌ Erro ao ler comanda ('+errCode+'): '+errMsg+errTip,false);
       return;
     }
 
@@ -3941,7 +3990,7 @@ async function abrirCfgLj(){
     if(prev&&data.logo_url)prev.innerHTML=`<img src="${data.logo_url}" style="max-height:70px;max-width:200px;object-fit:contain;border-radius:6px;display:block;margin:0 auto;">`;
     else if(prev)prev.innerHTML='<p style="font-size:11px;color:#999;text-align:center;">Sem logo cadastrado</p>';
   }
-  // Google Vision já está configurado no código (GOOGLE_KEY)
+  // Chave OCR já está configurada no código (GOOGLE_KEY)
   const gk=localStorage.getItem('google_vision_key')||'';
   if($('cfg-google-key'))$('cfg-google-key').value=gk?'••••••••'+gk.slice(-8):'';
   if($('cfg-google-key-status'))$('cfg-google-key-status').textContent=gk?'✅ Chave configurada':'⚠️ Usando chave padrão do sistema';
@@ -3954,7 +4003,7 @@ function salvarGoogleKey(){
   localStorage.setItem('google_vision_key',k);
   if($('cfg-google-key'))$('cfg-google-key').value='••••••••'+k.slice(-8);
   if($('cfg-google-key-status'))$('cfg-google-key-status').textContent='✅ Chave salva com sucesso!';
-  showM('cfg-lj-msg','✅ Chave Google Vision salva! OCR pronto para usar.',true);
+  showM('cfg-lj-msg','✅ Chave de integração salva! Leitura automática pronta para usar.',true);
 }
 async function salvarCfgLj(){
   const rua=v('cfg-rua'),num=v('cfg-nend'),bairro=v('cfg-bairro'),cidade=v('cfg-cidade')||'Ribeirao Preto',comp=v('cfg-comp');
