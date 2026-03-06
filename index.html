@@ -1435,10 +1435,11 @@ function toggleTaxaTipo(){
 async function fazerLogin(){
   const emailUser=v('l-email-user'),senha=v('l-senha'),btn=$('btn-login');
   if(!emailUser||!senha){showM('login-msg','Preencha login e senha');return;}
-  const email=emailUser+'@montarotai.com';
+  const email=emailUser.trim().toLowerCase()+'@montarotai.com';
   btn.disabled=true;btn.textContent='Entrando...';
   try{
-    const{data:u}=await db.from('usuarios').select('*').eq('email',email).single();
+    const{data:u,error:err}=await db.from('usuarios').select('*').eq('email',email).maybeSingle();
+    if(err){showM('login-msg','Erro ao conectar: '+err.message);return;}
     if(!u){showM('login-msg','Usuario nao encontrado');return;}
     if(u.status==='bloqueado'){showM('login-msg','Acesso bloqueado.');return;}
     if(senha!==u.senha_hash){showM('login-msg','Senha incorreta');return;}
