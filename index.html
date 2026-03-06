@@ -769,8 +769,8 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="fg"><label>Numero do Pedido / Codigo Ifood</label><input type="text" id="edit-num" placeholder="Ex: 4321"></div>
   <div class="fg"><label>Nome do Cliente</label><input type="text" id="edit-cli"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="edit-tel"></div>
-  <div class="g2"><div class="fg"><label>Rua / Avenida</label><input type="text" id="edit-rua" onblur="recalcEditarDist()"></div><div class="fg"><label>Numero</label><input type="text" id="edit-nend" onblur="recalcEditarDist()"></div></div>
-  <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="edit-bairro" onblur="recalcEditarDist()"></div><div class="fg"><label>Cidade</label><input type="text" id="edit-cidade"></div></div>
+  <div class="g2"><div class="fg"><label>Rua / Avenida</label><input type="text" id="edit-rua"></div><div class="fg"><label>Numero</label><input type="text" id="edit-nend"></div></div>
+  <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="edit-bairro"></div><div class="fg"><label>Cidade</label><input type="text" id="edit-cidade"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="edit-comp" placeholder="Ex: Apto 12 Torre 2"></div>
   <div class="fg"><label>Observacoes</label><input type="text" id="edit-obs"></div>
   <div id="edit-dist-preview" style="display:none;background:#f0f7ff;border-radius:8px;padding:9px 12px;margin-top:8px;font-size:13px;color:#004E89;font-weight:600;"></div>
@@ -4182,10 +4182,8 @@ async function salvarEdicaoPedido(){
   const rua=v('edit-rua'),nend=v('edit-nend'),bairro=v('edit-bairro'),cidade=v('edit-cidade')||'Ribeirao Preto',comp=v('edit-comp');
   const endereco=fEnd(rua,nend,bairro,cidade,comp);
   // Monta objeto de update sem campos que podem nao existir no banco
-  // Recalcula distância e valor se endereço mudou
-  if(!window._editGeo){
-    await recalcEditarDist();
-  }
+  // Sempre recalcula distância e valor ao salvar
+  await recalcEditarDist();
   const geo=window._editGeo;
   const upd={
     numero_pedido:v('edit-num')||null,
