@@ -3798,27 +3798,15 @@ async function carregarHistoricoTurno(){
     el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
     return;
   }
-  // ── Calcula distância via OSRM para pedidos sem distancia_km salva ──
-  const semDist = data.filter(e => e.status==='entregue' && !(parseFloat(e.distancia_km)>0) && e.lat_entrega && e.lng_entrega);
-  if(semDist.length > 0){
+  // ── Preenche distância faltante com linha reta (instantâneo, sem API externa) ──
+  {
     const lojaLat = lojaGeoCache.lat || RP_LAT;
     const lojaLng = lojaGeoCache.lng || RP_LNG;
-    // Processa sequencialmente com timeout de 4s por pedido (evita travar)
-    for(const e of semDist){
-      try {
-        const rotaPromise = calcularRotaOSRM(lojaLat, lojaLng, e.lat_entrega, e.lng_entrega);
-        const timeout = new Promise(res => setTimeout(() => res(null), 4000));
-        const rota = await Promise.race([rotaPromise, timeout]);
-        if(rota && rota.distanciaKm > 0){
-          e.distancia_km = rota.distanciaKm;
-          db.from('entregas').update({distancia_km: rota.distanciaKm}).eq('id', e.id);
-        } else if(!rota) {
-          // Timeout ou falha — usa linha reta como fallback
-          const d = distKm(lojaLat, lojaLng, e.lat_entrega, e.lng_entrega);
-          if(d > 0) e.distancia_km = parseFloat(d.toFixed(2));
-        }
-      } catch(err){ /* silently ignore */ }
-    }
+    data.forEach(e => {
+      if(!(parseFloat(e.distancia_km)>0) && e.lat_entrega && e.lng_entrega){
+        e.distancia_km = parseFloat(distKm(lojaLat, lojaLng, e.lat_entrega, e.lng_entrega).toFixed(2));
+      }
+    });
   }
 
   const entregues=data.filter(e=>e.status==='entregue');
