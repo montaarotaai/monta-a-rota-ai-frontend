@@ -331,10 +331,16 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     </div>
     <!-- Lojas -->
     <div id="adm-lojas" class="hidden">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button class="btn btn-green" style="font-size:13px;padding:9px 16px;" onclick="abrirNovaLoja()">➕ Nova Loja</button>
+      </div>
       <div id="adm-loj-lst"></div>
     </div>
     <!-- Entregadores -->
     <div id="adm-entregadores" class="hidden">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button class="btn btn-green" style="font-size:13px;padding:9px 16px;" onclick="abrirNovoEnt()">➕ Novo Entregador</button>
+      </div>
       <div id="adm-ent-lst"></div>
     </div>
     <!-- Financeiro -->
@@ -666,7 +672,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <button class="btn-sm blue" onclick="otimizarRotaInteligente()" style="padding:8px 13px;">🤖 Otimizar Auto</button>
     <button onclick="avisarPedidoPronto()" style="padding:8px 16px;background:linear-gradient(135deg,#FF6B35,#e74c3c);color:white;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 2px 8px rgba(231,76,60,.4);">🔔 Pedido Pronto</button>
   </div>
+  <!-- Tabs: Ativos / Histórico do Turno -->
+  <div style="display:flex;gap:0;margin-bottom:12px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">
+    <button id="tab-pedidos-ativos" onclick="switchPedidosTab('ativos')" style="flex:1;padding:9px 0;font-size:13px;font-weight:700;border:none;cursor:pointer;background:#004E89;color:#fff;transition:all .15s;">📦 Ativos</button>
+    <button id="tab-pedidos-hist" onclick="switchPedidosTab('hist')" style="flex:1;padding:9px 0;font-size:13px;font-weight:700;border:none;cursor:pointer;background:#f5f5f5;color:#666;transition:all .15s;">📋 Histórico do Turno</button>
+  </div>
   <div id="rota-lst"></div>
+  <div id="hist-turno-lst" style="display:none;"></div>
 </div></div>
 
 <!-- Relatorio Loja -->
@@ -854,6 +866,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="g2"><div class="fg"><label>Rua</label><input type="text" id="adm-edit-rua"></div><div class="fg"><label>Número</label><input type="text" id="adm-edit-nend"></div></div>
   <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="adm-edit-bairro"></div><div class="fg"><label>Cidade</label><input type="text" id="adm-edit-cidade"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="adm-edit-comp"></div>
+  <div class="fg">
+    <label>Senha atual</label>
+    <div style="background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <span id="adm-edit-senha-atual" style="font-family:monospace;font-size:14px;color:#333;letter-spacing:2px;">••••••</span>
+      <button onclick="admToggleSenha('loja')" style="background:none;border:none;cursor:pointer;font-size:18px;" title="Ver/ocultar senha">👁️</button>
+    </div>
+  </div>
   <div class="fg"><label>Nova Senha (em branco = não alterar)</label><input type="password" id="adm-edit-senha" placeholder="Mínimo 6 caracteres"></div>
   <div id="adm-edit-loja-msg" style="margin-top:6px;"></div>
   <button class="btn btn-primary" onclick="salvarEditLojaAdm()">✅ Salvar Alterações</button>
@@ -872,6 +891,13 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <div class="fg"><label>Chave Pix</label><input type="text" id="adm-edit-ent-pix"></div>
   </div>
   <div class="fg"><label>Observações</label><input type="text" id="adm-edit-ent-obs" placeholder="Anotações internas"></div>
+  <div class="fg">
+    <label>Senha atual</label>
+    <div style="background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+      <span id="adm-edit-ent-senha-atual" style="font-family:monospace;font-size:14px;color:#333;letter-spacing:2px;">••••••</span>
+      <button onclick="admToggleSenha('ent')" style="background:none;border:none;cursor:pointer;font-size:18px;" title="Ver/ocultar senha">👁️</button>
+    </div>
+  </div>
   <div class="fg"><label>Nova Senha (em branco = não alterar)</label><input type="password" id="adm-edit-ent-senha" placeholder="Mínimo 6 caracteres"></div>
   <div id="adm-edit-ent-msg" style="margin-top:6px;"></div>
   <button class="btn btn-primary" onclick="salvarEditEntAdm()">✅ Salvar Alterações</button>
@@ -1835,6 +1861,66 @@ async function removerFundoAdm(){
   showM('cfg-adm-msg','✅ Fundo removido.',true);setTimeout(()=>clearM('cfg-adm-msg'),2000);
 }
 
+
+// ── Admin: Ver/ocultar senha ──
+let _senhaVisivelLoja = false, _senhaVisivelEnt = false;
+let _senhaAtualLoja = '', _senhaAtualEnt = '';
+
+function admToggleSenha(tipo){
+  if(tipo==='loja'){
+    _senhaVisivelLoja = !_senhaVisivelLoja;
+    const el=$('adm-edit-senha-atual');
+    if(el) el.textContent = _senhaVisivelLoja ? (_senhaAtualLoja||'—') : '••••••';
+  } else {
+    _senhaVisivelEnt = !_senhaVisivelEnt;
+    const el=$('adm-edit-ent-senha-atual');
+    if(el) el.textContent = _senhaVisivelEnt ? (_senhaAtualEnt||'—') : '••••••';
+  }
+}
+
+// ── Admin: Criar Nova Loja ──
+function abrirNovaLoja(){
+  // Reuse edit modal but clear all fields and set mode=novo
+  $('adm-edit-loja-id').value='';
+  $('adm-edit-nome-loja').value='';
+  $('adm-edit-email').value='';
+  $('adm-edit-tel').value='';
+  $('adm-edit-cnpj').value='';
+  $('adm-edit-rua').value='';
+  $('adm-edit-nend').value='';
+  $('adm-edit-bairro').value='';
+  $('adm-edit-cidade').value='Ribeirao Preto';
+  $('adm-edit-comp').value='';
+  $('adm-edit-senha').value='';
+  const el=$('adm-edit-senha-atual');if(el)el.textContent='(nova conta)';
+  clearM('adm-edit-loja-msg');
+  // Muda título e botão para modo criação
+  const h2=document.querySelector('#m-adm-edit-loja h2');
+  if(h2)h2.textContent='🏪 Nova Loja';
+  document.querySelector('#m-adm-edit-loja .btn-primary').textContent='✅ Criar Loja';
+  document.querySelector('#m-adm-edit-loja .btn-primary').setAttribute('onclick','salvarEditLojaAdm()');
+  openM('adm-edit-loja');
+}
+
+// ── Admin: Criar Novo Entregador ──
+function abrirNovoEnt(){
+  $('adm-edit-ent-id').value='';
+  $('adm-edit-ent-nome').value='';
+  $('adm-edit-ent-email').value='';
+  $('adm-edit-ent-tel').value='';
+  $('adm-edit-ent-placa').value='';
+  $('adm-edit-ent-pix').value='';
+  $('adm-edit-ent-obs').value='';
+  $('adm-edit-ent-senha').value='';
+  const el=$('adm-edit-ent-senha-atual');if(el)el.textContent='(nova conta)';
+  clearM('adm-edit-ent-msg');
+  const h2=document.querySelector('#m-adm-edit-ent h2');
+  if(h2)h2.textContent='🛵 Novo Entregador';
+  document.querySelector('#m-adm-edit-ent .btn-primary').textContent='✅ Criar Entregador';
+  document.querySelector('#m-adm-edit-ent .btn-primary').setAttribute('onclick','salvarEditEntAdm()');
+  openM('adm-edit-ent');
+}
+
 async function abrirEditLojaAdm(id){
   const{data:l}=await db.from('usuarios').select('*').eq('id',id).single();
   if(!l)return;
@@ -1850,13 +1936,37 @@ async function abrirEditLojaAdm(id){
   $('adm-edit-cidade').value=l.endereco_cidade||l.cidade||'Ribeirao Preto';
   $('adm-edit-comp').value=l.endereco_complemento||'';
   $('adm-edit-senha').value='';
+  _senhaAtualLoja = l.senha_hash||'';
+  _senhaVisivelLoja = false;
+  const elSA=$('adm-edit-senha-atual');if(elSA)elSA.textContent='••••••';
   clearM('adm-edit-loja-msg');
+  // Reset title for edit mode
+  const h2l=document.querySelector('#m-adm-edit-loja h2');if(h2l)h2l.textContent='✏️ Editar Loja';
+  const btnl=document.querySelector('#m-adm-edit-loja .btn-primary');if(btnl){btnl.textContent='✅ Salvar Alterações';btnl.setAttribute('onclick','salvarEditLojaAdm()');}
   openM('adm-edit-loja');
 }
 
 async function salvarEditLojaAdm(){
   const id=$('adm-edit-loja-id').value;
-  if(!id)return;
+  // CREATE MODE (no id)
+  if(!id){
+    const nomeLoja=($('adm-edit-nome-loja').value||'').trim().toUpperCase();
+    const emailRaw=($('adm-edit-email').value||'').trim();
+    const novaSenha=($('adm-edit-senha').value||'').trim();
+    if(!nomeLoja){showM('adm-edit-loja-msg','❌ Nome obrigatório',false);return;}
+    if(!emailRaw){showM('adm-edit-loja-msg','❌ Email obrigatório',false);return;}
+    if(novaSenha.length<6){showM('adm-edit-loja-msg','❌ Senha mínimo 6 caracteres',false);return;}
+    const rua=($('adm-edit-rua').value||'').trim(),nend=($('adm-edit-nend').value||'').trim(),bairro=($('adm-edit-bairro').value||'').trim(),cidade=($('adm-edit-cidade').value||'Ribeirao Preto').trim(),comp=($('adm-edit-comp').value||'').trim();
+    const codLoja=Math.random().toString(36).substring(2,8).toUpperCase();
+    const d={tipo:'loja',nome_loja:nomeLoja,nome:nomeLoja,email:emailRaw,senha_hash:novaSenha,status:'ativo',taxa_sistema:0.99,taxa_entrega:0,taxa_tipo:'fixo',online:false,cidade,codigo_loja:codLoja,telefone:($('adm-edit-tel').value||'').trim(),cnpj:($('adm-edit-cnpj').value||'').trim(),endereco_rua:rua,endereco_numero:nend,endereco_bairro:bairro,endereco_cidade:cidade,endereco_complemento:comp,endereco:[rua,nend,bairro,cidade,comp].filter(Boolean).join(', ')};
+    const btn=document.querySelector('#m-adm-edit-loja .btn-primary');if(btn){btn.disabled=true;btn.textContent='Criando...';}
+    const{error}=await db.from('usuarios').insert([d]);
+    if(btn){btn.disabled=false;btn.textContent='✅ Criar Loja';}
+    if(error){showM('adm-edit-loja-msg','❌ Erro: '+error.message,false);return;}
+    showM('adm-edit-loja-msg',`✅ Loja criada! Login: ${emailRaw} | Código: ${codLoja}`,true);
+    setTimeout(()=>{closeM('adm-edit-loja');carregarAdmLojas();},2500);
+    return;
+  }
   const rua=($('adm-edit-rua').value||'').trim();
   const nend=($('adm-edit-nend').value||'').trim();
   const bairro=($('adm-edit-bairro').value||'').trim();
@@ -1900,12 +2010,33 @@ async function abrirEditEntAdm(id){
   $('adm-edit-ent-pix').value=e.chave_pix||'';
   $('adm-edit-ent-obs').value=e.observacoes||'';
   $('adm-edit-ent-senha').value='';
+  _senhaAtualEnt = e.senha_hash||'';
+  _senhaVisivelEnt = false;
+  const elSAE=$('adm-edit-ent-senha-atual');if(elSAE)elSAE.textContent='••••••';
   clearM('adm-edit-ent-msg');
+  const h2e=document.querySelector('#m-adm-edit-ent h2');if(h2e)h2e.textContent='✏️ Editar Entregador';
+  const btne=document.querySelector('#m-adm-edit-ent .btn-primary');if(btne){btne.textContent='✅ Salvar Alterações';btne.setAttribute('onclick','salvarEditEntAdm()');}
   openM('adm-edit-ent');
 }
 
 async function salvarEditEntAdm(){
-  const id=$('adm-edit-ent-id').value;if(!id)return;
+  const id=$('adm-edit-ent-id').value;
+  if(!id){
+    const nome=($('adm-edit-ent-nome').value||'').trim().toUpperCase();
+    const emailRaw=($('adm-edit-ent-email').value||'').trim();
+    const novaSenha=($('adm-edit-ent-senha').value||'').trim();
+    if(!nome){showM('adm-edit-ent-msg','❌ Nome obrigatório',false);return;}
+    if(!emailRaw){showM('adm-edit-ent-msg','❌ Email obrigatório',false);return;}
+    if(novaSenha.length<6){showM('adm-edit-ent-msg','❌ Senha mínimo 6 caracteres',false);return;}
+    const d={tipo:'entregador',nome,email:emailRaw,senha_hash:novaSenha,status:'ativo',taxa_sistema:0.50,taxa_entrega:0,taxa_tipo:'fixo',taxa_km_limite:5,taxa_km_excedente:2,online:false,telefone:($('adm-edit-ent-tel').value||'').trim(),placa_moto:($('adm-edit-ent-placa').value||'').trim().toUpperCase(),chave_pix:($('adm-edit-ent-pix').value||'').trim(),observacoes:($('adm-edit-ent-obs').value||'').trim()||null};
+    const btn=document.querySelector('#m-adm-edit-ent .btn-primary');if(btn){btn.disabled=true;btn.textContent='Criando...';}
+    const{error}=await db.from('usuarios').insert([d]);
+    if(btn){btn.disabled=false;btn.textContent='✅ Criar Entregador';}
+    if(error){showM('adm-edit-ent-msg','❌ Erro: '+error.message,false);return;}
+    showM('adm-edit-ent-msg',`✅ Entregador criado! Login: ${emailRaw}`,true);
+    setTimeout(()=>{closeM('adm-edit-ent');carregarAdmEnt();},2000);
+    return;
+  }
   const d={
     nome:($('adm-edit-ent-nome').value||'').trim(),
     telefone:($('adm-edit-ent-tel').value||'').trim(),
@@ -2852,7 +2983,7 @@ async function initLoja(){
   criarMapa('loja');await pullLj();
   ivs.mLj=setInterval(pullLj,5000);
   iniciarRealtimeDrivers('loja');
-  // Inicializa promoção chuva
+  // Inicializa incentivo chuva
   initPromocaoChuva();
 }
 
@@ -2955,11 +3086,15 @@ async function atualizarValorCorrida(){
   if(!geo){$('p-valor-corrida').classList.add('hidden');return;}
   const lojaLat=lojaGeoCache.lat||RP_LAT,lojaLng=lojaGeoCache.lng||RP_LNG;
   const dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);
-  const valor=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0);
-  $('p-valor-txt').textContent=fR(valor);
-  $('p-dist-txt').textContent='Distancia estimada: '+dist.toFixed(1)+' km';
+  const valorBase=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0,U.taxa_fixo_base||0);
+  const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
+  const valor=valorBase+chuvaBonus;
+  const distLabel=dist>0?` · ${dist.toFixed(1)} km`:'';
+  const chuvaLabel=chuvaBonus>0?` <span style="color:#1565C0;font-size:11px;">(+${fR(chuvaBonus)} 🌧️)</span>`:'';
+  $('p-valor-txt').innerHTML=fR(valor)+chuvaLabel;
+  $('p-dist-txt').textContent='Distância estimada: '+dist.toFixed(1)+' km';
   $('p-valor-corrida').classList.remove('hidden');
-  window._pedidoGeo={lat:geo.lat,lng:geo.lng,dist,valor};
+  window._pedidoGeo={lat:geo.lat,lng:geo.lng,dist,valor:valorBase};
 }
 
 function abrirCamera(){$('ocr-camera').click();}
@@ -3563,6 +3698,93 @@ async function confirmarRotaPlano(){
   alert(`✅ ${ordem-1} entrega${ordem>2?'s':''} despachada${ordem>2?'s':''}!`);
 }
 
+
+// ── Loja: Tabs Pedidos (Ativos / Histórico do Turno) ──
+let _pedidosTabAtual = 'ativos';
+
+function switchPedidosTab(tab){
+  _pedidosTabAtual = tab;
+  const btnAt=$('tab-pedidos-ativos'), btnHist=$('tab-pedidos-hist');
+  const lstAt=$('rota-lst'), lstHist=$('hist-turno-lst');
+  if(tab==='ativos'){
+    if(btnAt){btnAt.style.background='#004E89';btnAt.style.color='#fff';}
+    if(btnHist){btnHist.style.background='#f5f5f5';btnHist.style.color='#666';}
+    if(lstAt)lstAt.style.display='';
+    if(lstHist)lstHist.style.display='none';
+    carregarPedidos();
+  }else{
+    if(btnHist){btnHist.style.background='#004E89';btnHist.style.color='#fff';}
+    if(btnAt){btnAt.style.background='#f5f5f5';btnAt.style.color='#666';}
+    if(lstAt)lstAt.style.display='none';
+    if(lstHist)lstHist.style.display='';
+    carregarHistoricoTurno();
+  }
+}
+
+
+async function carregarHistoricoTurno(){
+  const el=document.getElementById('hist-turno-lst');
+  if(!el)return;
+  el.innerHTML='<p style="text-align:center;color:#999;padding:20px;">Carregando historico...</p>';
+  const ini=iDia(), fim=fDia();
+  const res=await db.from('entregas')
+    .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo,entregador:entregador_id(nome)')
+    .eq('loja_id',U.id)
+    .in('status',['entregue','cancelado'])
+    .gte('created_at',ini).lte('created_at',fim)
+    .order('created_at',{ascending:false});
+  const data=res.data;
+  if(!data||!data.length){
+    el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
+    return;
+  }
+  const entregues=data.filter(function(e){return e.status==='entregue';});
+  const cancelados=data.filter(function(e){return e.status==='cancelado';});
+  const total=entregues.reduce(function(s,e){return s+parseFloat(e.valor_corrida||0);},0);
+  var html='<div style="background:linear-gradient(135deg,#e8f5e9,#f0fdf4);border-radius:12px;padding:12px 14px;margin-bottom:12px;border:1.5px solid #c8e6c9;">';
+  html+='<div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Resumo do Turno</div>';
+  html+='<div style="display:flex;gap:12px;flex-wrap:wrap;">';
+  html+='<span style="font-size:13px;color:#2e7d32;font-weight:700;">Entregues: '+entregues.length+'</span>';
+  html+='<span style="font-size:13px;color:#c62828;font-weight:700;">Cancelados: '+cancelados.length+'</span>';
+  html+='<span style="font-size:13px;color:#004E89;font-weight:700;">Total: '+fR(total)+'</span>';
+  html+='</div></div>';
+  for(var i=0;i<data.length;i++){
+    var e=data[i];
+    var isEnt=e.status==='entregue';
+    var criadoAt=new Date(e.created_at);
+    var entregueAt=e.entregue_at?new Date(e.entregue_at):null;
+    var coletaAt=e.aceito_at?new Date(e.aceito_at):null;
+    var hrCriado=criadoAt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    var hrColeta=coletaAt?coletaAt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--';
+    var hrFim=entregueAt?entregueAt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--';
+    var durMin=(entregueAt&&coletaAt)?Math.round((entregueAt-coletaAt)/60000):null;
+    var durStr=durMin!=null?(durMin<60?durMin+'min':Math.floor(durMin/60)+'h'+String(durMin%60).padStart(2,'0')):'--';
+    var borderColor=isEnt?'#c8e6c9':'#ffcdd2';
+    var badgeBg=isEnt?'#e8f5e9':'#ffebee';
+    var badgeColor=isEnt?'#2e7d32':'#c62828';
+    var badgeText=isEnt?'Entregue':'Cancelado';
+    var nomEnt=e.entregador?e.entregador.nome:'--';
+    html+='<div style="background:#fff;border-radius:14px;padding:13px 14px;margin-bottom:9px;border:1.5px solid '+borderColor+';box-shadow:0 2px 10px rgba(0,0,0,.05);">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">';
+    html+='<div><span style="font-size:15px;font-weight:800;color:#111;">'+(e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Pedido')+'</span>';
+    html+='<span style="margin-left:8px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;background:'+badgeBg+';color:'+badgeColor+';">'+badgeText+'</span></div>';
+    html+='<span style="font-size:14px;font-weight:800;color:'+(isEnt?'#2e7d32':'#aaa')+';">'+fR(parseFloat(e.valor_corrida||0))+'</span>';
+    html+='</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;">';
+    html+='<div style="background:#f8f9fa;border-radius:8px;padding:6px 8px;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Criado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrCriado+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:8px;padding:6px 8px;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Coletado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrColeta+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:8px;padding:6px 8px;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:2px;">Finalizado</div><div style="font-size:12px;font-weight:700;color:#333;">'+hrFim+'</div></div>';
+    html+='</div>';
+    html+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">';
+    if(nomEnt!='--') html+='<span style="font-size:11px;font-weight:700;color:#004E89;">Entregador: '+nomEnt+'</span>';
+    if(e.distancia_km>0) html+='<span style="font-size:11px;color:#777;">Dist: '+parseFloat(e.distancia_km).toFixed(1)+' km</span>';
+    if(durMin!=null) html+='<span style="font-size:11px;color:#555;">Tempo: '+durStr+'</span>';
+    if(e.endereco_entrega) html+='<span style="font-size:11px;color:#555;width:100%;margin-top:2px;">Dest: '+e.endereco_entrega+'</span>';
+    html+='</div></div>';
+  }
+  el.innerHTML=html;
+}
+
 async function abrirPedidosLj(){
   openM('rota');
   if(!U||!U.id){
@@ -3737,8 +3959,10 @@ async function enviarCodigoRec() {
     // Mostra step 2
     $('rec-senha-step1').classList.add('hidden');
     $('rec-senha-step2').classList.remove('hidden');
-    // Mostra o código no painel admin (admin vê na tela de usuários)
-    console.log('[REC SENHA] Código para', data.nome, ':', codigo); // só p/ debug
+    // Mostra o código direto na tela (step 2 mostrará)
+    $('rec-codigo-display').textContent = codigo;
+    $('rec-nome-display').textContent = data.nome;
+    console.log('[REC SENHA] Código para', data.nome, ':', codigo);
   } catch(e) {
     showM('rec-msg', 'Erro: ' + e.message, false);
   }
@@ -5833,13 +6057,13 @@ function atualizarUIChuva(){
   const statusEl=$('lj-chuva-status');
   if(!btn||!statusEl)return;
   if(_chuvaAtiva){
-    btn.textContent='⏹️ Desativar Promoção';
+    btn.textContent='⏹️ Desativar Incentivo';
     btn.style.background='#e74c3c';
     statusEl.classList.remove('hidden');
     const inicio=_chuvaInicio?new Date(_chuvaInicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
     statusEl.textContent='🌧️ PROMOÇÃO CHUVA ATIVA desde '+inicio+' — Entregas a partir deste horário recebem o valor extra.';
   }else{
-    btn.textContent='🌧️ Ativar Promoção';
+    btn.textContent='🌧️ Ativar Incentivo';
     btn.style.background='#004E89';
     statusEl.classList.add('hidden');
   }
@@ -5852,7 +6076,7 @@ async function togglePromocaoChuva(){
     // Ativar
     const valor=parseFloat(valorEl?valorEl.value:0);
     if(!valor||valor<=0){
-      if(msgEl){msgEl.style.color='#e53935';msgEl.textContent='❌ Informe um valor válido para a promoção chuva.';}
+      if(msgEl){msgEl.style.color='#e53935';msgEl.textContent='❌ Informe um valor válido para a incentivo chuva.';}
       return;
     }
     _chuvaAtiva=true;
@@ -5868,7 +6092,7 @@ async function togglePromocaoChuva(){
     U.promocao_chuva_inicio=_chuvaInicio;
     U.promocao_chuva_valor=valor;
     salvarU();
-    if(msgEl){msgEl.style.color='#2e7d32';msgEl.textContent='✅ Promoção chuva ativada! Valor extra: R$ '+valor.toFixed(2)+'/entrega.';}
+    if(msgEl){msgEl.style.color='#2e7d32';msgEl.textContent='✅ Incentivo ativado! Valor extra: R$ '+valor.toFixed(2)+'/entrega.';}
   }else{
     // Desativar
     _chuvaAtiva=false;
@@ -5880,7 +6104,7 @@ async function togglePromocaoChuva(){
     }catch(e){console.warn('[chuva desativar]',e);}
     U.promocao_chuva_ativa=false;
     salvarU();
-    if(msgEl){msgEl.style.color='#555';msgEl.textContent='Promoção chuva desativada.';}
+    if(msgEl){msgEl.style.color='#555';msgEl.textContent='Incentivo desativado.';}
   }
   atualizarUIChuva();
   setTimeout(()=>{if(msgEl)msgEl.textContent='';},3000);
@@ -6641,7 +6865,11 @@ async function downloadPdfTermo(id,nome){
         <button class="btn btn-primary" onclick="enviarCodigoRec()">Enviar Código</button>
       </div>
       <div id="rec-senha-step2" class="hidden">
-        <p style="font-size:13px;color:#2e7d32;margin-bottom:14px;">✅ Código enviado! Peça ao administrador o código ou verifique o painel admin.</p>
+        <div style="background:#e8f5e9;border-radius:12px;padding:14px;margin-bottom:14px;text-align:center;">
+          <p style="font-size:12px;color:#555;margin-bottom:6px;">Olá, <strong id="rec-nome-display"></strong>! Seu código de verificação é:</p>
+          <div id="rec-codigo-display" style="font-size:32px;font-weight:900;letter-spacing:10px;color:#2e7d32;font-family:monospace;"></div>
+          <p style="font-size:11px;color:#888;margin-top:6px;">⏰ Válido por 30 minutos</p>
+        </div>
         <div class="fg"><label>Código de verificação</label><input type="text" id="rec-codigo" placeholder="6 dígitos" maxlength="6" style="letter-spacing:6px;font-size:20px;text-align:center;"></div>
         <div class="fg"><label>Nova Senha</label><input type="password" id="rec-nova-senha" placeholder="Mínimo 6 caracteres"></div>
         <div class="fg"><label>Confirmar Nova Senha</label><input type="password" id="rec-conf-senha" placeholder="Repita a senha"></div>
