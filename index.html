@@ -2353,8 +2353,13 @@ async function admForcaOffline(id, nome){
   if(!confirm(`Forçar ${nome} ficar Offline agora?`)) return;
   const{error}=await db.from('usuarios').update({online:false}).eq('id',id);
   if(error){alert('Erro: '+error.message);return;}
+  // Garante que a aba entregadores esteja visível antes de recarregar
+  ['adm-painel','adm-lojas','adm-entregadores','adm-financeiro','adm-impersonar','adm-termos'].forEach(a=>{const el=$(a);if(el)el.classList.add('hidden');});
+  const abaEl=$('adm-entregadores');if(abaEl)abaEl.classList.remove('hidden');
+  document.querySelectorAll('.adm-tab').forEach(b=>b.classList.remove('active'));
+  const tabBtn=document.querySelector('.adm-tab[onclick*="entregadores"]');if(tabBtn)tabBtn.classList.add('active');
+  await carregarAdmEnt();
   alert(`✅ ${nome} está Offline.`);
-  carregarAdmEnt();
 }
 
 // ── Admin: Forçar Desvincular de todas as lojas ──
@@ -2363,8 +2368,12 @@ async function admForcaDesvincular(id, nome){
   await db.from('usuarios').update({online:false, loja_ativa_id:null}).eq('id',id);
   const{error}=await db.from('loja_entregadores').delete().eq('entregador_id',id);
   if(error){alert('Erro: '+error.message);return;}
+  ['adm-painel','adm-lojas','adm-entregadores','adm-financeiro','adm-impersonar','adm-termos'].forEach(a=>{const el=$(a);if(el)el.classList.add('hidden');});
+  const abaEl=$('adm-entregadores');if(abaEl)abaEl.classList.remove('hidden');
+  document.querySelectorAll('.adm-tab').forEach(b=>b.classList.remove('active'));
+  const tabBtn=document.querySelector('.adm-tab[onclick*="entregadores"]');if(tabBtn)tabBtn.classList.add('active');
+  await carregarAdmEnt();
   alert(`✅ ${nome} foi desvinculado de todas as lojas e está Offline.`);
-  carregarAdmEnt();
 }
 
 async function toggleStAdm(id,st,tipo){
