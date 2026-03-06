@@ -525,18 +525,34 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
         <!-- Campos: Por km -->
         <div id="taxa-km-area" class="taxa-fields-wrap hidden">
-          <div class="taxa-field-row cols3">
+          <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">🟢 Faixa 1</div>
+          <div class="taxa-field-row cols2" style="margin-bottom:10px;">
             <div class="taxa-field-group">
               <div class="taxa-field-label">Valor até X km</div>
               <input type="number" id="lj-taxa-base" class="taxa-field-input" step="0.50" min="0" placeholder="8,00">
             </div>
             <div class="taxa-field-group">
               <div class="taxa-field-label">Limite (km)</div>
-              <input type="number" id="lj-km-limite" class="taxa-field-input" step="0.5" min="1" placeholder="5">
+              <input type="number" id="lj-km-limite" class="taxa-field-input" step="0.5" min="1" placeholder="7">
+            </div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">🟡 Faixa 2</div>
+          <div class="taxa-field-row cols2" style="margin-bottom:10px;">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Valor acima de X km</div>
+              <input type="number" id="lj-taxa-km-exc" class="taxa-field-input" step="0.50" min="0" placeholder="12,00">
             </div>
             <div class="taxa-field-group">
-              <div class="taxa-field-label">Acima do limite</div>
-              <input type="number" id="lj-taxa-km-exc" class="taxa-field-input" step="0.50" min="0" placeholder="12,00">
+              <div class="taxa-field-label">Até este limite (km)</div>
+              <input type="number" id="lj-km-limite-f3" class="taxa-field-input" step="0.5" min="0" placeholder="15 (opcional)">
+              <div class="taxa-field-hint">Deixe 0 se não tiver 3ª faixa</div>
+            </div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">🔴 Faixa 3 <span style="font-weight:500;color:#cbd5e1;">(opcional)</span></div>
+          <div class="taxa-field-row">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Valor acima do 2º limite</div>
+              <input type="number" id="lj-taxa-km-f3" class="taxa-field-input" step="0.50" min="0" placeholder="18,00">
             </div>
           </div>
           <button class="taxa-save-btn" onclick="salvarTaxaLj()">✓ Salvar configuração</button>
@@ -544,25 +560,41 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 
         <!-- Campos: Fixo base + km -->
         <div id="taxa-fixo-km-area" class="taxa-fields-wrap hidden">
-          <div class="taxa-field-row cols2" style="margin-bottom:8px;">
+          <div class="taxa-field-row" style="margin-bottom:10px;">
             <div class="taxa-field-group">
               <div class="taxa-field-label">⛽ Combustível / turno (R$)</div>
               <input type="number" id="lj-taxa-fixo-base" class="taxa-field-input" step="0.50" min="0" placeholder="30,00">
-              <div class="taxa-field-hint">Pago por turno (almoço e/ou jantar)</div>
+              <div class="taxa-field-hint">Pago uma vez por turno (almoço e/ou jantar)</div>
             </div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">🟢 Faixa 1</div>
+          <div class="taxa-field-row cols2" style="margin-bottom:10px;">
             <div class="taxa-field-group">
               <div class="taxa-field-label">Valor até X km</div>
               <input type="number" id="lj-taxa-por-ent" class="taxa-field-input" step="0.50" min="0" placeholder="8,00">
             </div>
-          </div>
-          <div class="taxa-field-row cols2">
             <div class="taxa-field-group">
               <div class="taxa-field-label">Limite (km)</div>
               <input type="number" id="lj-km-limite2" class="taxa-field-input" step="0.5" min="1" placeholder="7">
             </div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">🟡 Faixa 2</div>
+          <div class="taxa-field-row cols2" style="margin-bottom:10px;">
             <div class="taxa-field-group">
-              <div class="taxa-field-label">Acima do limite</div>
+              <div class="taxa-field-label">Valor acima de X km</div>
               <input type="number" id="lj-taxa-km-exc2" class="taxa-field-input" step="0.50" min="0" placeholder="12,00">
+            </div>
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Até este limite (km)</div>
+              <input type="number" id="lj-km-limite2-f3" class="taxa-field-input" step="0.5" min="0" placeholder="15 (opcional)">
+              <div class="taxa-field-hint">Deixe 0 se não tiver 3ª faixa</div>
+            </div>
+          </div>
+          <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">🔴 Faixa 3 <span style="font-weight:500;color:#cbd5e1;">(opcional)</span></div>
+          <div class="taxa-field-row">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Valor acima do 2º limite</div>
+              <input type="number" id="lj-taxa-km2-f3" class="taxa-field-input" step="0.50" min="0" placeholder="18,00">
             </div>
           </div>
           <button class="taxa-save-btn" onclick="salvarTaxaLj()">✓ Salvar configuração</button>
@@ -1592,15 +1624,15 @@ function pararEscutaAlertas(){
 }
 
 // Calcular valor corrida
-function calcularValorCorrida(distancia,taxaTipo,taxaBase,kmLimite,taxaExcedente,taxaFixoBase){
-  if(taxaTipo==='por_km'){
+function calcularValorCorrida(distancia,taxaTipo,taxaBase,kmLimite,taxaExcedente,taxaFixoBase,kmLimite2,taxaExcedente2){
+  if(taxaTipo==='por_km'||taxaTipo==='fixo_mais_km'){
+    // Faixa 1: até kmLimite → taxaBase
     if(distancia<=kmLimite)return taxaBase;
-    else return taxaExcedente;
-  }
-  if(taxaTipo==='fixo_mais_km'){
-    // fixoBase eh o valor por entrega; taxaFixoBase seria um fixo mensal (nao somado por corrida)
-    if(distancia<=kmLimite)return taxaBase;
-    else return taxaExcedente;
+    // Faixa 2: kmLimite até kmLimite2 → taxaExcedente (se kmLimite2 definido)
+    if(kmLimite2>0&&distancia<=kmLimite2)return taxaExcedente;
+    // Faixa 3: acima de kmLimite2 → taxaExcedente2 (se definido), senão taxaExcedente
+    if(kmLimite2>0&&taxaExcedente2>0)return taxaExcedente2;
+    return taxaExcedente;
   }
   return taxaBase; // fixo
 }
@@ -3126,11 +3158,15 @@ async function initLoja(){
     if($('lj-taxa-base'))$('lj-taxa-base').value=parseFloat(U.taxa_entrega||0).toFixed(2);
     if($('lj-km-limite'))$('lj-km-limite').value=parseFloat(U.taxa_km_limite||5).toFixed(1);
     if($('lj-taxa-km-exc'))$('lj-taxa-km-exc').value=parseFloat(U.taxa_km_excedente||2).toFixed(2);
+    if($('lj-km-limite-f3')&&U.taxa_km2_limite)$('lj-km-limite-f3').value=parseFloat(U.taxa_km2_limite).toFixed(1);
+    if($('lj-taxa-km-f3')&&U.taxa_km2_excedente)$('lj-taxa-km-f3').value=parseFloat(U.taxa_km2_excedente).toFixed(2);
   }else if(U.taxa_tipo==='fixo_mais_km'){
     if($('lj-taxa-fixo-base'))$('lj-taxa-fixo-base').value=parseFloat(U.taxa_fixo_base||0).toFixed(2);
     if($('lj-taxa-por-ent'))$('lj-taxa-por-ent').value=parseFloat(U.taxa_entrega||0).toFixed(2);
     if($('lj-km-limite2'))$('lj-km-limite2').value=parseFloat(U.taxa_km_limite||7).toFixed(1);
     if($('lj-taxa-km-exc2'))$('lj-taxa-km-exc2').value=parseFloat(U.taxa_km_excedente||0).toFixed(2);
+    if($('lj-km-limite2-f3')&&U.taxa_km2_limite)$('lj-km-limite2-f3').value=parseFloat(U.taxa_km2_limite).toFixed(1);
+    if($('lj-taxa-km2-f3')&&U.taxa_km2_excedente)$('lj-taxa-km2-f3').value=parseFloat(U.taxa_km2_excedente).toFixed(2);
   }else{if($('lj-taxa-new'))$('lj-taxa-new').value=parseFloat(U.taxa_entrega||0).toFixed(2);}
   const{data:ent}=await db.from('entregas').select('id').eq('loja_id',U.id).eq('status','entregue').not('entregador_id','is',null).gte('created_at',iDia()).lte('created_at',fDia());
   $('lj-hj').textContent=ent?ent.length:0;
@@ -3170,23 +3206,28 @@ async function pullLj(){
 
 async function salvarTaxaLj(){
   const tipo=v('lj-taxa-tipo');
-  let base,kmLim,kmExc,fixoBase=0;
+  let base,kmLim,kmExc,fixoBase=0,kmLim2=0,kmExc2=0;
   if(tipo==='por_km'){
     base=parseFloat(v('lj-taxa-base')||0);
     kmLim=parseFloat(v('lj-km-limite')||5);
     kmExc=parseFloat(v('lj-taxa-km-exc')||0);
+    kmLim2=parseFloat(v('lj-km-limite-f3')||0);
+    kmExc2=parseFloat(v('lj-taxa-km-f3')||0);
   }else if(tipo==='fixo_mais_km'){
     fixoBase=parseFloat(v('lj-taxa-fixo-base')||0);
     base=parseFloat(v('lj-taxa-por-ent')||0);
     kmLim=parseFloat(v('lj-km-limite2')||7);
     kmExc=parseFloat(v('lj-taxa-km-exc2')||0);
+    kmLim2=parseFloat(v('lj-km-limite2-f3')||0);
+    kmExc2=parseFloat(v('lj-taxa-km2-f3')||0);
   }else{
     base=parseFloat(v('lj-taxa-new')||0);kmLim=5;kmExc=0;
   }
-  // Tenta salvar com taxa_fixo_base
-  let{error}=await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc,taxa_fixo_base:fixoBase}).eq('id',U.id);
-  // Se coluna taxa_fixo_base nao existe, salva sem ela
-  if(error&&error.message&&error.message.includes('taxa_fixo_base')){
+  let{error}=await db.from('usuarios').update({
+    taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc,
+    taxa_fixo_base:fixoBase,taxa_km2_limite:kmLim2,taxa_km2_excedente:kmExc2
+  }).eq('id',U.id);
+  if(error&&error.message&&(error.message.includes('taxa_fixo_base')||error.message.includes('taxa_km2'))){
     const r2=await db.from('usuarios').update({taxa_entrega:base,taxa_tipo:tipo,taxa_km_limite:kmLim,taxa_km_excedente:kmExc}).eq('id',U.id);
     error=r2.error;
   }
@@ -3195,9 +3236,10 @@ async function salvarTaxaLj(){
     $('taxa-msg').textContent='❌ Erro ao salvar: '+error.message;
     return;
   }
-  U.taxa_entrega=base;U.taxa_tipo=tipo;U.taxa_km_limite=kmLim;U.taxa_km_excedente=kmExc;U.taxa_fixo_base=fixoBase;
+  U.taxa_entrega=base;U.taxa_tipo=tipo;U.taxa_km_limite=kmLim;U.taxa_km_excedente=kmExc;
+  U.taxa_fixo_base=fixoBase;U.taxa_km2_limite=kmLim2;U.taxa_km2_excedente=kmExc2;
   salvarU();
-  $('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='✅ Configuracao salva!';
+  $('taxa-msg').style.color='#27ae60';$('taxa-msg').textContent='✅ Configuração salva!';
   setTimeout(()=>{$('taxa-msg').textContent='';},2000);
 }
 
@@ -3247,7 +3289,7 @@ async function atualizarValorCorrida(){
   const rotaOSRM=await calcularRotaOSRM(lojaLat,lojaLng,geo.lat,geo.lng);
   if(rotaOSRM&&rotaOSRM.distanciaKm>0){dist=rotaOSRM.distanciaKm;usouOSRM=true;}
   else{dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);}
-  const valorBase=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0,U.taxa_fixo_base||0);
+  const valorBase=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0,U.taxa_fixo_base||0,U.taxa_km2_limite||0,U.taxa_km2_excedente||0);
   const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
   const valor=valorBase+chuvaBonus;
   const chuvaLabel=chuvaBonus>0?` <span style="color:#1565C0;font-size:11px;">(+${fR(chuvaBonus)} 🌧️)</span>`:'';
@@ -4541,7 +4583,7 @@ async function recalcEditarDist(){
   const rotaOSRM=await calcularRotaOSRM(lojaLat,lojaLng,geo.lat,geo.lng);
   if(rotaOSRM&&rotaOSRM.distanciaKm>0){dist=rotaOSRM.distanciaKm;usouOSRM=true;}
   else{dist=distKm(lojaLat,lojaLng,geo.lat,geo.lng);}
-  const valorBase=calcularValorCorrida(dist, U.taxa_tipo||'fixo', U.taxa_entrega||0, U.taxa_km_limite||5, U.taxa_km_excedente||0, U.taxa_fixo_base||0);
+  const valorBase=calcularValorCorrida(dist,U.taxa_tipo||'fixo',U.taxa_entrega||0,U.taxa_km_limite||5,U.taxa_km_excedente||0,U.taxa_fixo_base||0,U.taxa_km2_limite||0,U.taxa_km2_excedente||0);
   const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
   const valor=valorBase+chuvaBonus;
   window._editGeo={lat:geo.lat, lng:geo.lng, dist, valorBase, valor};
