@@ -3824,17 +3824,21 @@ async function carregarHistoricoTurno(){
       return;
     }
 
-    // Busca entregadores separadamente
+    // Busca só nome dos entregadores (sem taxa — taxa é da loja, não do entregador)
     const entIds=[...new Set(data.filter(e=>e.entregador_id).map(e=>e.entregador_id))];
     const entMap={};
     if(entIds.length){
       try{
-        const{data:ents}=await db.from('usuarios').select('id,nome,taxa_fixo_base,taxa_tipo').in('id',entIds);
+        const{data:ents}=await db.from('usuarios').select('id,nome').in('id',entIds);
         (ents||[]).forEach(e=>entMap[e.id]=e);
       }catch(e){}
     }
     if(_timedOut)return;
     data.forEach(e=>{ e.entregador=entMap[e.entregador_id]||null; });
+
+    // Taxa da loja (combustível, tipo, limites) — vem do próprio U (usuário logado = loja)
+    const lojaTaxaTipo = U.taxa_tipo||'fixo';
+    const lojaTaxaFixoBase = parseFloat(U.taxa_fixo_base||0);
   // ── Preenche distância faltante com linha reta (instantâneo, sem API externa) ──
   {
     const lojaLat = lojaGeoCache.lat || RP_LAT;
@@ -3855,7 +3859,7 @@ async function carregarHistoricoTurno(){
   entregues.forEach(e=>{
     const eid=e.entregador_id||'sem';
     const nome=e.entregador?e.entregador.nome:'Sem entregador';
-    if(!porEnt[eid]) porEnt[eid]={nome,corridas:0,km:0,custoCorridas:0,taxaFixoBase:parseFloat(e.entregador?.taxa_fixo_base||0),taxaTipo:e.entregador?.taxa_tipo||'fixo',turnos:new Set()};
+    if(!porEnt[eid]) porEnt[eid]={nome,corridas:0,km:0,custoCorridas:0,taxaFixoBase:lojaTaxaFixoBase,taxaTipo:lojaTaxaTipo,turnos:new Set()};
     porEnt[eid].corridas++;
     porEnt[eid].km+=parseFloat(e.distancia_km||0);
     porEnt[eid].custoCorridas+=parseFloat(e.valor_corrida||0);
