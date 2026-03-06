@@ -6425,18 +6425,28 @@ function _gnhCacheValido(mesRef){
   return _gnhCache.ts&&_gnhCache.mesRef===mesRef&&(Date.now()-_gnhCache.ts)<60000;
 }
 
-async function _carregarDadosGanhos(){
-  // Sempre busca dados do mês corrente (ou do mês selecionado em _gnhMesOffset)
-  // Uma única query de entregas + uma de vales, em paralelo — em vez de 5~7 queries separadas
+async function _carregarDadosGanhos(forceIni, forceFim){
+  // Se receber range explícito (ex: CalPicker custom), busca esse intervalo direto
+  if(forceIni && forceFim){
+    const ini=new Date(forceIni); const fim=new Date(forceFim);
+    const mesRef=`custom_${ini.toISOString().split('T')[0]}_${fim.toISOString().split('T')[0]}`;
+    if(_gnhCacheValido(mesRef))return;
+    const [entregas,vales]=await Promise.all([
+      safeQuery(()=>db.from('entregas').select('id,valor_corrida,valor_entregador,valor_incentivo,tipo_incentivo,created_at,entregue_at,loja_id,status,pagamento_id,l:loja_id(nome_loja,nome,endereco,taxa_tipo,taxa_fixo_base)').eq('entregador_id',U.id).in('status',['entregue']).gte('created_at',ini.toISOString()).lte('created_at',fim.toISOString()).order('created_at',{ascending:true})),
+      safeQuery(()=>db.from('vales_entregadores').select('id,valor,pagamento_id,observacao,created_at,loja:loja_id(nome_loja,nome)').eq('entregador_id',U.id).gte('created_at',ini.toISOString()).lte('created_at',fim.toISOString()).order('created_at',{ascending:false})),
+    ]);
+    _gnhCache={entregas,vales,ts:Date.now(),mesRef,inicioReal:ini,fimMes:fim,inicioMes:ini};
+    return;
+  }
   const agora=new Date();
   const anoRef=new Date(agora.getFullYear(),agora.getMonth()+(_gnhMesOffset||0),1);
   const inicioMes=new Date(anoRef.getFullYear(),anoRef.getMonth(),1);
   const fimMes=new Date(anoRef.getFullYear(),anoRef.getMonth()+1,0,23,59,59,999);
-  // Para cobrir Ontem e Esta Semana que podem cair fora do mês atual,
-  // buscamos desde o início da semana (máx 6 dias atrás) ou início do mês, o que for menor
   const inicioSem=new Date(agora);
   inicioSem.setDate(inicioSem.getDate()-((agora.getDay()+6)%7));inicioSem.setHours(0,0,0,0);
-  const inicioReal=inicioSem<inicioMes?inicioSem:inicioMes;
+  // Cobre também ontem e semana passada (máx 14 dias atrás)
+  const inicioBuffer=new Date(agora); inicioBuffer.setDate(inicioBuffer.getDate()-14); inicioBuffer.setHours(0,0,0,0);
+  const inicioReal=[inicioSem,inicioMes,inicioBuffer].sort((a,b)=>a-b)[0];
   const mesRef=`${anoRef.getFullYear()}-${anoRef.getMonth()}`;
   if(_gnhCacheValido(mesRef))return;
   const [entregas,vales]=await Promise.all([
@@ -6533,8 +6543,8 @@ async function carregarGanhos(){
     inicio=new Date(r.inicio); fim=new Date(r.fim);
   }
 
-  // Usa cache se disponível — evita re-buscar dados do banco desnecessariamente
-  await _carregarDadosGanhos();
+  // Usa cache. Para datas fora do mês atual, busca diretamente com o range
+  await _carregarDadosGanhos(inicio, fim);
   const inicioDate=new Date(inicio);
   const fimDate=new Date(fim);
   const data=(_gnhCache.entregas||[]).filter(e=>{const d=new Date(e.created_at);return d>=inicioDate&&d<=fimDate;});
