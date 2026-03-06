@@ -2287,131 +2287,285 @@ async function carregarAdmImpersonar(){
   if(ents)ents.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nome;selE.appendChild(o);});
 }
 
+// Estado do painel admin loja
+var _admLojaPer='hoje';
+var _admLojaDataCustom='';
+
+function _admLojaRangeCustom(dataStr){
+  // dataStr = 'YYYY-MM-DD'
+  const d=new Date(dataStr+'T00:00:00');
+  const inicio=new Date(d);inicio.setHours(0,0,0,0);
+  const fim=new Date(d);fim.setHours(23,59,59,999);
+  return{inicio:inicio.toISOString(),fim:fim.toISOString()};
+}
+
 async function admVerLoja(perOverride){
   const id=$('adm-sel-loja').value;if(!id)return;
-  const per=perOverride||$('adm-loja-per')?$('adm-loja-per').value||'hoje':'hoje';
-  const el=$('adm-loja-view');el.innerHTML='<p>Carregando...</p>';
+  // Atualiza estado global do período
+  if(perOverride!==undefined)_admLojaPer=perOverride;
+  const per=_admLojaPer||'hoje';
+  const el=$('adm-loja-view');el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">⏳ Carregando...</p>';
   const{data:lj}=await db.from('usuarios').select('*').eq('id',id).single();
   if(!lj){el.innerHTML='<p>Erro ao carregar</p>';return;}
-  const mesOff=per==='mes_passado'?-1:0;
-  const perKey=per==='mes_passado'?'mes':per;
-  const{inicio,fim}=periodoRange(perKey,mesOff);
-  const periodoLabels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'};
-  const[{data:ents},{data:assoc},{data:rel}]=await Promise.all([
+  // Calcular início/fim do período
+  let inicio,fim;
+  const periodoLabels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado',data_custom:'Data específica'};
+  if(per==='data_custom'&&_admLojaDataCustom){
+    const r=_admLojaRangeCustom(_admLojaDataCustom);inicio=r.inicio;fim=r.fim;
+  }else{
+    const mesOff=per==='mes_passado'?-1:0;
+    const perKey=per==='mes_passado'?'mes':per;
+    const r=periodoRange(perKey,mesOff);inicio=r.inicio;fim=r.fim;
+  }
+  const labelPer=per==='data_custom'&&_admLojaDataCustom
+    ? new Date(_admLojaDataCustom+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})
+    : (periodoLabels[per]||per);
+
+  const[{data:entsAtivos},{data:assoc},{data:rel}]=await Promise.all([
     db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).in('status',['pendente','aceito','chegou_loja','saiu_entrega','em_rota']).order('ordem_rota'),
     db.from('loja_entregadores').select('*,e:entregador_id(nome,online,status)').eq('loja_id',id),
-    db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).gte('created_at',inicio).lte('created_at',fim),
+    db.from('entregas').select('*,entregador:entregador_id(nome)').eq('loja_id',id).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false}),
   ]);
-  const totH=rel?rel.filter(e=>e.status==='entregue').length:0;
-  const totSis=rel?rel.filter(e=>e.status==='entregue').reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0):0;
-  const totEnt=rel?rel.filter(e=>e.status==='entregue').reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
+
+  const entregues=(rel||[]).filter(e=>e.status==='entregue');
+  const cancelados=(rel||[]).filter(e=>e.status==='cancelado');
+  const totH=entregues.length;
+  const totSis=entregues.reduce((s,e)=>s+parseFloat(e.valor_sistema||0),0);
+  const totEnt=entregues.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
+  const totCanc=cancelados.length;
+
+  // HTML do seletor de período
+  const selOpts=['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'];
+  const selLabels={'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'};
+  const selHTML=`<select id="adm-loja-per" onchange="admLojaTrocaPer(this.value)" style="width:100%;padding:8px;border:1.5px solid #004E89;border-radius:8px;font-size:13px;font-weight:600;margin-top:3px;color:#004E89;">
+    ${selOpts.map(o=>`<option value="${o}" ${per===o?'selected':''}>${selLabels[o]}</option>`).join('')}
+  </select>
+  <div id="adm-loja-datepicker" style="display:${per==='data_custom'?'block':'none'};margin-top:6px;">
+    <input type="date" id="adm-loja-data" value="${_admLojaDataCustom}" onchange="admLojaSetData(this.value)"
+      style="width:100%;padding:8px;border:1.5px solid #FF6B35;border-radius:8px;font-size:13px;">
+  </div>`;
+
+  // Monta cards de pedidos
+  const cardAtivos=(!entsAtivos||!entsAtivos.length)
+    ?'<p style="color:#999;font-size:12px;padding:6px 0;">Nenhum pedido ativo no momento</p>'
+    :entsAtivos.map(e=>`
+      <div class="ecard ${e.status==='em_rota'?'rota':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+          <span class="badge b-${e.status_detalhado||e.status}" style="font-size:10px;">${e.status_detalhado||e.status}</span>
+        </div>
+        <p style="font-size:12px;color:#555;margin:3px 0;">&#128205; ${e.endereco_entrega||'-'}</p>
+        ${e.entregador?`<p style="font-size:11px;color:#004E89;margin:2px 0;">&#128757; ${e.entregador.nome}</p>`:''}
+        ${e.valor_corrida>0?`<span class="badge b-ativo" style="margin-top:4px;">${fR(e.valor_corrida)}</span>`:''}
+      </div>`).join('');
+
+  const cardEntregues=!entregues.length
+    ?'<p style="color:#999;font-size:12px;padding:6px 0;">Nenhuma entrega no período</p>'
+    :entregues.map(e=>`
+      <div class="ecard entregue-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:10px;color:#888;">${new Date(e.entregue_at||e.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
+            <span class="badge b-entregue" style="font-size:10px;">entregue</span>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#555;margin:3px 0;">&#128205; ${e.endereco_entrega||'-'}</p>
+        ${e.entregador?`<p style="font-size:11px;color:#004E89;margin:2px 0;">&#128757; ${e.entregador.nome}</p>`:''}
+        ${e.valor_corrida>0?`<span class="badge b-ativo" style="margin-top:4px;">${fR(e.valor_corrida)}</span>`:''}
+      </div>`).join('');
+
+  const cardCancelados=!cancelados.length?''
+    :cancelados.map(e=>`
+      <div class="ecard" style="opacity:.6;border-left-color:#c62828;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+          <span class="badge b-cancelado" style="font-size:10px;">cancelado</span>
+        </div>
+        <p style="font-size:12px;color:#555;margin:3px 0;">&#128205; ${e.endereco_entrega||'-'}</p>
+        ${e.entregador?`<p style="font-size:11px;color:#888;margin:2px 0;">&#128757; ${e.entregador.nome}</p>`:''}
+      </div>`).join('');
+
   el.innerHTML=`
     <div style="background:#e3f2fd;border-radius:10px;padding:12px;margin-bottom:10px;">
-      <strong>${lj.nome_loja||lj.nome}</strong> | Codigo: <strong>${lj.codigo_loja||'---'}</strong><br>
-      <small>${lj.endereco||''}</small><br>
+      <strong>${lj.nome_loja||lj.nome}</strong> | Cod: <strong>${lj.codigo_loja||'---'}</strong><br>
+      <small style="color:#555;">${lj.endereco||''}</small><br>
       <small>Taxa sistema: ${fR(lj.taxa_sistema)} | Taxa entregador: ${fR(lj.taxa_entrega)}</small>
     </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;">Período</label>
-      <select id="adm-loja-per" onchange="admVerLoja(this.value)" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;margin-top:3px;">
-        <option value="hoje" ${per==='hoje'?'selected':''}>📅 Hoje</option>
-        <option value="ontem" ${per==='ontem'?'selected':''}>📅 Ontem</option>
-        <option value="semana" ${per==='semana'?'selected':''}>📅 Esta Semana</option>
-        <option value="semana_passada" ${per==='semana_passada'?'selected':''}>📅 Semana Passada</option>
-        <option value="mes" ${per==='mes'?'selected':''}>📅 Este Mês</option>
-        <option value="mes_passado" ${per==='mes_passado'?'selected':''}>📅 Mês Passado</option>
-      </select>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtrar período</label>
+      ${selHTML}
     </div>
-    <div class="g3" style="margin-bottom:10px;">
-      <div style="text-align:center;padding:8px;background:#fff3e0;border-radius:8px;"><p style="font-size:10px;color:#888;">${periodoLabels[per]||per}</p><p style="font-size:18px;font-weight:700;color:#FF6B35;">${totH}</p></div>
-      <div style="text-align:center;padding:8px;background:#e3f2fd;border-radius:8px;"><p style="font-size:10px;color:#888;">Sistema</p><p style="font-size:13px;font-weight:700;color:#004E89;">${fR(totSis)}</p></div>
-      <div style="text-align:center;padding:8px;background:#e8f5e9;border-radius:8px;"><p style="font-size:10px;color:#888;">Entregad.</p><p style="font-size:13px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p></div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">
+      <div style="text-align:center;padding:8px;background:#fff3e0;border-radius:8px;">
+        <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Entregues</p>
+        <p style="font-size:20px;font-weight:800;color:#FF6B35;">${totH}</p>
+      </div>
+      <div style="text-align:center;padding:8px;background:#ffebee;border-radius:8px;">
+        <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Cancelados</p>
+        <p style="font-size:20px;font-weight:800;color:#c62828;">${totCanc}</p>
+      </div>
+      <div style="text-align:center;padding:8px;background:#e3f2fd;border-radius:8px;">
+        <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Sistema</p>
+        <p style="font-size:13px;font-weight:700;color:#004E89;">${fR(totSis)}</p>
+      </div>
+      <div style="text-align:center;padding:8px;background:#e8f5e9;border-radius:8px;">
+        <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Entregad.</p>
+        <p style="font-size:13px;font-weight:700;color:#00C9A7;">${fR(totEnt)}</p>
+      </div>
     </div>
-    <div style="margin-bottom:8px;"><strong>Entregadores vinculados:</strong><br>${(assoc||[]).map(a=>`<span class="badge ${a.e&&a.e.online?'b-online':'b-offline'}" style="margin:2px;">${a.e?a.e.nome:'?'}</span>`).join('')||'Nenhum'}</div>
-    <div style="margin-bottom:10px;"><strong>🚴 Pedidos ativos:</strong><br>${(!ents||!ents.length)?'<p style="color:#999;font-size:12px;">Nenhum pedido ativo</p>':ents.map(e=>`
-      <div class="ecard ${e.status==='em_rota'?'rota':''}">
-        <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${e.status_detalhado||e.status}">${e.status_detalhado||e.status}</span></div>
-        <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
-        ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
-        ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
-      </div>`).join('')}
+
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;">Entregadores vinculados:</strong><br>
+      ${(assoc||[]).map(a=>`<span class="badge ${a.e&&a.e.online?'b-online':'b-offline'}" style="margin:2px;">${a.e?a.e.nome:'?'}</span>`).join('')||'<span style="font-size:12px;color:#999;">Nenhum</span>'}
     </div>
-    ${(()=>{
-      const entregues=(rel||[]).filter(e=>e.status==='entregue');
-      const cancelados=(rel||[]).filter(e=>e.status==='cancelado');
-      let html='';
-      if(entregues.length){
-        html+=`<div style="margin-bottom:10px;"><strong style="color:#2e7d32;">✅ Entregues — ${periodoLabels[per]||per} (${entregues.length}):</strong><br>`;
-        html+=entregues.map(e=>`
-          <div class="ecard entregue-card">
-            <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-entregue">entregue</span></div>
-            <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
-            ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
-            ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
-          </div>`).join('');
-        html+='</div>';
-      }
-      if(cancelados.length){
-        html+=`<div><strong style="color:#c62828;">✖ Cancelados — ${periodoLabels[per]||per} (${cancelados.length}):</strong><br>`;
-        html+=cancelados.map(e=>`
-          <div class="ecard" style="opacity:.65;border-left-color:#c62828;">
-            <div style="display:flex;justify-content:space-between;"><strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-cancelado">cancelado</span></div>
-            <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
-            ${e.entregador?`<p style="font-size:11px;color:#004E89;">&#128757; ${e.entregador.nome}</p>`:''}
-          </div>`).join('');
-        html+='</div>';
-      }
-      return html;
-    })()}`;
+
+    <details open style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;padding:6px 0;color:#e65100;">🚴 Pedidos ativos agora (${(entsAtivos||[]).length})</summary>
+      <div style="margin-top:6px;">${cardAtivos}</div>
+    </details>
+
+    <details open style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;padding:6px 0;color:#2e7d32;">✅ Entregues — ${labelPer} (${totH})</summary>
+      <div style="margin-top:6px;">${cardEntregues}</div>
+    </details>
+
+    ${cancelados.length?`<details style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;padding:6px 0;color:#c62828;">✖ Cancelados — ${labelPer} (${totCanc})</summary>
+      <div style="margin-top:6px;">${cardCancelados}</div>
+    </details>`:''}
+  `;
 }
+
+function admLojaTrocaPer(val){
+  _admLojaPer=val;
+  const dp=$('adm-loja-datepicker');
+  if(dp)dp.style.display=val==='data_custom'?'block':'none';
+  if(val!=='data_custom')admVerLoja();
+}
+function admLojaSetData(val){
+  _admLojaDataCustom=val;
+  if(val)admVerLoja();
+}
+
+var _admEntPer='hoje';
+var _admEntDataCustom='';
 
 async function admVerEnt(perOverride){
   const id=$('adm-sel-ent').value;if(!id)return;
-  const per=perOverride||($('adm-ent-per')?$('adm-ent-per').value||'hoje':'hoje');
-  const el=$('adm-ent-view');el.innerHTML='<p>Carregando...</p>';
-  const{data:ent}=await db.from('usuarios').select('*').eq('id',id).single();
-  if(!ent){el.innerHTML='<p>Erro</p>';return;}
-  const mesOff=per==='mes_passado'?-1:0;
-  const perKey=per==='mes_passado'?'mes':per;
-  const{inicio,fim}=periodoRange(perKey,mesOff);
-  const periodoLabels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'};
-  const[{data:rota},{data:ganhos}]=await Promise.all([
+  if(perOverride!==undefined)_admEntPer=perOverride;
+  const per=_admEntPer||'hoje';
+  const el=$('adm-ent-view');el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">⏳ Carregando...</p>';
+  const periodoLabels={hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado',data_custom:'Data específica'};
+  let inicio,fim;
+  if(per==='data_custom'&&_admEntDataCustom){
+    const d=new Date(_admEntDataCustom+'T00:00:00');
+    const i=new Date(d);i.setHours(0,0,0,0);
+    const f=new Date(d);f.setHours(23,59,59,999);
+    inicio=i.toISOString();fim=f.toISOString();
+  }else{
+    const mesOff=per==='mes_passado'?-1:0;
+    const perKey=per==='mes_passado'?'mes':per;
+    const r=periodoRange(perKey,mesOff);inicio=r.inicio;fim=r.fim;
+  }
+  const labelPer=per==='data_custom'&&_admEntDataCustom
+    ? new Date(_admEntDataCustom+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})
+    : (periodoLabels[per]||per);
+
+  const[{data:ent},{data:rota},{data:ganhos},{data:assoc}]=await Promise.all([
+    db.from('usuarios').select('*').eq('id',id).single().then(r=>({data:r.data})),
     db.from('entregas').select('*,loja:loja_id(nome_loja,nome)').eq('entregador_id',id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega']).order('ordem_rota'),
-    db.from('entregas').select('id,valor_corrida,valor_entregador').eq('entregador_id',id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim),
+    db.from('entregas').select('*,loja:loja_id(nome_loja,nome)').eq('entregador_id',id).in('status',['entregue']).gte('created_at',inicio).lte('created_at',fim).order('created_at',{ascending:false}),
+    db.from('loja_entregadores').select('l:loja_id(nome_loja,nome)').eq('entregador_id',id),
   ]);
+  if(!ent){el.innerHTML='<p>Erro</p>';return;}
   const totalGanhos=ganhos?ganhos.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0):0;
-  const{data:assoc}=await db.from('loja_entregadores').select('l:loja_id(nome_loja,nome)').eq('entregador_id',id);
+
+  const selOpts=['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'];
+  const selLabels={'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'};
+  const selHTML=`<select id="adm-ent-per" onchange="admEntTrocaPer(this.value)" style="width:100%;padding:8px;border:1.5px solid #004E89;border-radius:8px;font-size:13px;font-weight:600;margin-top:3px;color:#004E89;">
+    ${selOpts.map(o=>`<option value="${o}" ${per===o?'selected':''}>${selLabels[o]}</option>`).join('')}
+  </select>
+  <div id="adm-ent-datepicker" style="display:${per==='data_custom'?'block':'none'};margin-top:6px;">
+    <input type="date" id="adm-ent-data" value="${_admEntDataCustom}" onchange="admEntSetData(this.value)"
+      style="width:100%;padding:8px;border:1.5px solid #FF6B35;border-radius:8px;font-size:13px;">
+  </div>`;
+
+  const cardGanhos=!ganhos||!ganhos.length
+    ?'<p style="color:#999;font-size:12px;padding:6px 0;">Nenhuma entrega no período</p>'
+    :ganhos.map(e=>`
+      <div class="ecard entregue-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:10px;color:#888;">${new Date(e.entregue_at||e.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
+            <span class="badge b-ativo" style="font-size:10px;">${fR(e.valor_corrida||e.valor_entregador||0)}</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#888;margin:2px 0;">&#127978; ${e.loja?e.loja.nome_loja||e.loja.nome:'-'}</p>
+        <p style="font-size:12px;color:#555;margin:2px 0;">&#128205; ${e.endereco_entrega||'-'}</p>
+      </div>`).join('');
+
   el.innerHTML=`
     <div style="background:#e8f5e9;border-radius:10px;padding:12px;margin-bottom:10px;">
-      <strong>${ent.nome}</strong> <span class="badge ${ent.online?'b-online':'b-offline'}">${ent.online?'Online':'Offline'}</span><br>
-      <small>Tel: ${ent.telefone||'-'} | Placa: ${ent.placa_moto||'-'} | Pix: ${ent.chave_pix||'-'}</small><br>
-      <small>Lojas: ${(assoc||[]).map(a=>a.l?a.l.nome_loja||a.l.nome:'?').join(', ')||'Nenhuma'}</small><br>
-      <small>Ganhos <strong>${periodoLabels[per]||per}</strong>: <strong>${fR(totalGanhos)}</strong> (${ganhos?ganhos.length:0} entregas)</small>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong style="font-size:15px;">${ent.nome}</strong>
+        <span class="badge ${ent.online?'b-online':'b-offline'}">${ent.online?'🟢 Online':'⚫ Offline'}</span>
+      </div>
+      <small style="color:#555;">Tel: ${ent.telefone||'-'} | Placa: ${ent.placa_moto||'-'} | Pix: ${ent.chave_pix||'-'}</small><br>
+      <small>Lojas: ${(assoc||[]).map(a=>a.l?a.l.nome_loja||a.l.nome:'?').join(', ')||'Nenhuma'}</small>
     </div>
-    <div style="margin-bottom:10px;">
-      <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;">Período dos ganhos</label>
-      <select id="adm-ent-per" onchange="admVerEnt(this.value)" style="width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;margin-top:3px;">
-        <option value="hoje" ${per==='hoje'?'selected':''}>📅 Hoje</option>
-        <option value="ontem" ${per==='ontem'?'selected':''}>📅 Ontem</option>
-        <option value="semana" ${per==='semana'?'selected':''}>📅 Esta Semana</option>
-        <option value="semana_passada" ${per==='semana_passada'?'selected':''}>📅 Semana Passada</option>
-        <option value="mes" ${per==='mes'?'selected':''}>📅 Este Mês</option>
-        <option value="mes_passado" ${per==='mes_passado'?'selected':''}>📅 Mês Passado</option>
-      </select>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;">🔍 Filtrar período</label>
+      ${selHTML}
     </div>
-    <strong>Rota atual:</strong><br>
-    ${(!rota||!rota.length)?'<p style="color:#999;font-size:12px;">Sem entregas na rota.</p>':rota.map((e,i)=>`
-      <div class="ecard rota">
-        <div style="display:flex;justify-content:space-between;"><strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${e.status_detalhado||e.status}">${e.status_detalhado||e.status}</span></div>
-        <p style="font-size:12px;color:#555;">&#128205; ${e.endereco_entrega}</p>
-        <p style="font-size:11px;color:#888;">&#127978; ${e.loja?e.loja.nome_loja||e.loja.nome:'?'}</p>
-        ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">&#128273; Cod. Conf: ${e.codigo_confirmacao}</p>`:''}
-        ${e.valor_corrida>0?`<span class="badge b-ativo">${fR(e.valor_corrida)}</span>`:''}
-        <div class="row" style="margin-top:6px;flex-wrap:wrap;">
-          <button class="btn-sm blue" onclick="admForcarStatus('${e.id}','entregue')">&#10003; Marcar Entregue (ADM)</button>
-          <button class="btn-sm red" onclick="admForcarStatus('${e.id}','cancelado')">Cancelar</button>
-        </div>
-      </div>`).join('')}`;
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">
+      <div style="text-align:center;padding:10px;background:#e8f5e9;border-radius:8px;">
+        <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Corridas</p>
+        <p style="font-size:22px;font-weight:800;color:#2e7d32;">${ganhos?ganhos.length:0}</p>
+      </div>
+      <div style="text-align:center;padding:10px;background:#f3e5f5;border-radius:8px;">
+        <p style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Total ganho</p>
+        <p style="font-size:18px;font-weight:800;color:#6a1b9a;">${fR(totalGanhos)}</p>
+      </div>
+    </div>
+
+    <details open style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;padding:6px 0;color:#2e7d32;">💰 Entregas — ${labelPer} (${ganhos?ganhos.length:0})</summary>
+      <div style="margin-top:6px;">${cardGanhos}</div>
+    </details>
+
+    <details style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-weight:700;font-size:13px;padding:6px 0;color:#004E89;">🛵 Rota atual (${(rota||[]).length})</summary>
+      <div style="margin-top:6px;">${(!rota||!rota.length)?'<p style="color:#999;font-size:12px;padding:6px 0;">Sem entregas na rota.</p>':rota.map((e,i)=>`
+        <div class="ecard rota">
+          <div style="display:flex;justify-content:space-between;"><strong>${i+1}. ${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong><span class="badge b-${e.status_detalhado||e.status}" style="font-size:10px;">${e.status_detalhado||e.status}</span></div>
+          <p style="font-size:12px;color:#555;margin:2px 0;">&#128205; ${e.endereco_entrega}</p>
+          <p style="font-size:11px;color:#888;margin:2px 0;">&#127978; ${e.loja?e.loja.nome_loja||e.loja.nome:'?'}</p>
+          ${e.codigo_confirmacao?`<p style="font-size:11px;color:#8e44ad;">&#128273; Cod: ${e.codigo_confirmacao}</p>`:''}
+          ${e.valor_corrida>0?`<span class="badge b-ativo" style="margin-top:4px;">${fR(e.valor_corrida)}</span>`:''}
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn-sm blue" onclick="admForcarStatus('${e.id}','entregue')">✓ Entregue</button>
+            <button class="btn-sm red" onclick="admForcarStatus('${e.id}','cancelado')">✖ Cancelar</button>
+          </div>
+        </div>`).join('')}
+      </div>
+    </details>
+  `;
+}
+
+function admEntTrocaPer(val){
+  _admEntPer=val;
+  const dp=$('adm-ent-datepicker');
+  if(dp)dp.style.display=val==='data_custom'?'block':'none';
+  if(val!=='data_custom')admVerEnt();
+}
+function admEntSetData(val){
+  _admEntDataCustom=val;
+  if(val)admVerEnt();
 }
 
 async function admForcarStatus(id,status){
