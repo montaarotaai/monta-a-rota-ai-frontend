@@ -3785,7 +3785,7 @@ async function carregarHistoricoTurno(){
   el.innerHTML='<p style="text-align:center;color:#999;padding:20px;">Carregando histórico...</p>';
   const ini=iDia(), fim=fDia();
   const res=await db.from('entregas')
-    .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo,entregador:entregador_id(id,nome,taxa_fixo_base,taxa_tipo)')
+    .select('id,numero_pedido,cliente_nome,endereco_entrega,status,valor_corrida,distancia_km,lat_entrega,lng_entrega,created_at,entregue_at,aceito_at,entregador_id,valor_incentivo,tipo_incentivo,entregador:entregador_id(id,nome,taxa_fixo_base,taxa_tipo)')
     .eq('loja_id',U.id)
     .in('status',['entregue','cancelado'])
     .gte('created_at',ini).lte('created_at',fim)
@@ -3795,9 +3795,25 @@ async function carregarHistoricoTurno(){
     el.innerHTML='<p style="text-align:center;color:#999;padding:30px;">Nenhum pedido finalizado no turno de hoje.</p>';
     return;
   }
+  // ── Calcula distância via OSRM para pedidos sem distancia_km salva ──
+  const semDist = data.filter(e => e.status==='entregue' && !(parseFloat(e.distancia_km)>0) && e.lat_entrega && e.lng_entrega);
+  if(semDist.length > 0){
+    const lojaLat = lojaGeoCache.lat || RP_LAT;
+    const lojaLng = lojaGeoCache.lng || RP_LNG;
+    await Promise.all(semDist.map(async e => {
+      try {
+        const rota = await calcularRotaOSRM(lojaLat, lojaLng, e.lat_entrega, e.lng_entrega);
+        if(rota && rota.distanciaKm > 0){
+          e.distancia_km = rota.distanciaKm;
+          // Salva no banco para não recalcular da próxima vez
+          db.from('entregas').update({distancia_km: rota.distanciaKm}).eq('id', e.id);
+        }
+      } catch(err){ /* silently ignore */ }
+    }));
+  }
+
   const entregues=data.filter(e=>e.status==='entregue');
   const cancelados=data.filter(e=>e.status==='cancelado');
-  const totalGeral=entregues.reduce((s,e)=>s+parseFloat(e.valor_corrida||0),0);
   const kmGeral=entregues.reduce((s,e)=>s+parseFloat(e.distancia_km||0),0);
 
   // ── Breakdown por entregador ──
@@ -3805,15 +3821,25 @@ async function carregarHistoricoTurno(){
   entregues.forEach(e=>{
     const eid=e.entregador_id||'sem';
     const nome=e.entregador?e.entregador.nome:'Sem entregador';
-    if(!porEnt[eid]) porEnt[eid]={nome,corridas:0,km:0,custoTotal:0,taxaFixoBase:parseFloat(e.entregador?.taxa_fixo_base||0),taxaTipo:e.entregador?.taxa_tipo||'fixo',turnos:new Set()};
+    if(!porEnt[eid]) porEnt[eid]={nome,corridas:0,km:0,custoCorridas:0,taxaFixoBase:parseFloat(e.entregador?.taxa_fixo_base||0),taxaTipo:e.entregador?.taxa_tipo||'fixo',turnos:new Set()};
     porEnt[eid].corridas++;
     porEnt[eid].km+=parseFloat(e.distancia_km||0);
-    porEnt[eid].custoTotal+=parseFloat(e.valor_corrida||0);
-    // Conta turnos distintos (para combustível)
+    porEnt[eid].custoCorridas+=parseFloat(e.valor_corrida||0);
     const dt=new Date(e.entregue_at||e.created_at);
     const turnoKey=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
     porEnt[eid].turnos.add(turnoKey);
   });
+
+  // Calcula custo total real (corridas + combustível) por entregador
+  Object.values(porEnt).forEach(ent=>{
+    const nTurnos=ent.turnos.size;
+    ent.custoCombustivel=ent.taxaTipo==='fixo_mais_km'?ent.taxaFixoBase*nTurnos:0;
+    ent.custoTotal=ent.custoCorridas+ent.custoCombustivel;
+    ent.nTurnos=nTurnos;
+  });
+
+  // Custo total geral = soma de todos os custos reais (corridas + combustível)
+  const totalGeral=Object.values(porEnt).reduce((s,ent)=>s+ent.custoTotal,0);
 
   // ── Resumo geral ──
   var html='<div style="background:#f8f9fa;border-radius:14px;padding:14px 16px;margin-bottom:14px;border:1.5px solid #e8e8e8;">';
@@ -3822,18 +3848,16 @@ async function carregarHistoricoTurno(){
   html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;"><div style="font-size:20px;font-weight:900;color:#2e7d32;">'+entregues.length+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Entregues</div></div>';
   html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#c62828;">'+cancelados.length+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Cancelados</div></div>';
   html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#004E89;">'+(kmGeral>0?kmGeral.toFixed(1)+'km':'—')+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">KM Total</div></div>';
-  html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#004E89;">'+fR(totalGeral)+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Custo</div></div>';
+  html+='<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;border-left:1px solid #eee;"><div style="font-size:20px;font-weight:900;color:#c62828;">'+fR(totalGeral)+'</div><div style="font-size:9px;color:#888;font-weight:700;text-transform:uppercase;">Custo Total</div></div>';
   html+='</div></div>';
 
   // ── Cards por entregador ──
   Object.values(porEnt).forEach(ent=>{
-    const nTurnos=ent.turnos.size;
-    const custoCombustivel=ent.taxaTipo==='fixo_mais_km'?ent.taxaFixoBase*nTurnos:0;
-    const custoLiquido=ent.custoTotal; // valor pago ao entregador
-    const custoTotal=custoLiquido+custoCombustivel;
-    const ticketMedio=ent.corridas>0?custoLiquido/ent.corridas:0;
-    // Se pagou: custo < receita estimada (usa taxa sistema como proxy)
-    const receitaSistema=entregues.filter(e=>(e.entregador?.nome||'')===ent.nome).reduce((s,e)=>s+parseFloat(e.valor_sistema||U.taxa_sistema||0),0);
+    const nTurnos=ent.nTurnos;
+    const custoCombustivel=ent.custoCombustivel;
+    const custoTotal=ent.custoTotal;
+    const ticketMedio=ent.corridas>0?custoTotal/ent.corridas:0; // ticket médio real = custo total / corridas
+    const custoPorKm=ent.km>0?custoTotal/ent.km:0;
 
     html+='<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1.5px solid #e8e8e8;box-shadow:0 2px 12px rgba(0,0,0,.04);">';
     html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">';
@@ -3842,8 +3866,19 @@ async function carregarHistoricoTurno(){
     html+='<div style="font-size:11px;color:#888;">'+ent.corridas+' corridas · '+nTurnos+' turno'+(nTurnos>1?'s':'')+'</div></div></div>';
     html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">';
     html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">KM Rodados</div><div style="font-size:16px;font-weight:900;color:#004E89;">'+(ent.km>0?ent.km.toFixed(1):'—')+'<span style="font-size:10px;font-weight:400;"> km</span></div></div>';
-    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Custo Corridas</div><div style="font-size:16px;font-weight:900;color:#c62828;">'+fR(custoLiquido)+'</div></div>';
-    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Ticket Médio</div><div style="font-size:16px;font-weight:900;color:#555;">'+fR(ticketMedio)+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Custo Total</div><div style="font-size:16px;font-weight:900;color:#c62828;">'+fR(custoTotal)+'</div></div>';
+    html+='<div style="background:#f8f9fa;border-radius:9px;padding:8px;text-align:center;"><div style="font-size:9px;color:#aaa;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Custo/Entrega</div><div style="font-size:16px;font-weight:900;color:#555;">'+fR(ticketMedio)+'</div></div>';
+    html+='</div>';
+    // Detalhamento do custo
+    html+='<div style="background:#f8f9fa;border-radius:9px;padding:10px 12px;margin-bottom:8px;">';
+    html+='<div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:11px;color:#888;">Corridas ('+ent.corridas+'×)</span><span style="font-size:12px;font-weight:700;color:#333;">'+fR(ent.custoCorridas)+'</span></div>';
+    if(custoCombustivel>0){
+      html+='<div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:11px;color:#e65100;">⛽ Combustível ('+nTurnos+' turno'+(nTurnos>1?'s':'')+')</span><span style="font-size:12px;font-weight:700;color:#e65100;">'+fR(custoCombustivel)+'</span></div>';
+      html+='<div style="border-top:1px solid #e8e8e8;margin-top:4px;padding-top:5px;display:flex;justify-content:space-between;">';
+      html+='<span style="font-size:11px;font-weight:700;color:#333;">Total saiu do caixa</span>';
+      html+='<span style="font-size:13px;font-weight:900;color:#c62828;">'+fR(custoTotal)+'</span></div>';
+    }
+    if(ent.km>0) html+='<div style="margin-top:4px;text-align:right;font-size:11px;color:#aaa;">Custo/km: <strong style="color:#777;">'+fR(custoPorKm)+'/km</strong></div>';
     html+='</div>';
     if(custoCombustivel>0){
       html+='<div style="display:flex;justify-content:space-between;align-items:center;background:#fff8e1;border-radius:9px;padding:8px 12px;margin-bottom:8px;">';
