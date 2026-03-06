@@ -2387,7 +2387,7 @@ async function saveTaxAdm(id){
 function _buildCustomSelect(containerId, items, selectedValue, onChange){
   const wrap = $(containerId);
   if(!wrap) return;
-  // Store real value
+  // Store real value on the container
   wrap._cselValue = selectedValue || '';
   wrap._cselItems = items;
   wrap._cselOnChange = onChange;
@@ -2395,24 +2395,28 @@ function _buildCustomSelect(containerId, items, selectedValue, onChange){
   const selLabel = items.find(i=>i.value===selectedValue)?.label || items[0]?.label || '';
   const isPlaceholder = !selectedValue;
 
+  // Always wrap in .csel-wrap so position:relative is correct
   wrap.innerHTML = `
-    <div class="csel-trigger ${isPlaceholder?'placeholder':''}" onclick="_cselToggle('${containerId}')">
-      <span class="csel-label">${selLabel}</span>
-      <span class="csel-arrow">▼</span>
-    </div>
-    <div class="csel-dropdown" style="display:none;" id="${containerId}-dd">
-      ${items.map(it=>`
-        <div class="csel-item ${it.value===selectedValue?'selected':''} ${!it.value?'placeholder-opt':''}"
-             onclick="_cselSelect('${containerId}','${it.value}')">
-          <span>${it.label}</span>
-          <div class="csel-radio"></div>
-        </div>`).join('')}
+    <div class="csel-wrap">
+      <div class="csel-trigger ${isPlaceholder?'placeholder':''}" onclick="_cselToggle('${containerId}')">
+        <span class="csel-label">${selLabel}</span>
+        <span class="csel-arrow">▼</span>
+      </div>
+      <div class="csel-dropdown" style="display:none;" id="${containerId}-dd">
+        ${items.map(it=>`
+          <div class="csel-item ${it.value===selectedValue?'selected':''} ${!it.value?'placeholder-opt':''}"
+               onclick="_cselSelect('${containerId}','${it.value}')">
+            <span>${it.label}</span>
+            <div class="csel-radio"></div>
+          </div>`).join('')}
+      </div>
     </div>`;
 }
 
 function _cselToggle(id){
-  const dd = $(id+'-dd');
-  const trigger = $(id).querySelector('.csel-trigger');
+  const wrap = $(id); if(!wrap) return;
+  const dd = wrap.querySelector('.csel-dropdown');
+  const trigger = wrap.querySelector('.csel-trigger');
   if(!dd||!trigger) return;
   const isOpen = dd.style.display !== 'none';
   // Close all other dropdowns
@@ -2421,9 +2425,8 @@ function _cselToggle(id){
   if(!isOpen){
     dd.style.display='block';
     trigger.classList.add('open');
-    // Close when clicking outside
     setTimeout(()=>{
-      const closer=e=>{if(!$(id).contains(e.target)){dd.style.display='none';trigger.classList.remove('open');document.removeEventListener('click',closer);}};
+      const closer=e=>{if(!wrap.contains(e.target)){dd.style.display='none';trigger.classList.remove('open');document.removeEventListener('click',closer);}};
       document.addEventListener('click',closer);
     },10);
   }
@@ -2442,15 +2445,13 @@ function _cselSelect(id, value){
     trigger.querySelector('.csel-label').textContent = label;
     trigger.classList.toggle('placeholder', isPlaceholder);
   }
-  // Update selected state
   wrap.querySelectorAll('.csel-item').forEach(el=>{
-    el.classList.toggle('selected', el.getAttribute('onclick').includes("'"+value+"'") && value!=='');
+    const isThis = el.getAttribute('onclick')?.includes("'"+value+"'") && value!=='';
+    el.classList.toggle('selected', isThis);
   });
-  // Close dropdown
-  const dd = $(id+'-dd');
+  const dd = wrap.querySelector('.csel-dropdown');
   if(dd) dd.style.display='none';
   trigger?.classList.remove('open');
-  // Call onChange
   if(wrap._cselOnChange) wrap._cselOnChange(value);
 }
 
