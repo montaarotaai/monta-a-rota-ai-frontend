@@ -189,6 +189,47 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 .csel-item.selected .csel-radio{border-color:#004E89;background:#004E89;}
 .csel-item.selected .csel-radio::after{content:'';width:7px;height:7px;border-radius:50%;background:#fff;}
 .csel-item.placeholder-opt{color:#aaa;font-style:italic;}
+
+  /* ── CalPicker Universal ── */
+  .calpicker-wrap{position:relative;width:100%;}
+  .calpicker-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:11px 14px;cursor:pointer;user-select:none;transition:border-color .15s,box-shadow .15s;}
+  .calpicker-trigger:hover{border-color:#90b8d8;}
+  .calpicker-trigger.open{border-color:#004E89;box-shadow:0 0 0 3px rgba(0,78,137,.1);}
+  .calpicker-trigger-left{display:flex;align-items:center;gap:9px;}
+  .calpicker-trigger-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#004E89,#0077cc);display:flex;align-items:center;justify-content:center;font-size:14px;color:white;flex-shrink:0;}
+  .calpicker-trigger-text{font-size:13px;font-weight:700;color:#1a2a3a;}
+  .calpicker-trigger-sub{font-size:10px;color:#94a3b8;margin-top:1px;}
+  .calpicker-chevron{font-size:11px;color:#64748b;transition:transform .25s;}
+  .calpicker-trigger.open .calpicker-chevron{transform:rotate(180deg);}
+  .calpicker-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;box-shadow:0 8px 32px rgba(0,46,89,.14);z-index:9999;overflow:hidden;}
+  .calpicker-panel.open{display:block;animation:cpSlide .18s ease;}
+  @keyframes cpSlide{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  .calpicker-shortcuts{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 10px 6px;}
+  .calpicker-sc{border:1.5px solid #e8edf2;border-radius:9px;padding:8px 10px;cursor:pointer;font-size:11px;font-weight:700;color:#475569;background:#fafbfc;transition:all .15s;text-align:center;}
+  .calpicker-sc:hover,.calpicker-sc.active{border-color:#004E89;background:#f0f7ff;color:#004E89;}
+  .calpicker-divider{height:1px;background:#f0f4f8;margin:4px 10px;}
+  .calpicker-cal-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 4px;}
+  .calpicker-month-label{font-size:13px;font-weight:800;color:#1a2a3a;cursor:pointer;}
+  .calpicker-nav{width:28px;height:28px;border:none;background:#f1f5f9;border-radius:8px;cursor:pointer;font-size:16px;color:#475569;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+  .calpicker-nav:hover{background:#e0eaf5;color:#004E89;}
+  .calpicker-weekdays{display:grid;grid-template-columns:repeat(7,1fr);padding:0 8px;gap:2px;}
+  .calpicker-wd{font-size:9px;font-weight:800;color:#94a3b8;text-align:center;padding:3px 0;text-transform:uppercase;}
+  .calpicker-days{display:grid;grid-template-columns:repeat(7,1fr);padding:0 8px 10px;gap:2px;}
+  .calpicker-day{aspect-ratio:1;border:none;background:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;color:#334155;transition:all .12s;display:flex;align-items:center;justify-content:center;}
+  .calpicker-day:hover:not(:disabled){background:#f0f7ff;color:#004E89;}
+  .calpicker-day.today{font-weight:900;color:#004E89;}
+  .calpicker-day.today::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:#004E89;position:absolute;bottom:3px;}
+  .calpicker-day{position:relative;}
+  .calpicker-day.selected{background:#004E89;color:white;font-weight:800;}
+  .calpicker-day.selected:hover{background:#0066b3;}
+  .calpicker-day.in-range{background:#e0eaf5;color:#004E89;border-radius:0;}
+  .calpicker-day.range-start{border-radius:8px 0 0 8px;background:#004E89;color:white;}
+  .calpicker-day.range-end{border-radius:0 8px 8px 0;background:#004E89;color:white;}
+  .calpicker-day:disabled{color:#cbd5e1;cursor:default;}
+  .calpicker-day.other-month{color:#cbd5e1;}
+  .calpicker-footer{padding:8px 10px 10px;display:flex;gap:6px;}
+  .calpicker-footer-btn{flex:1;padding:9px;border:none;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer;transition:opacity .2s;}
+  .calpicker-footer-btn:hover{opacity:.85;}
 </style>
 </head>
 <body>
@@ -866,7 +907,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div style="font-size:11px;color:#888;margin-top:1px;">Visão completa por período</div>
     </div>
   </div>
-  <div id="rel-f" style="margin-bottom:14px;" data-csel-init='{"items":[{"value":"hoje","label":"📅 Hoje"},{"value":"semana","label":"📅 Esta Semana"},{"value":"semana_passada","label":"📅 Semana Passada"},{"value":"mes","label":"📅 Este Mês"},{"value":"mes_passado","label":"📅 Mês Passado"}],"default":"semana","cb":"carregarRel"}'></div>
+  <div id="rel-f" style="margin-bottom:14px;"></div>
   <div id="rel-dados"></div>
 </div></div>
 
@@ -911,20 +952,8 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <div id="m-ganhos" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('ganhos')">&times;</button>
   <h2 style="margin-bottom:9px;">💰 Meus Ganhos</h2>
-  <!-- Filtros rápidos com scroll horizontal -->
-  <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-    <button onclick="filtroGanhos('hoje',this)" class="btn-sm green" id="gnhf-hoje" style="white-space:nowrap;">Hoje</button>
-    <button onclick="filtroGanhos('ontem',this)" class="btn-sm gray" id="gnhf-ontem" style="white-space:nowrap;">Ontem</button>
-    <button onclick="filtroGanhos('semana',this)" class="btn-sm gray" id="gnhf-semana" style="white-space:nowrap;">Esta Semana</button>
-    <button onclick="filtroGanhos('semana_passada',this)" class="btn-sm gray" id="gnhf-semana-pass" style="white-space:nowrap;">Semana Passada</button>
-    <button onclick="filtroGanhos('mes',this)" class="btn-sm gray" id="gnhf-mes" style="white-space:nowrap;">Este Mês</button>
-  </div>
-  <!-- Navegação de meses -->
-  <div id="gnh-nav-mes" style="display:none;align-items:center;justify-content:space-between;background:#f0f4ff;border-radius:10px;padding:8px 12px;margin-bottom:8px;">
-    <button onclick="navMes(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;color:#004E89;padding:0 8px;">‹</button>
-    <span id="gnh-mes-label" style="font-weight:700;font-size:13px;color:#004E89;text-transform:capitalize;"></span>
-    <button onclick="navMes(1)" id="gnh-nav-prox" style="background:none;border:none;font-size:20px;cursor:pointer;color:#004E89;padding:0 8px;">›</button>
-  </div>
+  <div id="ganhos-calpicker" style="margin-bottom:10px;"></div>
+
   <div id="gnh-resumo" style="margin-bottom:12px;"></div>
   <div id="gnh-dados"></div>
 </div></div>
@@ -1222,6 +1251,257 @@ let realtimeCh=null;
 let myLat=null,myLng=null;
 let lojaGeoCache={lat:null,lng:null};
 let geocodeCache={};
+
+
+// ═══════════════════════════════════════════════════════════
+// CalPicker — Seletor de período universal
+// Uso: _CalPicker.init(containerId, defaultPer, callback)
+// ═══════════════════════════════════════════════════════════
+const _CalPicker = (function(){
+  const SHORTCUTS = [
+    {key:'hoje',      label:'Hoje'},
+    {key:'ontem',     label:'Ontem'},
+    {key:'semana',    label:'Esta Semana'},
+    {key:'semana_passada', label:'Sem. Passada'},
+    {key:'mes',       label:'Este Mês'},
+    {key:'mes_passado',label:'Mês Passado'},
+  ];
+  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+  // Retorna label legível para o período
+  function label(per, customRange) {
+    if(per === 'custom' && customRange) {
+      const f = d => d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+      if(customRange.ini.toDateString() === customRange.fim.toDateString())
+        return f(customRange.ini);
+      return f(customRange.ini) + ' – ' + f(customRange.fim);
+    }
+    const map = {hoje:'Hoje',ontem:'Ontem',semana:'Esta Semana',semana_passada:'Sem. Passada',mes:'Este Mês',mes_passado:'Mês Passado'};
+    return map[per] || per;
+  }
+
+  // Resolve período para {ini, fim} ISO string (UTC-3 aware)
+  function resolve(per, customRange) {
+    const now = new Date();
+    const br = d => new Date(d.getTime() - 3*60*60*1000);
+    let ini, fim;
+    if(per === 'custom' && customRange) {
+      ini = new Date(customRange.ini); ini.setHours(0,0,0,0);
+      fim = new Date(customRange.fim); fim.setHours(23,59,59,999);
+    } else if(per === 'hoje') {
+      ini = new Date(now); ini.setHours(0,0,0,0);
+      fim = new Date(now); fim.setHours(23,59,59,999);
+    } else if(per === 'ontem') {
+      ini = new Date(now); ini.setDate(ini.getDate()-1); ini.setHours(0,0,0,0);
+      fim = new Date(now); fim.setDate(fim.getDate()-1); fim.setHours(23,59,59,999);
+    } else if(per === 'semana') {
+      ini = new Date(now); ini.setDate(ini.getDate()-((now.getDay()+6)%7)); ini.setHours(0,0,0,0);
+      fim = new Date(ini); fim.setDate(fim.getDate()+6); fim.setHours(23,59,59,999);
+    } else if(per === 'semana_passada') {
+      ini = new Date(now); ini.setDate(ini.getDate()-((now.getDay()+6)%7)-7); ini.setHours(0,0,0,0);
+      fim = new Date(ini); fim.setDate(fim.getDate()+6); fim.setHours(23,59,59,999);
+    } else if(per === 'mes') {
+      ini = new Date(now.getFullYear(), now.getMonth(), 1, 0,0,0,0);
+      fim = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59,999);
+    } else if(per === 'mes_passado') {
+      ini = new Date(now.getFullYear(), now.getMonth()-1, 1, 0,0,0,0);
+      fim = new Date(now.getFullYear(), now.getMonth(), 0, 23,59,59,999);
+    } else {
+      ini = new Date(now); ini.setHours(0,0,0,0);
+      fim = new Date(now); fim.setHours(23,59,59,999);
+    }
+    // Ajusta UTC-3
+    return { ini: new Date(ini.getTime()-3*60*60*1000).toISOString(), fim: new Date(fim.getTime()-3*60*60*1000).toISOString() };
+  }
+
+  function init(containerId, defaultPer, callback, opts) {
+    const container = document.getElementById(containerId);
+    if(!container) return;
+    opts = opts || {};
+
+    let state = {
+      per: defaultPer || 'hoje',
+      customRange: null,      // {ini: Date, fim: Date}
+      calYear: new Date().getFullYear(),
+      calMonth: new Date().getMonth(),
+      rangeStep: 0,           // 0=nenhum, 1=aguardando fim
+      rangeStart: null,
+    };
+
+    function getLabel() { return label(state.per, state.customRange); }
+    function getSub() {
+      const r = resolve(state.per, state.customRange);
+      const f = s => new Date(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'});
+      const a = f(r.ini), b = f(r.fim);
+      return a === b ? a : a + ' – ' + b;
+    }
+
+    function render() {
+      const isOpen = container.querySelector('.calpicker-panel')?.classList.contains('open');
+      container.innerHTML = buildHTML(isOpen);
+      attachEvents();
+    }
+
+    function buildHTML(panelOpen) {
+      const today = new Date();
+      const year = state.calYear, month = state.calMonth;
+      const firstDay = new Date(year, month, 1).getDay(); // 0=dom
+      const daysInMonth = new Date(year, month+1, 0).getDate();
+      const daysInPrev = new Date(year, month, 0).getDate();
+      // Start week on Monday: shift Sunday to 6
+      const startOffset = (firstDay + 6) % 7;
+
+      let days = [];
+      // Prev month days
+      for(let i = startOffset-1; i >= 0; i--) {
+        const d = new Date(year, month-1, daysInPrev-i);
+        days.push({date:d, other:true});
+      }
+      // This month
+      for(let i = 1; i <= daysInMonth; i++) {
+        days.push({date: new Date(year, month, i), other:false});
+      }
+      // Next month fill to complete grid
+      let next = 1;
+      while(days.length % 7 !== 0) {
+        days.push({date: new Date(year, month+1, next++), other:true});
+      }
+
+      const rangeIni = state.customRange?.ini;
+      const rangeF = state.customRange?.fim;
+
+      const dayBtns = days.map(({date, other}) => {
+        const isToday = date.toDateString() === today.toDateString();
+        const ts = date.getTime();
+        let cls = 'calpicker-day';
+        if(other) cls += ' other-month';
+        if(isToday) cls += ' today';
+        if(state.per === 'custom') {
+          if(rangeIni && date.toDateString() === rangeIni.toDateString()) cls += ' range-start selected';
+          else if(rangeF && date.toDateString() === rangeF.toDateString()) cls += ' range-end selected';
+          else if(rangeIni && rangeF && ts > rangeIni.getTime() && ts < rangeF.getTime()) cls += ' in-range';
+        }
+        return `<button class="${cls}" data-ts="${ts}" data-date="${date.toISOString().split('T')[0]}">${date.getDate()}</button>`;
+      }).join('');
+
+      const scHTML = SHORTCUTS.map(s =>
+        `<div class="calpicker-sc${state.per===s.key?' active':''}" data-per="${s.key}">${s.label}</div>`
+      ).join('');
+
+      return `<div class="calpicker-wrap" id="cpw-${containerId}">
+        <div class="calpicker-trigger${panelOpen?' open':''}">
+          <div class="calpicker-trigger-left">
+            <div class="calpicker-trigger-icon">📅</div>
+            <div>
+              <div class="calpicker-trigger-text">${getLabel()}</div>
+              <div class="calpicker-trigger-sub">${getSub()}</div>
+            </div>
+          </div>
+          <div class="calpicker-chevron">▾</div>
+        </div>
+        <div class="calpicker-panel${panelOpen?' open':''}">
+          <div class="calpicker-shortcuts">${scHTML}</div>
+          <div class="calpicker-divider"></div>
+          <div class="calpicker-cal-header">
+            <button class="calpicker-nav" id="cp-prev">‹</button>
+            <div class="calpicker-month-label">${MESES[month]} ${year}</div>
+            <button class="calpicker-nav" id="cp-next">›</button>
+          </div>
+          <div class="calpicker-weekdays">${DIAS_SEMANA.map(d=>`<div class="calpicker-wd">${d}</div>`).join('')}</div>
+          <div class="calpicker-days">${dayBtns}</div>
+          ${state.rangeStep===1?`<div style="padding:4px 12px 8px;font-size:11px;color:#94a3b8;text-align:center;">Clique no dia de término</div>`:''}
+        </div>
+      </div>`;
+    }
+
+    function attachEvents() {
+      const trigger = container.querySelector('.calpicker-trigger');
+      const panel = container.querySelector('.calpicker-panel');
+
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        const wasOpen = panel.classList.contains('open');
+        // Close all other pickers
+        document.querySelectorAll('.calpicker-panel.open').forEach(p => p.classList.remove('open'));
+        document.querySelectorAll('.calpicker-trigger.open').forEach(t => t.classList.remove('open'));
+        if(!wasOpen) { panel.classList.add('open'); trigger.classList.add('open'); }
+      });
+
+      // Shortcuts
+      container.querySelectorAll('.calpicker-sc').forEach(sc => {
+        sc.addEventListener('click', e => {
+          e.stopPropagation();
+          state.per = sc.dataset.per;
+          state.customRange = null;
+          state.rangeStep = 0;
+          panel.classList.remove('open');
+          trigger.classList.remove('open');
+          render();
+          if(callback) callback(state.per, resolve(state.per, null));
+        });
+      });
+
+      // Navigation
+      const prev = container.querySelector('#cp-prev');
+      const next = container.querySelector('#cp-next');
+      if(prev) prev.addEventListener('click', e => { e.stopPropagation(); state.calMonth--; if(state.calMonth<0){state.calMonth=11;state.calYear--;} render(); container.querySelector('.calpicker-panel').classList.add('open'); container.querySelector('.calpicker-trigger').classList.add('open'); });
+      if(next) next.addEventListener('click', e => { e.stopPropagation(); state.calMonth++; if(state.calMonth>11){state.calMonth=0;state.calYear++;} render(); container.querySelector('.calpicker-panel').classList.add('open'); container.querySelector('.calpicker-trigger').classList.add('open'); });
+
+      // Day clicks
+      container.querySelectorAll('.calpicker-day').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const d = new Date(parseInt(btn.dataset.ts));
+          if(state.rangeStep === 0) {
+            // Start range selection
+            state.per = 'custom';
+            state.customRange = { ini: d, fim: d };
+            state.rangeStep = 1;
+            render();
+            container.querySelector('.calpicker-panel').classList.add('open');
+            container.querySelector('.calpicker-trigger').classList.add('open');
+          } else {
+            // End range
+            state.rangeStep = 0;
+            if(d < state.customRange.ini) {
+              state.customRange = { ini: d, fim: state.customRange.ini };
+            } else {
+              state.customRange.fim = d;
+            }
+            panel.classList.remove('open');
+            trigger.classList.remove('open');
+            render();
+            if(callback) callback('custom', resolve('custom', state.customRange));
+          }
+        });
+      });
+    }
+
+    // Close on outside click
+    document.addEventListener('click', () => {
+      const p = container.querySelector('.calpicker-panel');
+      const t = container.querySelector('.calpicker-trigger');
+      if(p) p.classList.remove('open');
+      if(t) t.classList.remove('open');
+    });
+
+    // Expose getValue
+    container._cpGetValue = () => ({ per: state.per, range: resolve(state.per, state.customRange) });
+    container._cpValue = defaultPer;
+
+    render();
+  }
+
+  return { init, resolve };
+})();
+
+// Helper para pegar valor de um CalPicker
+function _cpVal(id) {
+  const el = document.getElementById(id);
+  if(!el || !el._cpGetValue) return { per:'hoje', range: _CalPicker.resolve('hoje') };
+  return el._cpGetValue();
+}
 
 // ============ INIT ============
 window.onload=()=>{
@@ -2379,8 +2659,10 @@ async function carregarAdmEnt(){
 
 async function carregarFinAdm(){
   // Init period select if not done
-  if(!$('adm-fin-per')?._cselValue&&$('adm-fin-per')){_buildCustomSelect('adm-fin-per',[{value:'hoje',label:'📅 Hoje'},{value:'semana',label:'📅 Esta Semana'},{value:'semana_passada',label:'📅 Semana Passada'},{value:'mes',label:'📅 Este Mês'},{value:'mes_passado',label:'📅 Mês Passado'}],'semana',carregarFinAdm);}
-  const p=_cselVal('adm-fin-per')||'semana';
+  if(!$('adm-fin-per')?._cpGetValue&&$('adm-fin-per')){
+    _CalPicker.init('adm-fin-per','semana',()=>carregarFinAdm());
+  }
+  const _cpFin=_cpVal('adm-fin-per'), p=_cpFin.per;
   const lojaFiltro=_cselVal('adm-fin-loja');
   const el=$('adm-fin-dados');
   el.innerHTML='<p style="text-align:center;padding:20px;color:#888;">⏳ Carregando dados...</p>';
@@ -2964,7 +3246,7 @@ async function admVerLoja(perOverride){
       <div style="margin-top:6px;">${cardCancelados}</div>
     </details>`:''}
   `;
-  setTimeout(()=>{_buildCustomSelect('adm-loja-per',['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'].map(o=>({value:o,label:{'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'}[o]})),_admLojaPer,admLojaTrocaPer);},0);
+  setTimeout(()=>{ _CalPicker.init('adm-loja-per', _admLojaPer||'semana', (per,range)=>{ _admLojaPer=per; _admLojaRange=range; admVerLoja(); }); },0);
 }
 
 function admLojaTrocaPer(val){
@@ -3096,7 +3378,7 @@ async function admVerEnt(perOverride){
       </div>
     </details>
   `;
-  setTimeout(()=>{_buildCustomSelect('adm-ent-per',['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'].map(o=>({value:o,label:{'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'}[o]})),_admEntPer,admEntTrocaPer);},0);
+  setTimeout(()=>{ _CalPicker.init('adm-ent-per', _admEntPer||'semana', (per,range)=>{ _admEntPer=per; _admEntRange=range; admVerEnt(); }); },0);
 }
 
 function admEntTrocaPer(val){
@@ -4646,9 +4928,15 @@ async function marcarEnt(id){
 }
 async function cancelarEnt(id){if(!confirm('Cancelar esta entrega?'))return;await db.from('entregas').update({status:'cancelado',status_detalhado:'cancelado'}).eq('id',id);carregarPedidos();}
 
-async function abrirRelLj(){openM('rel');if(!$('rel-f')?._cselValue){_buildCustomSelect('rel-f',[{value:'hoje',label:'📅 Hoje'},{value:'semana',label:'📅 Esta Semana'},{value:'semana_passada',label:'📅 Semana Passada'},{value:'mes',label:'📅 Este Mês'},{value:'mes_passado',label:'📅 Mês Passado'}],'semana',carregarRel);}carregarRel();}
+async function abrirRelLj(){
+  openM('rel');
+  if(!$('rel-f')?._cpGetValue){
+    _CalPicker.init('rel-f','semana',(per,range)=>{ carregarRel(); });
+  }
+  carregarRel();
+}
 async function carregarRel(){
-  const p=_cselVal('rel-f'),el=$('rel-dados');
+  const _cpR=_cpVal('rel-f'), p=_cpR.per, _cpRange=_cpR.range, el=$('rel-dados');
   el.innerHTML='<p style="text-align:center;padding:20px;color:#888;">⏳ Carregando...</p>';
 
   function getRelPeriodo(per){
@@ -4669,7 +4957,7 @@ async function carregarRel(){
     // Ajusta UTC-3
     return{ini:new Date(ini.getTime()-3*60*60*1000).toISOString(),fim:new Date(fim.getTime()-3*60*60*1000).toISOString()};
   }
-  const{ini:dtIni,fim:dtFim}=getRelPeriodo(p);
+  const dtIni=_cpRange.ini, dtFim=_cpRange.fim;
 
   // Busca dados em paralelo para ser mais rápido
   const [resEnts, resCancelados] = await Promise.all([
@@ -5987,6 +6275,7 @@ function focarEntregadorMapa(entId){
 }
 let _gnhFiltro='hoje';
 let _gnhMesOffset=0; // 0 = mês atual, -1 = mês passado, -2 = 2 meses atrás, etc.
+let _gnhRange=null; // range do CalPicker quando per==='custom'
 
 // Verifica virada de mês e arquiva ganhos do mês anterior no banco
 async function verificarArquivoMensal(){
@@ -6021,17 +6310,18 @@ async function abrirGanhosEnt(){
   openM('ganhos');
   _gnhFiltro='hoje';
   _gnhMesOffset=0;
-  // Verificar e arquivar ganhos do mês passado se necessário
   verificarArquivoMensal().catch(e=>console.warn('[arquivo mensal]',e));
-  // Highlight botão ativo
-  ['hoje','ontem','semana','mes'].forEach(f=>{
-    const b=$('gnhf-'+f);if(b){b.style.background=f==='hoje'?'#00C9A7':'#888';b.style.opacity='1';}
-  });
-  // Oculta nav de mes ao abrir (filtro padrão é hoje)
-  const navEl=$('gnh-nav-mes');if(navEl)navEl.style.display='none';
-  await _carregarDadosGanhos(); // 1 única query para tudo
+  // Inicializa CalPicker se ainda não foi
+  setTimeout(()=>{
+    if(!document.getElementById('ganhos-calpicker')?._cpGetValue){
+      _CalPicker.init('ganhos-calpicker','hoje',(per,range)=>{
+        _gnhFiltro=per; _gnhRange=range;
+        _carregarDadosGanhos().then(()=>Promise.all([carregarResumoGanhos(), carregarGanhos()]));
+      });
+    }
+  },60);
+  await _carregarDadosGanhos();
   await Promise.all([carregarResumoGanhos(), carregarGanhos()]);
-  // Mostrar histórico mensal se houver
   mostrarHistoricoMensal();
 }
 
@@ -6235,7 +6525,13 @@ async function carregarResumoGanhos(){
 async function carregarGanhos(){
   const per=_gnhFiltro||'hoje';
   const el=$('gnh-dados');el.innerHTML='<p style="text-align:center;color:#999;font-size:12px;">Carregando...</p>';
-  const{inicio,fim}=periodoRange(per,per==='mes'?_gnhMesOffset:0);
+  let inicio, fim;
+  if(per==='custom'&&_gnhRange){
+    inicio=new Date(_gnhRange.ini); fim=new Date(_gnhRange.fim);
+  } else {
+    const r=periodoRange(per,per==='mes'?_gnhMesOffset:0);
+    inicio=new Date(r.inicio); fim=new Date(r.fim);
+  }
 
   // Usa cache se disponível — evita re-buscar dados do banco desnecessariamente
   await _carregarDadosGanhos();
