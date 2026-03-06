@@ -1027,42 +1027,80 @@ window.onload=()=>{
 };
 
 // ============================================================
-// AUTO-LOGOUT ÀS 03:00 — todos os entregadores online
+// AUTO-LOGOUT ÀS 03:00 E 16:59 — desvincular de todas as lojas
 // ============================================================
 function agendarAutoLogout(){
   const agora=new Date();
-  const prox=new Date(agora);
-  prox.setHours(3,0,0,0);
-  if(prox<=agora)prox.setDate(prox.getDate()+1); // se já passou das 03h, agenda pro dia seguinte
+
+  // Próximos horários de reset: 03:00 e 16:59
+  const candidatos=[
+    new Date(agora.getFullYear(),agora.getMonth(),agora.getDate(),3,0,0,0),
+    new Date(agora.getFullYear(),agora.getMonth(),agora.getDate(),16,59,0,0),
+  ].map(d=>{if(d<=agora)d.setDate(d.getDate()+1);return d;});
+  const prox=candidatos.reduce((a,b)=>a<b?a:b);
   const msAte=prox-agora;
 
   setTimeout(async()=>{
-    // Executa o logout de todos os entregadores online desta loja (roda em todo cliente logado)
     try{
       if(U&&U.tipo==='loja'){
-        // Lado loja: deslogar todos os entregadores vinculados que estão online
+        // Loja: deslogar e desvincular todos entregadores online
         const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id);
         const ids=(assoc||[]).map(a=>a.entregador_id);
         if(ids.length){
-          await db.from('usuarios').update({online:false}).in('id',ids).eq('online',true);
+          await db.from('usuarios').update({online:false,loja_ativa_id:null}).in('id',ids);
+          await db.from('loja_entregadores').delete().in('entregador_id',ids).eq('loja_id',U.id);
         }
-      } else if(U&&U.tipo==='entregador'&&U.online){
-        // Lado entregador: desloga a si mesmo
-        await db.from('usuarios').update({online:false}).eq('id',U.id);
-        U.online=false;salvarU(U);
-        // Atualiza UI
-        const btnOff=$('btn-offline');if(btnOff)btnOff.textContent='🔴 Ficar Offline';
-        const statusEl=$('ent-online-status');if(statusEl)statusEl.textContent='';
+      } else if(U&&U.tipo==='entregador'){
+        // Entregador: deslogar, desvincular de todas as lojas
+        await db.from('usuarios').update({online:false,loja_ativa_id:null}).eq('id',U.id);
+        await db.from('loja_entregadores').delete().eq('entregador_id',U.id);
+        U.online=false;U.loja_ativa_id=null;U._loja_ativa_nome=null;U._loja_ativa_codigo=null;salvarU(U);
+        atuBtnOn(false);
+        carregarLojaAtiva();
+        if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
+        if(ivs.rastPush){clearInterval(ivs.rastPush);ivs.rastPush=null;}
+        swPostMessage({type:'STOP_GPS'});
+        alert('⏰ Turno encerrado automaticamente. Reconecte-se à loja para o próximo turno.');
       }
-    }catch(e){console.warn('[AutoLogout 03h]',e);}
-    // Agenda para o próximo dia às 03:00
+    }catch(e){console.warn('[AutoLogout]',e);}
     agendarAutoLogout();
   }, msAte);
 
-  // Log para debug (removível)
   const minutos=Math.round(msAte/60000);
-  console.log(`[AutoLogout] Agendado em ${minutos} min (${prox.toLocaleTimeString('pt-BR')})`);
+  console.log(`[AutoLogout] Próximo reset em ${minutos} min (${prox.toLocaleTimeString('pt-BR')})`);
 }
+
+// ============================================================
+// VALIDAÇÃO DE HORÁRIO DA LOJA — entregador só pode ficar online
+// dentro do horário de funcionamento (com 10 min de antecedência)
+// ============================================================
+async function verificarHorarioLoja(lojaId){
+  // Busca horários da loja ativa
+  const{data:lj}=await db.from('usuarios').select('horario_abertura,horario_fechamento').eq('id',lojaId).single();
+  if(!lj||!lj.horario_abertura||!lj.horario_fechamento)return{permitido:true}; // sem horário = livre
+
+  const agora=new Date();
+  const [hAb,mAb]=lj.horario_abertura.split(':').map(Number);
+  const [hFch,mFch]=lj.horario_fechamento.split(':').map(Number);
+
+  // Início do turno com 10 min de antecedência
+  const abertura=hAb*60+mAb-10;
+  const fechamento=hFch*60+mFch;
+  const agoraMin=agora.getHours()*60+agora.getMinutes();
+
+  // Suporte a turnos que cruzam meia-noite (ex: 18:00 às 02:00)
+  let permitido;
+  if(abertura<=fechamento){
+    permitido=agoraMin>=abertura&&agoraMin<fechamento;
+  }else{
+    permitido=agoraMin>=abertura||agoraMin<fechamento;
+  }
+
+  const hAbStr=`${String(hAb).padStart(2,'0')}:${String(mAb).padStart(2,'0')}`;
+  const hFchStr=`${String(hFch).padStart(2,'0')}:${String(mFch).padStart(2,'0')}`;
+  return{permitido,abertura:hAbStr,fechamento:hFchStr};
+}
+
 
 
 // ── GPS EM BACKGROUND: Wake Lock + Visibility API ──
@@ -4659,6 +4697,14 @@ async function toggleOnline(){
       U.loja_ativa_id=assoc[0].loja_id;
       if(assoc[0].l){U._loja_ativa_nome=assoc[0].l.nome_loja||assoc[0].l.nome;}
       salvarU();
+    }
+    // Valida horário de funcionamento da loja ativa
+    if(U.loja_ativa_id){
+      const hr=await verificarHorarioLoja(U.loja_ativa_id);
+      if(!hr.permitido){
+        alert(`⛔ Fora do horário de funcionamento.\n\nA loja atende das ${hr.abertura} às ${hr.fechamento}.\n\nVocê poderá ficar online 10 minutos antes da abertura.`);
+        return;
+      }
     }
   }
   const novo=!U.online;
