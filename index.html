@@ -2352,7 +2352,7 @@ async function admVerLoja(perOverride){
       <div class="ecard ${e.status==='em_rota'?'rota':''}">
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <strong>${e.numero_pedido?'#'+e.numero_pedido:e.cliente_nome||'Entrega'}</strong>
-          <span class="badge b-${e.status_detalhado||e.status}" style="font-size:10px;">${e.status_detalhado||e.status}</span>
+          <span class="badge b-${e.status}" style="font-size:10px;">${e.status}</span>
         </div>
         <p style="font-size:12px;color:#555;margin:3px 0;">&#128205; ${e.endereco_entrega||'-'}</p>
         ${e.entregador?`<p style="font-size:11px;color:#004E89;margin:2px 0;">&#128757; ${e.entregador.nome}</p>`:''}
@@ -2569,8 +2569,14 @@ function admEntSetData(val){
 }
 
 async function admForcarStatus(id,status){
-  await db.from('entregas').update({status,status_detalhado:status,entregue_at:status==='entregue'?new Date().toISOString():null}).eq('id',id);
-  const sel=$('adm-sel-ent').value;if(sel)admVerEnt();
+  await db.from('entregas').update({
+    status,
+    status_detalhado:status,
+    entregue_at:status==='entregue'?new Date().toISOString():null
+  }).eq('id',id);
+  // Recarregar tanto loja quanto entregador
+  const selL=$('adm-sel-loja').value;if(selL)admVerLoja();
+  const selE=$('adm-sel-ent').value;if(selE)admVerEnt();
 }
 
 // ============ LOJA ============
