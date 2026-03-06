@@ -170,6 +170,25 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   .header-bg{height:220px;}
   #pg-admin, #pg-loja, #pg-entregador{max-width:520px;margin:0 auto;}
 }
+
+/* ── Custom Select Dropdown ── */
+.csel-wrap{position:relative;width:100%;user-select:none;}
+.csel-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;background:#fff;border:1.5px solid #e8ecf0;border-radius:13px;cursor:pointer;font-size:14px;font-weight:600;color:#222;transition:all .18s;box-shadow:0 2px 8px rgba(0,0,0,.05);}
+.csel-trigger:hover{border-color:#004E89;box-shadow:0 4px 14px rgba(0,78,137,.12);}
+.csel-trigger.open{border-color:#004E89;border-radius:13px 13px 0 0;box-shadow:0 4px 14px rgba(0,78,137,.12);}
+.csel-trigger .csel-arrow{font-size:11px;color:#aaa;transition:transform .18s;flex-shrink:0;}
+.csel-trigger.open .csel-arrow{transform:rotate(180deg);}
+.csel-trigger .csel-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.csel-trigger.placeholder .csel-label{color:#aaa;font-weight:500;}
+.csel-dropdown{position:absolute;left:0;right:0;top:100%;background:#fff;border:1.5px solid #004E89;border-top:none;border-radius:0 0 13px 13px;z-index:9999;max-height:280px;overflow-y:auto;box-shadow:0 12px 32px rgba(0,0,0,.14);}
+.csel-item{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;font-size:14px;font-weight:500;color:#222;cursor:pointer;transition:background .12s;border-bottom:1px solid #f5f5f5;}
+.csel-item:last-child{border-bottom:none;border-radius:0 0 11px 11px;}
+.csel-item:hover{background:#f0f6ff;}
+.csel-item.selected{background:#f0f6ff;color:#004E89;font-weight:700;}
+.csel-item .csel-radio{width:18px;height:18px;border-radius:50%;border:2px solid #ddd;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.csel-item.selected .csel-radio{border-color:#004E89;background:#004E89;}
+.csel-item.selected .csel-radio::after{content:'';width:7px;height:7px;border-radius:50%;background:#fff;}
+.csel-item.placeholder-opt{color:#aaa;font-style:italic;}
 </style>
 </head>
 <body>
@@ -322,17 +341,9 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <div id="adm-financeiro" class="hidden">
       <div class="secao">
         <div class="s-title">📊 Relatório Financeiro — Admin</div>
-        <div class="g2b" style="gap:8px;margin-bottom:8px;">
-          <select id="adm-fin-per" onchange="carregarFinAdm()" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;">
-            <option value="hoje">Hoje</option>
-            <option value="semana" selected>Esta semana (Seg-Dom)</option>
-            <option value="mes">Este mês</option>
-            <option value="semana_passada">Semana passada</option>
-            <option value="mes_passado">Mês passado</option>
-          </select>
-          <select id="adm-fin-loja" onchange="carregarFinAdm()" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;">
-            <option value="">Todas as lojas</option>
-          </select>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+          <div id="adm-fin-per"></div>
+          <div id="adm-fin-loja"></div>
         </div>
         <button onclick="carregarFinAdm()" class="btn btn-blue" style="margin-bottom:4px;">🔄 Atualizar</button>
       </div>
@@ -342,16 +353,12 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <div id="adm-impersonar" class="hidden">
       <div class="secao">
         <div class="s-title">Ver como Loja</div>
-        <select id="adm-sel-loja" onchange="admVerLoja()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:8px;">
-          <option value="">Selecione uma loja...</option>
-        </select>
+        <div id="adm-sel-loja" style="margin-bottom:10px;"></div>
         <div id="adm-loja-view"></div>
       </div>
       <div class="secao">
         <div class="s-title">Ver como Entregador</div>
-        <select id="adm-sel-ent" onchange="admVerEnt()" style="width:100%;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;margin-bottom:8px;">
-          <option value="">Selecione um entregador...</option>
-        </select>
+        <div id="adm-sel-ent" style="margin-bottom:10px;"></div>
         <div id="adm-ent-view"></div>
       </div>
     </div>
@@ -672,13 +679,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div style="font-size:11px;color:#888;margin-top:1px;">Visão completa por período</div>
     </div>
   </div>
-  <select id="rel-f" onchange="carregarRel()" style="width:100%;padding:10px 12px;border:2px solid #e8ecf0;border-radius:10px;margin-bottom:14px;font-size:13px;font-weight:600;color:#333;background:white;appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M6 8L0 0h12z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 12px center;">
-    <option value="hoje">Hoje</option>
-    <option value="semana" selected>Esta semana (Seg–Dom)</option>
-    <option value="semana_passada">Semana passada</option>
-    <option value="mes">Este mês</option>
-    <option value="mes_passado">Mês passado</option>
-  </select>
+  <div id="rel-f" style="margin-bottom:14px;" data-csel-init='{"items":[{"value":"hoje","label":"📅 Hoje"},{"value":"semana","label":"📅 Esta Semana"},{"value":"semana_passada","label":"📅 Semana Passada"},{"value":"mes","label":"📅 Este Mês"},{"value":"mes_passado","label":"📅 Mês Passado"}],"default":"semana","cb":"carregarRel"}'></div>
   <div id="rel-dados"></div>
 </div></div>
 
@@ -2055,8 +2056,10 @@ async function carregarAdmEnt(){
 }
 
 async function carregarFinAdm(){
-  const p=$('adm-fin-per').value;
-  const lojaFiltro=$('adm-fin-loja')?.value||'';
+  // Init period select if not done
+  if(!$('adm-fin-per')?._cselValue&&$('adm-fin-per')){_buildCustomSelect('adm-fin-per',[{value:'hoje',label:'📅 Hoje'},{value:'semana',label:'📅 Esta Semana'},{value:'semana_passada',label:'📅 Semana Passada'},{value:'mes',label:'📅 Este Mês'},{value:'mes_passado',label:'📅 Mês Passado'}],'semana',carregarFinAdm);}
+  const p=_cselVal('adm-fin-per')||'semana';
+  const lojaFiltro=_cselVal('adm-fin-loja');
   const el=$('adm-fin-dados');
   el.innerHTML='<p style="text-align:center;padding:20px;color:#888;">⏳ Carregando dados...</p>';
 
@@ -2086,10 +2089,8 @@ async function carregarFinAdm(){
   const{data:lojas}=await db.from('usuarios').select('id,nome_loja,nome').eq('tipo','loja');
 
   // Popula filtro de lojas (uma vez)
-  const selLoja=$('adm-fin-loja');
-  if(selLoja&&selLoja.options.length<=1&&lojas){
-    lojas.forEach(l=>{if(!selLoja.querySelector(`option[value="${l.id}"]`)){const o=document.createElement('option');o.value=l.id;o.textContent=l.nome_loja||l.nome;selLoja.appendChild(o);}});
-  }
+  // Build loja filter select (always rebuild to avoid duplicates)
+  if(lojas){_buildCustomSelect('adm-fin-loja',[{value:'',label:'🏪 Todas as lojas'}].concat(lojas.map(l=>({value:l.id,label:l.nome_loja||l.nome}))),'',carregarFinAdm);}
 
   if(!entregas||!entregas.length){el.innerHTML='<p style="color:#999;text-align:center;padding:30px;">Sem entregas no período selecionado.</p>';return;}
 
@@ -2379,12 +2380,89 @@ async function saveTaxAdm(id){
   setTimeout(()=>{m.textContent='';},4000);
 }
 
+
+// ── Custom Select System ──
+// _buildCustomSelect(containerId, items, selectedValue, onChange)
+// items = [{value, label}]
+function _buildCustomSelect(containerId, items, selectedValue, onChange){
+  const wrap = $(containerId);
+  if(!wrap) return;
+  // Store real value
+  wrap._cselValue = selectedValue || '';
+  wrap._cselItems = items;
+  wrap._cselOnChange = onChange;
+
+  const selLabel = items.find(i=>i.value===selectedValue)?.label || items[0]?.label || '';
+  const isPlaceholder = !selectedValue;
+
+  wrap.innerHTML = `
+    <div class="csel-trigger ${isPlaceholder?'placeholder':''}" onclick="_cselToggle('${containerId}')">
+      <span class="csel-label">${selLabel}</span>
+      <span class="csel-arrow">▼</span>
+    </div>
+    <div class="csel-dropdown" style="display:none;" id="${containerId}-dd">
+      ${items.map(it=>`
+        <div class="csel-item ${it.value===selectedValue?'selected':''} ${!it.value?'placeholder-opt':''}"
+             onclick="_cselSelect('${containerId}','${it.value}')">
+          <span>${it.label}</span>
+          <div class="csel-radio"></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function _cselToggle(id){
+  const dd = $(id+'-dd');
+  const trigger = $(id).querySelector('.csel-trigger');
+  if(!dd||!trigger) return;
+  const isOpen = dd.style.display !== 'none';
+  // Close all other dropdowns
+  document.querySelectorAll('.csel-dropdown').forEach(d=>{d.style.display='none';});
+  document.querySelectorAll('.csel-trigger').forEach(t=>t.classList.remove('open'));
+  if(!isOpen){
+    dd.style.display='block';
+    trigger.classList.add('open');
+    // Close when clicking outside
+    setTimeout(()=>{
+      const closer=e=>{if(!$(id).contains(e.target)){dd.style.display='none';trigger.classList.remove('open');document.removeEventListener('click',closer);}};
+      document.addEventListener('click',closer);
+    },10);
+  }
+}
+
+function _cselSelect(id, value){
+  const wrap = $(id);
+  if(!wrap) return;
+  wrap._cselValue = value;
+  const items = wrap._cselItems || [];
+  const item = items.find(i=>i.value===value);
+  const label = item?.label || '';
+  const isPlaceholder = !value;
+  const trigger = wrap.querySelector('.csel-trigger');
+  if(trigger){
+    trigger.querySelector('.csel-label').textContent = label;
+    trigger.classList.toggle('placeholder', isPlaceholder);
+  }
+  // Update selected state
+  wrap.querySelectorAll('.csel-item').forEach(el=>{
+    el.classList.toggle('selected', el.getAttribute('onclick').includes("'"+value+"'") && value!=='');
+  });
+  // Close dropdown
+  const dd = $(id+'-dd');
+  if(dd) dd.style.display='none';
+  trigger?.classList.remove('open');
+  // Call onChange
+  if(wrap._cselOnChange) wrap._cselOnChange(value);
+}
+
+// Shim: make _cselGetValue work like .value
+function _cselVal(id){ return ($(id)||{})._cselValue||''; }
+
 async function carregarAdmImpersonar(){
   const{data:lojas}=await db.from('usuarios').select('id,nome_loja,nome').eq('tipo','loja');
   const{data:ents}=await db.from('usuarios').select('id,nome').eq('tipo','entregador');
-  const selL=$('adm-sel-loja'),selE=$('adm-sel-ent');
-  if(lojas)lojas.forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.nome_loja||l.nome;selL.appendChild(o);});
-  if(ents)ents.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nome;selE.appendChild(o);});
+  // RESET antes de popular — evita duplicatas ao recarregar
+  _buildCustomSelect('adm-sel-loja', [{value:'',label:'Selecione uma loja...'}].concat((lojas||[]).map(l=>({value:l.id,label:l.nome_loja||l.nome}))), '', admVerLoja);
+  _buildCustomSelect('adm-sel-ent', [{value:'',label:'Selecione um entregador...'}].concat((ents||[]).map(e=>({value:e.id,label:e.nome}))), '', admVerEnt);
 }
 
 // Estado do painel admin loja
@@ -2400,7 +2478,7 @@ function _admLojaRangeCustom(dataStr){
 }
 
 async function admVerLoja(perOverride){
-  const id=$('adm-sel-loja').value;if(!id)return;
+  const id=_cselVal('adm-sel-loja');if(!id)return;
   // Atualiza estado global do período
   if(perOverride!==undefined)_admLojaPer=perOverride;
   const per=_admLojaPer||'hoje';
@@ -2437,9 +2515,7 @@ async function admVerLoja(perOverride){
   // HTML do seletor de período
   const selOpts=['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'];
   const selLabels={'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'};
-  const selHTML=`<select id="adm-loja-per" onchange="admLojaTrocaPer(this.value)" style="width:100%;padding:8px;border:1.5px solid #004E89;border-radius:8px;font-size:13px;font-weight:600;margin-top:3px;color:#004E89;">
-    ${selOpts.map(o=>`<option value="${o}" ${per===o?'selected':''}>${selLabels[o]}</option>`).join('')}
-  </select>
+  const selHTML=`<div id="adm-loja-per" style="margin-bottom:8px;"></div>
   <div id="adm-loja-datepicker" style="display:${per==='data_custom'?'block':'none'};margin-top:6px;">
     <input type="date" id="adm-loja-data" value="${_admLojaDataCustom}" onchange="admLojaSetData(this.value)"
       style="width:100%;padding:8px;border:1.5px solid #FF6B35;border-radius:8px;font-size:13px;">
@@ -2536,6 +2612,7 @@ async function admVerLoja(perOverride){
       <div style="margin-top:6px;">${cardCancelados}</div>
     </details>`:''}
   `;
+  setTimeout(()=>{_buildCustomSelect('adm-loja-per',['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'].map(o=>({value:o,label:{'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'}[o]})),_admLojaPer,admLojaTrocaPer);},0);
 }
 
 function admLojaTrocaPer(val){
@@ -2553,7 +2630,7 @@ var _admEntPer='hoje';
 var _admEntDataCustom='';
 
 async function admVerEnt(perOverride){
-  const id=$('adm-sel-ent').value;if(!id)return;
+  const id=_cselVal('adm-sel-ent');if(!id)return;
   if(perOverride!==undefined)_admEntPer=perOverride;
   const per=_admEntPer||'hoje';
   const el=$('adm-ent-view');el.innerHTML='<p style="color:#999;text-align:center;padding:20px;">⏳ Carregando...</p>';
@@ -2584,9 +2661,7 @@ async function admVerEnt(perOverride){
 
   const selOpts=['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'];
   const selLabels={'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'};
-  const selHTML=`<select id="adm-ent-per" onchange="admEntTrocaPer(this.value)" style="width:100%;padding:8px;border:1.5px solid #004E89;border-radius:8px;font-size:13px;font-weight:600;margin-top:3px;color:#004E89;">
-    ${selOpts.map(o=>`<option value="${o}" ${per===o?'selected':''}>${selLabels[o]}</option>`).join('')}
-  </select>
+  const selHTML=`<div id="adm-ent-per" style="margin-bottom:8px;"></div>
   <div id="adm-ent-datepicker" style="display:${per==='data_custom'?'block':'none'};margin-top:6px;">
     <input type="date" id="adm-ent-data" value="${_admEntDataCustom}" onchange="admEntSetData(this.value)"
       style="width:100%;padding:8px;border:1.5px solid #FF6B35;border-radius:8px;font-size:13px;">
@@ -2669,6 +2744,7 @@ async function admVerEnt(perOverride){
       </div>
     </details>
   `;
+  setTimeout(()=>{_buildCustomSelect('adm-ent-per',['hoje','ontem','semana','semana_passada','mes','mes_passado','data_custom'].map(o=>({value:o,label:{'hoje':'📅 Hoje','ontem':'📅 Ontem','semana':'📅 Esta Semana','semana_passada':'📅 Semana Passada','mes':'📅 Este Mês','mes_passado':'📅 Mês Passado','data_custom':'🗓️ Data específica...'}[o]})),_admEntPer,admEntTrocaPer);},0);
 }
 
 function admEntTrocaPer(val){
@@ -2689,8 +2765,8 @@ async function admForcarStatus(id,status){
     entregue_at:status==='entregue'?new Date().toISOString():null
   }).eq('id',id);
   // Recarregar tanto loja quanto entregador
-  const selL=$('adm-sel-loja').value;if(selL)admVerLoja();
-  const selE=$('adm-sel-ent').value;if(selE)admVerEnt();
+  const selL=_cselVal('adm-sel-loja');if(selL)admVerLoja();
+  const selE=_cselVal('adm-sel-ent');if(selE)admVerEnt();
 }
 
 // ============ LOJA ============
@@ -3852,9 +3928,9 @@ async function marcarEnt(id){
 }
 async function cancelarEnt(id){if(!confirm('Cancelar esta entrega?'))return;await db.from('entregas').update({status:'cancelado',status_detalhado:'cancelado'}).eq('id',id);carregarPedidos();}
 
-async function abrirRelLj(){openM('rel');carregarRel();}
+async function abrirRelLj(){openM('rel');if(!$('rel-f')?._cselValue){_buildCustomSelect('rel-f',[{value:'hoje',label:'📅 Hoje'},{value:'semana',label:'📅 Esta Semana'},{value:'semana_passada',label:'📅 Semana Passada'},{value:'mes',label:'📅 Este Mês'},{value:'mes_passado',label:'📅 Mês Passado'}],'semana',carregarRel);}carregarRel();}
 async function carregarRel(){
-  const p=$('rel-f').value,el=$('rel-dados');
+  const p=_cselVal('rel-f'),el=$('rel-dados');
   el.innerHTML='<p style="text-align:center;padding:20px;color:#888;">⏳ Carregando...</p>';
   // Calcula período com início e fim corretos usando BR timezone
   function getRelPeriodo(per){
@@ -5970,7 +6046,7 @@ async function carregarValesParaEnt(entId){
   const el=document.getElementById('vales-lst-'+entId);
   if(!el)return;
   try{
-    const{ini:dtIni,fim:dtFim}=getRelPeriodoHelper($('rel-f').value||'semana');
+    const{ini:dtIni,fim:dtFim}=getRelPeriodoHelper(_cselVal('rel-f')||'semana');
     const{data:vales}=await db.from('vales_entregadores')
       .select('valor,observacao,created_at')
       .eq('entregador_id',entId)
@@ -6024,8 +6100,8 @@ async function abrirPagamento(entId, entNome) {
   el.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">⏳ Carregando extrato...</p>';
 
   // Período do filtro atual (para exibir o label e pagamentos do período)
-  const {ini: dtIni, fim: dtFim} = getRelPeriodoHelper($('rel-f')?.value || 'semana');
-  const periodoLabel = $('rel-f') ? {hoje:'Hoje',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'}[$('rel-f').value] || 'Período' : 'Período';
+  const {ini: dtIni, fim: dtFim} = getRelPeriodoHelper(_cselVal('rel-f') || 'semana');
+  const periodoLabel = $('rel-f') ? {hoje:'Hoje',semana:'Esta Semana',semana_passada:'Semana Passada',mes:'Este Mês',mes_passado:'Mês Passado'}[_cselVal('rel-f')] || 'Período' : 'Período';
 
   // Busca TODAS as corridas não pagas — sem filtro de data — para não deixar pendências antigas escaparem
   const listaCorridas = await safeQuery(()=>db.from('entregas')
