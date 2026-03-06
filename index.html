@@ -412,70 +412,186 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div class="card"><h3>Online</h3><div class="val" id="lj-online-cnt">0</div></div>
     </div>
     <!-- Taxa config — painel colapsável -->
-    <div class="secao" style="padding:0;overflow:hidden;">
-      <button onclick="toggleTaxaCfgPanel()" id="taxa-cfg-toggle-btn" style="width:100%;background:none;border:none;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;text-align:left;">
-        <span style="font-size:14px;font-weight:700;color:#555;">⚙️ Configurações de Taxa e Pagamento</span>
-        <span id="taxa-cfg-arrow" style="font-size:18px;color:#999;transition:transform .3s;">▾</span>
-      </button>
-      <div id="taxa-cfg-panel" style="display:none;padding:0 16px 16px;">
-      <div class="s-title" style="margin-top:4px;">&#128176; Configuracao de Taxa ao Entregador</div>
-      <div class="fg">
-        <label>Tipo de taxa</label>
-        <select id="lj-taxa-tipo" onchange="toggleTaxaTipo()">
-          <option value="fixo">Valor fixo (mesmo valor para qualquer distancia)</option>
-          <option value="por_km">Por distancia (ate X km fixo, acima diferente)</option>
-          <option value="fixo_mais_km">Fixo base + valor por entrega (ate X km) + acima diferente</option>
-        </select>
-      </div>
-      <div id="taxa-fixo-area">
-        <div class="fg"><label>Valor fixo por entrega (R$)</label>
-          <div class="row"><input type="number" id="lj-taxa-new" step="0.50" min="0" placeholder="0.00" style="flex:1;padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;">
-          <button class="btn-sm blue" onclick="salvarTaxaLj()">Salvar</button></div>
-        </div>
-      </div>
-      <div id="taxa-km-area" class="hidden">
-        <div class="g3">
-          <div class="fg"><label>Valor ate X km</label><input type="number" id="lj-taxa-base" step="0.50" min="0" placeholder="8.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
-          <div class="fg"><label>Limite (km)</label><input type="number" id="lj-km-limite" step="0.5" min="1" placeholder="5" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
-          <div class="fg"><label>Acima do limite</label><input type="number" id="lj-taxa-km-exc" step="0.50" min="0" placeholder="12.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
-        </div>
-        <button class="btn btn-blue" onclick="salvarTaxaLj()" style="margin-top:4px;">Salvar Configuracao de Taxa</button>
-      </div>
-      <!-- Novo tipo: fixo base + por km -->
-      <div id="taxa-fixo-km-area" class="hidden">
-        <p style="font-size:11px;color:#888;margin-bottom:8px;">Ex: R$30 combustível por turno + R$8 por entrega ate 7km, acima R$10</p>
-        <div class="g2b">
-          <div class="fg">
-            <label>⛽ Combustível por Turno (R$)</label>
-            <input type="number" id="lj-taxa-fixo-base" step="0.50" min="0" placeholder="0.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;">
-            <p style="font-size:10px;color:#888;margin-top:3px;">Pago por turno trabalhado (almoço e/ou jantar)</p>
-          </div>
-          <div class="fg"><label>Por entrega ate X km</label><input type="number" id="lj-taxa-por-ent" step="0.50" min="0" placeholder="8.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
-        </div>
-        <div class="g2b">
-          <div class="fg"><label>Limite (km)</label><input type="number" id="lj-km-limite2" step="0.5" min="1" placeholder="7" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
-          <div class="fg"><label>Acima do limite</label><input type="number" id="lj-taxa-km-exc2" step="0.50" min="0" placeholder="10.00" style="padding:9px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;"></div>
-        </div>
-        <button class="btn btn-blue" onclick="salvarTaxaLj()" style="margin-top:4px;">Salvar Configuracao de Taxa</button>
-      </div>
-      <div id="taxa-msg" style="font-size:12px;margin-top:5px;"></div>
+    <!-- CARD CONFIGURAÇÕES DE TAXA — redesenhado -->
+    <style>
+      .taxa-cfg-wrap{background:#fff;border-radius:18px;border:1.5px solid #e8edf2;overflow:hidden;box-shadow:0 2px 16px rgba(0,46,89,.06);}
+      .taxa-cfg-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;background:#fff;transition:background .2s;}
+      .taxa-cfg-header:active{background:#f5f8fc;}
+      .taxa-cfg-header-left{display:flex;align-items:center;gap:10px;}
+      .taxa-cfg-icon{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#004E89,#0077cc);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+      .taxa-cfg-title{font-size:13px;font-weight:800;color:#1a2a3a;letter-spacing:.2px;}
+      .taxa-cfg-sub{font-size:10px;color:#94a3b8;margin-top:1px;font-weight:500;}
+      .taxa-cfg-chevron{width:28px;height:28px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;transition:transform .3s,background .2s;font-size:11px;color:#64748b;}
+      .taxa-cfg-chevron.open{transform:rotate(180deg);background:#e0eaf5;color:#004E89;}
+      .taxa-cfg-body{display:none;padding:0 14px 16px;}
+      .taxa-cfg-body.open{display:block;}
+      .taxa-type-cards{display:grid;grid-template-columns:1fr;gap:7px;margin-bottom:14px;}
+      .taxa-type-card{border:2px solid #e8edf2;border-radius:12px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:11px;transition:all .18s;background:#fafbfc;}
+      .taxa-type-card:hover{border-color:#90b8d8;background:#f0f7ff;}
+      .taxa-type-card.selected{border-color:#004E89;background:#f0f7ff;box-shadow:0 0 0 3px rgba(0,78,137,.08);}
+      .taxa-type-card-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:#f1f5f9;transition:background .18s;}
+      .taxa-type-card.selected .taxa-type-card-icon{background:linear-gradient(135deg,#004E89,#0077cc);}
+      .taxa-type-card-text{flex:1;}
+      .taxa-type-card-label{font-size:12px;font-weight:800;color:#1a2a3a;}
+      .taxa-type-card-desc{font-size:10px;color:#94a3b8;margin-top:1px;}
+      .taxa-type-card-radio{width:16px;height:16px;border-radius:50%;border:2px solid #cbd5e1;transition:all .18s;flex-shrink:0;}
+      .taxa-type-card.selected .taxa-type-card-radio{border-color:#004E89;background:#004E89;box-shadow:inset 0 0 0 3px #fff;}
+      .taxa-fields-wrap{background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:12px;border:1px solid #e8edf2;}
+      .taxa-field-row{display:grid;gap:8px;margin-bottom:0;}
+      .taxa-field-row.cols2{grid-template-columns:1fr 1fr;}
+      .taxa-field-row.cols3{grid-template-columns:1fr 1fr 1fr;}
+      .taxa-field-group{display:flex;flex-direction:column;gap:3px;}
+      .taxa-field-label{font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.6px;}
+      .taxa-field-input{padding:9px 11px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:600;color:#1a2a3a;background:#fff;width:100%;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;outline:none;}
+      .taxa-field-input:focus{border-color:#004E89;box-shadow:0 0 0 3px rgba(0,78,137,.1);}
+      .taxa-field-hint{font-size:9px;color:#94a3b8;margin-top:2px;}
+      .taxa-save-btn{width:100%;padding:11px;border:none;border-radius:11px;background:linear-gradient(135deg,#004E89,#0077cc);color:#fff;font-size:13px;font-weight:800;cursor:pointer;letter-spacing:.3px;box-shadow:0 4px 14px rgba(0,78,137,.25);transition:transform .15s,box-shadow .15s;margin-top:10px;}
+      .taxa-save-btn:active{transform:scale(.98);box-shadow:0 2px 8px rgba(0,78,137,.2);}
+      .taxa-divider{height:1px;background:linear-gradient(90deg,transparent,#e2e8f0,transparent);margin:14px 0;}
+      .incentivo-card{border-radius:12px;padding:13px;border:1.5px solid #e8edf2;background:#fafbfc;}
+      .incentivo-header{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+      .incentivo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#1565C0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:15px;}
+      .incentivo-title{font-size:12px;font-weight:800;color:#1a2a3a;}
+      .incentivo-subtitle{font-size:10px;color:#94a3b8;}
+      .incentivo-row{display:flex;align-items:flex-end;gap:8px;}
+      .incentivo-input-wrap{flex:1;}
+      .incentivo-btn-ativ{flex-shrink:0;padding:10px 14px;border:none;border-radius:10px;font-size:11px;font-weight:800;cursor:pointer;transition:all .18s;letter-spacing:.2px;}
+      .incentivo-btn-off{background:#f1f5f9;color:#475569;}
+      .incentivo-btn-on{background:linear-gradient(135deg,#e65100,#ff7043);color:#fff;box-shadow:0 3px 10px rgba(230,81,0,.3);}
+      .incentivo-status{margin-top:8px;border-radius:9px;padding:8px 12px;font-size:11px;font-weight:700;text-align:center;display:none;}
+      .incentivo-status.active{display:block;background:linear-gradient(135deg,#e3f2fd,#bbdefb);color:#0d47a1;border:1px solid #90caf9;}
+      #taxa-msg{font-size:11px;margin-top:6px;text-align:center;}
+    </style>
 
-      <!-- Incentivos (Chuva/Domingo/Feriado) — dentro das configurações -->
-      <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e0e0e0;">
-        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:8px;">🌧️ Incentivo (Chuva · Domingo · Feriado)</div>
-        <p style="font-size:11px;color:#888;margin-bottom:8px;line-height:1.4;">Valor extra por entrega ativado manualmente quando chover, for domingo ou feriado.</p>
-        <div class="g2b" style="margin-bottom:8px;">
-          <div class="fg"><label style="font-size:11px;">Valor extra (R$)</label>
-            <input type="number" id="lj-chuva-valor" step="0.50" min="0" placeholder="Ex: 3.00" style="padding:8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;width:100%;">
-          </div>
-          <div style="display:flex;flex-direction:column;justify-content:flex-end;">
-            <button id="lj-chuva-btn" class="btn btn-blue" onclick="togglePromocaoChuva()" style="padding:9px;font-size:12px;">🌧️ Ativar Incentivo</button>
+    <div class="taxa-cfg-wrap">
+      <div class="taxa-cfg-header" onclick="toggleTaxaCfgPanel()">
+        <div class="taxa-cfg-header-left">
+          <div class="taxa-cfg-icon">⚙️</div>
+          <div>
+            <div class="taxa-cfg-title">Configurações de Taxa</div>
+            <div class="taxa-cfg-sub">Pagamento e incentivos ao entregador</div>
           </div>
         </div>
-        <div id="lj-chuva-status" class="hidden" style="background:#e3f2fd;border-radius:8px;padding:9px;font-size:11px;color:#004E89;font-weight:700;text-align:center;"></div>
-        <div id="lj-chuva-msg" style="font-size:11px;margin-top:4px;"></div>
+        <div class="taxa-cfg-chevron" id="taxa-cfg-arrow">▾</div>
       </div>
-      </div><!-- /taxa-cfg-panel -->
+
+      <div class="taxa-cfg-body" id="taxa-cfg-panel">
+        <!-- select oculto mantido para compatibilidade com JS existente -->
+        <select id="lj-taxa-tipo" onchange="toggleTaxaTipo()" style="display:none;">
+          <option value="fixo">fixo</option>
+          <option value="por_km">por_km</option>
+          <option value="fixo_mais_km">fixo_mais_km</option>
+        </select>
+
+        <!-- Cards de tipo de taxa -->
+        <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Modelo de cobrança</div>
+        <div class="taxa-type-cards">
+          <div class="taxa-type-card selected" id="taxa-card-fixo" onclick="selecionarTipoTaxa('fixo')">
+            <div class="taxa-type-card-icon">💵</div>
+            <div class="taxa-type-card-text">
+              <div class="taxa-type-card-label">Valor Fixo</div>
+              <div class="taxa-type-card-desc">Mesmo valor para qualquer distância</div>
+            </div>
+            <div class="taxa-type-card-radio"></div>
+          </div>
+          <div class="taxa-type-card" id="taxa-card-por_km" onclick="selecionarTipoTaxa('por_km')">
+            <div class="taxa-type-card-icon">📍</div>
+            <div class="taxa-type-card-text">
+              <div class="taxa-type-card-label">Por Distância</div>
+              <div class="taxa-type-card-desc">Até X km fixo, acima valor diferente</div>
+            </div>
+            <div class="taxa-type-card-radio"></div>
+          </div>
+          <div class="taxa-type-card" id="taxa-card-fixo_mais_km" onclick="selecionarTipoTaxa('fixo_mais_km')">
+            <div class="taxa-type-card-icon">⛽</div>
+            <div class="taxa-type-card-text">
+              <div class="taxa-type-card-label">Combustível + Por Entrega</div>
+              <div class="taxa-type-card-desc">Fixo por turno + valor por corrida</div>
+            </div>
+            <div class="taxa-type-card-radio"></div>
+          </div>
+        </div>
+
+        <!-- Campos: Fixo -->
+        <div id="taxa-fixo-area" class="taxa-fields-wrap">
+          <div class="taxa-field-row">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Valor por entrega (R$)</div>
+              <input type="number" id="lj-taxa-new" class="taxa-field-input" step="0.50" min="0" placeholder="0,00">
+            </div>
+          </div>
+          <button class="taxa-save-btn" onclick="salvarTaxaLj()">✓ Salvar configuração</button>
+        </div>
+
+        <!-- Campos: Por km -->
+        <div id="taxa-km-area" class="taxa-fields-wrap hidden">
+          <div class="taxa-field-row cols3">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Valor até X km</div>
+              <input type="number" id="lj-taxa-base" class="taxa-field-input" step="0.50" min="0" placeholder="8,00">
+            </div>
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Limite (km)</div>
+              <input type="number" id="lj-km-limite" class="taxa-field-input" step="0.5" min="1" placeholder="5">
+            </div>
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Acima do limite</div>
+              <input type="number" id="lj-taxa-km-exc" class="taxa-field-input" step="0.50" min="0" placeholder="12,00">
+            </div>
+          </div>
+          <button class="taxa-save-btn" onclick="salvarTaxaLj()">✓ Salvar configuração</button>
+        </div>
+
+        <!-- Campos: Fixo base + km -->
+        <div id="taxa-fixo-km-area" class="taxa-fields-wrap hidden">
+          <div class="taxa-field-row cols2" style="margin-bottom:8px;">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">⛽ Combustível / turno (R$)</div>
+              <input type="number" id="lj-taxa-fixo-base" class="taxa-field-input" step="0.50" min="0" placeholder="30,00">
+              <div class="taxa-field-hint">Pago por turno (almoço e/ou jantar)</div>
+            </div>
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Valor até X km</div>
+              <input type="number" id="lj-taxa-por-ent" class="taxa-field-input" step="0.50" min="0" placeholder="8,00">
+            </div>
+          </div>
+          <div class="taxa-field-row cols2">
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Limite (km)</div>
+              <input type="number" id="lj-km-limite2" class="taxa-field-input" step="0.5" min="1" placeholder="7">
+            </div>
+            <div class="taxa-field-group">
+              <div class="taxa-field-label">Acima do limite</div>
+              <input type="number" id="lj-taxa-km-exc2" class="taxa-field-input" step="0.50" min="0" placeholder="12,00">
+            </div>
+          </div>
+          <button class="taxa-save-btn" onclick="salvarTaxaLj()">✓ Salvar configuração</button>
+        </div>
+
+        <div id="taxa-msg"></div>
+
+        <div class="taxa-divider"></div>
+
+        <!-- Incentivo Chuva -->
+        <div class="incentivo-card">
+          <div class="incentivo-header">
+            <div class="incentivo-icon">🌧️</div>
+            <div>
+              <div class="incentivo-title">Incentivo por Condição</div>
+              <div class="incentivo-subtitle">Chuva · Domingo · Feriado</div>
+            </div>
+          </div>
+          <div class="incentivo-row">
+            <div class="incentivo-input-wrap">
+              <div class="taxa-field-label" style="margin-bottom:4px;">Valor extra por entrega (R$)</div>
+              <input type="number" id="lj-chuva-valor" class="taxa-field-input" step="0.50" min="0" placeholder="Ex: 5,00">
+            </div>
+            <button id="lj-chuva-btn" class="incentivo-btn-ativ incentivo-btn-off" onclick="togglePromocaoChuva()">🌧️ Ativar</button>
+          </div>
+          <div id="lj-chuva-status" class="incentivo-status"></div>
+          <div id="lj-chuva-msg" style="font-size:10px;margin-top:4px;color:#94a3b8;"></div>
+        </div>
+      </div>
     </div>
     <!-- Promoção Chuva standalone — removida, agora dentro das configurações -->
 
@@ -1514,14 +1630,14 @@ function toggleCad(){
 function toggleTaxaCfgPanel(){
   const panel=$('taxa-cfg-panel');
   const arrow=$('taxa-cfg-arrow');
-  const btn=$('taxa-cfg-toggle-btn');
-  if(panel.style.display==='none'){
-    panel.style.display='block';
-    arrow.style.transform='rotate(180deg)';
-    btn.style.borderBottom='1px solid #e0e0e0';
+  if(!panel)return;
+  const open=panel.classList.contains('open');
+  if(!open){
+    panel.classList.add('open');
+    if(arrow)arrow.classList.add('open');
   }else{
-    panel.style.display='none';
-    arrow.style.transform='';
+    panel.classList.remove('open');
+    if(arrow)arrow.classList.remove('open');
     btn.style.borderBottom='none';
   }
 }
@@ -1530,6 +1646,15 @@ function toggleTaxaTipo(){
   $('taxa-fixo-area').classList.toggle('hidden',t!=='fixo');
   $('taxa-km-area').classList.toggle('hidden',t!=='por_km');
   $('taxa-fixo-km-area').classList.toggle('hidden',t!=='fixo_mais_km');
+  // Sync visual cards
+  ['fixo','por_km','fixo_mais_km'].forEach(tipo=>{
+    const card=$('taxa-card-'+tipo);
+    if(card)card.classList.toggle('selected',tipo===t);
+  });
+}
+function selecionarTipoTaxa(tipo){
+  const sel=$('lj-taxa-tipo');
+  if(sel){sel.value=tipo;toggleTaxaTipo();}
 }
 
 // ============ AUTH ============
