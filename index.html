@@ -769,10 +769,12 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div class="fg"><label>Numero do Pedido / Codigo Ifood</label><input type="text" id="edit-num" placeholder="Ex: 4321"></div>
   <div class="fg"><label>Nome do Cliente</label><input type="text" id="edit-cli"></div>
   <div class="fg"><label>Telefone</label><input type="tel" id="edit-tel"></div>
-  <div class="g2"><div class="fg"><label>Rua / Avenida</label><input type="text" id="edit-rua"></div><div class="fg"><label>Numero</label><input type="text" id="edit-nend"></div></div>
-  <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="edit-bairro"></div><div class="fg"><label>Cidade</label><input type="text" id="edit-cidade"></div></div>
+  <div class="g2"><div class="fg"><label>Rua / Avenida</label><input type="text" id="edit-rua" onblur="recalcEditarDist()"></div><div class="fg"><label>Numero</label><input type="text" id="edit-nend" onblur="recalcEditarDist()"></div></div>
+  <div class="g2b"><div class="fg"><label>Bairro</label><input type="text" id="edit-bairro" onblur="recalcEditarDist()"></div><div class="fg"><label>Cidade</label><input type="text" id="edit-cidade"></div></div>
   <div class="fg"><label>Complemento</label><input type="text" id="edit-comp" placeholder="Ex: Apto 12 Torre 2"></div>
   <div class="fg"><label>Observacoes</label><input type="text" id="edit-obs"></div>
+  <div id="edit-dist-preview" style="display:none;background:#f0f7ff;border-radius:8px;padding:9px 12px;margin-top:8px;font-size:13px;color:#004E89;font-weight:600;"></div>
+  <div id="edit-dist-preview" style="display:none;background:#f0f7ff;border-radius:8px;padding:9px 12px;margin-top:8px;font-size:13px;color:#004E89;font-weight:600;"></div>
   <div id="edit-msg" style="margin-top:5px;"></div>
   <button class="btn btn-primary" onclick="salvarEdicaoPedido()">&#10003; Salvar Alteracoes</button>
 </div></div>
@@ -4141,8 +4143,38 @@ function abrirEditarPedido(id,num,cli,tel,rua,nend,bairro,cidade,comp,obs){
   $('edit-rua').value=rua||'';$('edit-nend').value=nend||'';
   $('edit-bairro').value=bairro||'';$('edit-cidade').value=cidade||'Ribeirao Preto';
   $('edit-comp').value=comp||'';$('edit-obs').value=obs||'';
+  window._editGeo=null;
+  const prev=$('edit-dist-preview');if(prev)prev.style.display='none';
   clearM('edit-msg');openM('editar');
+  // Calcula distância atual imediatamente ao abrir
+  setTimeout(recalcEditarDist, 300);
 }
+
+// ── Editar Pedido: recalcular distância e valor ao mudar endereço ──
+async function recalcEditarDist(){
+  const rua=v('edit-rua'), nend=v('edit-nend'), bairro=v('edit-bairro'), cidade=v('edit-cidade')||'Ribeirao Preto';
+  if(!rua) return;
+  const prev=$('edit-dist-preview');
+  if(prev){ prev.style.display='block'; prev.textContent='📍 Calculando distância...'; }
+  const endFull=fEnd(rua, nend, bairro, cidade, '');
+  const geo=await geocode(endFull);
+  if(!geo){
+    if(prev){ prev.style.color='#c62828'; prev.textContent='⚠️ Endereço não encontrado — valor será mantido.'; }
+    window._editGeo=null; return;
+  }
+  const lojaLat=lojaGeoCache.lat||RP_LAT, lojaLng=lojaGeoCache.lng||RP_LNG;
+  const dist=distKm(lojaLat, lojaLng, geo.lat, geo.lng);
+  const valorBase=calcularValorCorrida(dist, U.taxa_tipo||'fixo', U.taxa_entrega||0, U.taxa_km_limite||5, U.taxa_km_excedente||0, U.taxa_fixo_base||0);
+  const chuvaBonus=(_chuvaAtiva&&U.promocao_chuva_valor)?parseFloat(U.promocao_chuva_valor):0;
+  const valor=valorBase+chuvaBonus;
+  window._editGeo={lat:geo.lat, lng:geo.lng, dist, valorBase, valor};
+  const chuvaStr=chuvaBonus>0?' (+'+fR(chuvaBonus)+' 🌧️)':'';
+  if(prev){
+    prev.style.display='block'; prev.style.color='#004E89';
+    prev.textContent='📏 '+dist.toFixed(1)+' km  ·  💰 '+fR(valor)+chuvaStr;
+  }
+}
+
 async function salvarEdicaoPedido(){
   const id=$('edit-id').value;if(!id){showM('edit-msg','Erro: ID do pedido não encontrado.',false);return;}
   const btn=document.querySelector('#m-editar .btn-primary');
@@ -4150,12 +4182,24 @@ async function salvarEdicaoPedido(){
   const rua=v('edit-rua'),nend=v('edit-nend'),bairro=v('edit-bairro'),cidade=v('edit-cidade')||'Ribeirao Preto',comp=v('edit-comp');
   const endereco=fEnd(rua,nend,bairro,cidade,comp);
   // Monta objeto de update sem campos que podem nao existir no banco
+  // Recalcula distância e valor se endereço mudou
+  if(!window._editGeo){
+    await recalcEditarDist();
+  }
+  const geo=window._editGeo;
   const upd={
     numero_pedido:v('edit-num')||null,
     cliente_nome:v('edit-cli'),
     cliente_telefone:v('edit-tel'),
     endereco_rua:rua,endereco_numero:nend,endereco_bairro:bairro,endereco_cidade:cidade,
-    endereco_complemento:comp,endereco_entrega:endereco
+    endereco_complemento:comp,endereco_entrega:endereco,
+    ...(geo?{
+      distancia_km: parseFloat(geo.dist.toFixed(2)),
+      valor_corrida: parseFloat(geo.valor.toFixed(2)),
+      valor_entregador: parseFloat(geo.valor.toFixed(2)),
+      lat_entrega: geo.lat,
+      lng_entrega: geo.lng,
+    }:{})
   };
   // Tenta adicionar observacoes - se coluna nao existir, tenta notas
   const obsVal=v('edit-obs');
@@ -4284,7 +4328,7 @@ async function carregarRel(){
       ent.lista.forEach(e=>{
         const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
         const diaKey=dt.toISOString().split('T')[0];
-        const turno=dt.getHours()<16?'almoco':'jantar';
+        const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
         const chave=`${diaKey}_${turno}`;
         if(!combCtrlEnt[chave]){combCtrlEnt[chave]=true;combEnt+=parseFloat(U.taxa_fixo_base);}
       });
@@ -4665,7 +4709,7 @@ async function abrirHistCorridas(entId, entNome, periodo){
           const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
           const diaFmt=dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
           const hrFmt=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-          const turno=dt.getHours()<16?'🌤️':'🌙';
+          const turno=(dt.getHours()*60+dt.getMinutes())<1020?'🌤️':'🌙';
           const val=parseFloat(e.valor_corrida||e.valor_entregador||0);
           const inc=parseFloat(e.valor_incentivo||0);
           const incLabels={chuva:'🌧️',domingo:'📅','chuva+domingo':'🌧️📅',feriado:'🎉'};
@@ -5677,7 +5721,7 @@ async function carregarResumoGanhos(){
     dados.forEach(e=>{
       if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
       const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
-      const chave=`${e.loja_id}_${dt.toISOString().split('T')[0]}_${dt.getHours()<16?'a':'j'}`;
+      const chave=`${e.loja_id}_${dt.toISOString().split('T')[0]}_${(dt.getHours()*60+dt.getMinutes())<1020?'a':'j'}`;
       if(!combCtrl[chave]){combCtrl[chave]=true;totalCombMes+=parseFloat(e.l.taxa_fixo_base);}
     });
     const totalValesMes=valesMesArr.reduce((s,v)=>s+parseFloat(v.valor||0),0);
@@ -5712,7 +5756,7 @@ async function carregarResumoGanhos(){
     const dM=dadosTodos.filter(e=>new Date(e.created_at)>=inicioMes);
     const valesArr=valesTodos;
     const soma=arr=>arr.reduce((s,e)=>s+parseFloat(e.valor_corrida||e.valor_entregador||0),0);
-    const calcComb=arr=>{let t=0;const c={};arr.forEach(e=>{if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);const ch=`${e.loja_id}_${dt.toISOString().split('T')[0]}_${dt.getHours()<16?'a':'j'}`;if(!c[ch]){c[ch]=true;t+=parseFloat(e.l.taxa_fixo_base);}});return t;};
+    const calcComb=arr=>{let t=0;const c={};arr.forEach(e=>{if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);const ch=`${e.loja_id}_${dt.toISOString().split('T')[0]}_${(dt.getHours()*60+dt.getMinutes())<1020?'a':'j'}`;if(!c[ch]){c[ch]=true;t+=parseFloat(e.l.taxa_fixo_base);}});return t;};
     const valesHoje=valesArr.filter(v=>new Date(v.created_at)>=inicioHoje).reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const valesOntem=valesArr.filter(v=>{const d=new Date(v.created_at);return d>=inicioOntem&&d<=fimOntem;}).reduce((s,v)=>s+parseFloat(v.valor||0),0);
     const valesSem=valesArr.filter(v=>new Date(v.created_at)>=inicioSem).reduce((s,v)=>s+parseFloat(v.valor||0),0);
@@ -5779,7 +5823,7 @@ async function carregarGanhos(){
     const combVal=parseFloat(e.l.taxa_fixo_base);
     const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
     const diaKey=dt.toISOString().split('T')[0];
-    const turno=dt.getHours()<16?'almoco':'jantar';
+    const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
     const chave=`${lId}_${diaKey}_${turno}`;
     if(!combustivelPorLoja[chave]){
       combustivelPorLoja[chave]=true;
@@ -5801,7 +5845,7 @@ async function carregarGanhos(){
     if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
     const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
     const diaKey=dt.toISOString().split('T')[0];
-    const turno=dt.getHours()<16?'almoco':'jantar';
+    const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
     const chave=`${e.loja_id}_${diaKey}_${turno}`;
     if(!combCtrlPend[chave]){combCtrlPend[chave]=true;combustivelPendente+=parseFloat(e.l.taxa_fixo_base);}
   });
@@ -5818,7 +5862,7 @@ async function carregarGanhos(){
     if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
     const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
     const diaKey=dt.toISOString().split('T')[0];
-    const turno=dt.getHours()<16?'almoco':'jantar';
+    const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
     const chave=`${e.loja_id}_${diaKey}_${turno}`;
     if(!combCtrl2[chave]){
       combCtrl2[chave]=true;
@@ -5902,7 +5946,7 @@ async function carregarGanhos(){
         if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
         const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
         const diaKey=dt.toISOString().split('T')[0];
-        const turno=dt.getHours()<16?'almoco':'jantar';
+        const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
         const chave=`${e.loja_id}_${diaKey}_${turno}`;
         if(!combustivelCards[chave]){
           combustivelCards[chave]={valor:parseFloat(e.l.taxa_fixo_base),primeiroId:e.id,dia:diaKey,turno};
@@ -5923,7 +5967,7 @@ async function carregarGanhos(){
 
         // Combustível: só exibe no primeiro entregado do turno naquele dia
         const diaKey=dt.toISOString().split('T')[0];
-        const turno=dt.getHours()<16?'almoco':'jantar';
+        const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
         const chave=`${e.loja_id}_${diaKey}_${turno}`;
         const combCard=combustivelCards[chave];
         const mostrarComb=combCard&&combCard.primeiroId===e.id;
@@ -6391,7 +6435,7 @@ async function abrirPagamento(entId, entNome) {
     if (!e.l || e.l.taxa_tipo !== 'fixo_mais_km' || !(e.l.taxa_fixo_base > 0)) return;
     const dt = e.entregue_at ? new Date(e.entregue_at) : new Date(e.created_at);
     const diaKey = dt.toISOString().split('T')[0];
-    const turno = dt.getHours() < 16 ? 'almoco' : 'jantar';
+    const turno = (dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
     const chave = `${e.loja_id}_${diaKey}_${turno}`;
     if (!_combCtrlLiq[chave]) { _combCtrlLiq[chave] = true; totalCombustivel += parseFloat(e.l.taxa_fixo_base); }
   });
@@ -6433,7 +6477,7 @@ async function abrirPagamento(entId, entNome) {
           if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
           const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
           const diaKey=dt.toISOString().split('T')[0];
-          const turno=dt.getHours()<16?'almoco':'jantar';
+          const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
           const chave=`${e.loja_id}_${diaKey}_${turno}`;
           if(!combCtrlP[chave]){combCtrlP[chave]=true;combDetP.push({dia:diaKey,turno,valor:parseFloat(e.l.taxa_fixo_base)});}
         });
@@ -6494,7 +6538,7 @@ async function abrirPagamento(entId, entNome) {
             if(!e.l||e.l.taxa_tipo!=='fixo_mais_km'||!(e.l.taxa_fixo_base>0))return;
             const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
             const diaKey=dt.toISOString().split('T')[0];
-            const turno=dt.getHours()<16?'almoco':'jantar';
+            const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
             const chave=`${e.loja_id}_${diaKey}_${turno}`;
             if(!combCtrlL[chave])combCtrlL[chave]={valor:parseFloat(e.l.taxa_fixo_base),primeiroId:e.id};
           });
@@ -6503,7 +6547,7 @@ async function abrirPagamento(entId, entNome) {
             const dt=e.entregue_at?new Date(e.entregue_at):new Date(e.created_at);
             const diaFmt=dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'});
             const hr=dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-            const turno=dt.getHours()<16?'almoco':'jantar';
+            const turno=(dt.getHours()*60+dt.getMinutes())<1020?'almoco':'jantar';
             const turnoLabel=turno==='almoco'?'🌤️ Almoço':'🌙 Jantar';
             const diaKey=dt.toISOString().split('T')[0];
             const chave=`${e.loja_id}_${diaKey}_${turno}`;
