@@ -3282,13 +3282,44 @@ async function gerarCobrancaLoja(lojaId, nomeLoja, qtd, taxa, valor) {
 // Abre Pix para qualquer loja, mesmo sem entrega (valor livre)
 function abrirPixLoja(lojaId, nomeLoja, valorSugerido) {
   const vencStr = proxQuarta(new Date()).toISOString().split('T')[0];
-  // Pede valor se for 0
-  if (!valorSugerido || valorSugerido <= 0) {
-    const inp = prompt('Valor a cobrar de ' + nomeLoja + ' (R$):', '0,00');
-    if (inp === null) return;
-    valorSugerido = parseFloat(inp.replace(',','.')) || 0;
-  }
-  abrirPixCobranca(lojaId, nomeLoja, valorSugerido, vencStr);
+  const vencFmt = new Date(vencStr + 'T12:00:00').toLocaleDateString('pt-BR');
+
+  // Remove modal anterior se existir
+  const antigo = document.getElementById('pix-modal-overlay');
+  if (antigo) antigo.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'pix-modal-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:22px;max-width:340px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,.3);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="font-size:16px;font-weight:900;color:#1a2a3a;">💰 Cobrança Avulsa</div>
+        <button onclick="document.getElementById('pix-modal-overlay').remove()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#94a3b8;line-height:1;">×</button>
+      </div>
+      <div style="background:#f8fafc;border-radius:12px;padding:12px;margin-bottom:16px;">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;">Loja</div>
+        <div style="font-size:15px;font-weight:900;color:#1a2a3a;">${nomeLoja}</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:4px;">Vencimento: ${vencFmt}</div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:6px;">Valor a cobrar (R$)</div>
+        <input id="pix-avulso-val" type="number" step="0.01" min="0"
+          value="${valorSugerido > 0 ? valorSugerido.toFixed(2) : ''}"
+          placeholder="0,00"
+          style="width:100%;box-sizing:border-box;padding:14px;font-size:22px;font-weight:900;border:2px solid #004E89;border-radius:12px;text-align:center;color:#004E89;outline:none;">
+      </div>
+      <button onclick="
+        const v = parseFloat(document.getElementById('pix-avulso-val').value) || 0;
+        document.getElementById('pix-modal-overlay').remove();
+        abrirPixCobranca('${lojaId}', '${nomeLoja.replace(/'/g,"\'")}', v, '${vencStr}');
+      " style="width:100%;background:linear-gradient(135deg,#004E89,#0077cc);color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:900;cursor:pointer;">
+        ⚡ Gerar QR Code Pix
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+  setTimeout(() => { const inp = document.getElementById('pix-avulso-val'); if(inp) inp.focus(); }, 100);
 }
 
 async function carregarCobrancas() {
