@@ -2224,14 +2224,13 @@ async function navDesenharRotaGeral(entregas, origemLL) {
   const coords = waypoints.map(p=>`${p[1]},${p[0]}`).join(';');
   const rota = await _fetchOSRM(coords);
   if (rota && _navMap) {
-    if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
-    if (_navRotaLayer)  _navMap.removeLayer(_navRotaLayer);
+    if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} }
+    if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer);}catch(e){} }
     _navRotaSombra = L.geoJSON(rota.geometry,{style:{color:'#001a4d',weight:12,opacity:.18}}).addTo(_navMap);
     _navRotaLayer  = L.geoJSON(rota.geometry,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
-    _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
-    if (_navUserMarker) _navUserMarker.bringToFront();
-    _navGeometriaCache = null; // cache da geral NÃO serve para a navegação ativa
-    _navStepsCache = [];
+    _navDestinoMarkers.forEach(dm => { try{dm.marker.bringToFront();}catch(e){} });
+    if (_navUserMarker) { try{_navUserMarker.bringToFront();}catch(e){} }
+    console.log('[OSRM geral] rota desenhada, pontos:', rota.geometry.coordinates.length);
   }
 }
 
@@ -2587,8 +2586,8 @@ function _navInicializarMarcadorAtivo(lat, lng) {
 
 // Servidores OSRM em ordem de preferencia
 const _OSRM_SERVERS = [
-  'https://router.project-osrm.org',
   'https://routing.openstreetmap.de/routed-car',
+  'https://router.project-osrm.org',
 ];
 let _osrmServerIdx = 0;
 
@@ -2598,16 +2597,19 @@ async function _fetchOSRM(coords) {
     const server = _OSRM_SERVERS[(_osrmServerIdx + i) % _OSRM_SERVERS.length];
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 5000);
+      const t = setTimeout(() => ctrl.abort(), 8000);
       const r = await fetch(`${server}/route/v1/driving/${coords}${params}`, { signal: ctrl.signal });
       clearTimeout(t);
+      if (!r.ok) { console.warn('[OSRM]', server, r.status); continue; }
       const d = await r.json();
       if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
         _osrmServerIdx = (_osrmServerIdx + i) % _OSRM_SERVERS.length;
+        console.log('[OSRM] OK:', server);
         return d.routes[0];
       }
-    } catch(e) { /* tenta proximo servidor */ }
+    } catch(e) { console.warn('[OSRM] falhou:', server, e.message); }
   }
+  console.warn('[OSRM] todos os servidores falharam para:', coords);
   return null;
 }
 
@@ -2618,11 +2620,12 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
   const dLat = parseFloat(e.lat_entrega), dLng = parseFloat(e.lng_entrega);
 
   const rota = await _fetchOSRM(`${lng},${lat};${dLng},${dLat}`);
-  if (rota) {
+  if (rota && _navMapAtivo) {
     _navGeometriaCache = rota.geometry;
     _navDesenharGeometriaNoAtivo(rota.geometry);
     _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
     navAtualizarInstrucao(lat, lng);
+    console.log('[OSRM ativo] rota desenhada, pontos:', rota.geometry.coordinates.length);
     // NÃO mexe na câmera — _navPosInicialAtivo continua guardando até entregador mover 15m
   } else {
     // Fallback: linha reta já está desenhada — só atualiza texto
