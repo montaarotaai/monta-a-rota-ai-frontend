@@ -132,17 +132,40 @@ function chaveEnd(end) {
 }
 
 // ── Geocode: lat/lng via Nominatim ──────────────────────────────
+// Valida que resultado está dentro de Ribeirão Preto (bounding box real)
+const RP_BOUNDS = { latMin: -21.35, latMax: -20.95, lngMin: -48.05, lngMax: -47.60 };
+
+function dentroDeRP(lat, lng) {
+  return lat >= RP_BOUNDS.latMin && lat <= RP_BOUNDS.latMax &&
+         lng >= RP_BOUNDS.lngMin && lng <= RP_BOUNDS.lngMax;
+}
+
 async function geocode(endereco) {
   if (!endereco) return null;
   try {
+    // Tenta com cidade explícita primeiro
     const q = encodeURIComponent(endereco + ', Ribeirao Preto, SP, Brasil');
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`,
+      `https://nominatim.openstreetmap.org/search?format=json&limit=3&q=${q}&countrycodes=br`,
       { headers: { 'User-Agent': 'MontaRotai/1.0 (admin@montarotai.com)' } }
     );
     const d = await r.json();
-    if (d && d[0]) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
-  } catch (e) {}
+    if (d && d.length > 0) {
+      // Prefere resultado dentro de Ribeirão Preto
+      for (const item of d) {
+        const lat = parseFloat(item.lat);
+        const lng = parseFloat(item.lon);
+        if (dentroDeRP(lat, lng)) {
+          return { lat, lng };
+        }
+      }
+      // Nenhum dentro de RP — não aceita (evita coordenadas de outra cidade)
+      console.warn(`[geocode] Endereço fora de RP: "${endereco}" → lat=${d[0].lat} lng=${d[0].lon}`);
+      return null;
+    }
+  } catch (e) {
+    console.warn(`[geocode] Erro: ${e.message}`);
+  }
   return null;
 }
 
@@ -192,10 +215,26 @@ function calcularValorCorrida(distancia, taxaTipo, taxaBase, kmLimite, taxaExced
 //  5. Dentro de cada rota, ordena por distância da loja
 //  6. Sinaliza pedidos extras do mesmo cluster que cabem na rota
 // ══════════════════════════════════════════════════════════════════
+// ── OSRM: distância real por rota ────────────────────────────────
+async function distOSRM(lat1, lng1, lat2, lng2) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=false`;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'MontaRotai/1.0' } });
+    clearTimeout(t);
+    const d = await r.json();
+    if (d.code === 'Ok' && d.routes?.[0]) return parseFloat((d.routes[0].distance / 1000).toFixed(2));
+  } catch (e) {}
+  return null; // fallback para Haversine
+}
+
 async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlobal, taxaConfig }) {
   const RP_LAT = -21.1775, RP_LNG = -47.8103;
-  const baseLat = lojaLat || RP_LAT;
-  const baseLng = lojaLng || RP_LNG;
+  // Valida coords da loja — se fora de RP ou nulas, usa centro de RP
+  const baseLat = (lojaLat && dentroDeRP(lojaLat, lojaLng || 0)) ? lojaLat : RP_LAT;
+  const baseLng = (lojaLng && dentroDeRP(lojaLat || 0, lojaLng)) ? lojaLng : RP_LNG;
+  if (!lojaLat || !lojaLng) console.warn('[rota] Loja sem coordenadas — usando centro de RP como base');
   const db = createClient(SB_URL, SB_KEY);
 
   // ── PASSO 1: Agrupar por endereço (deduplicar paradas) ──────────
@@ -217,16 +256,23 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
     let bairro = rep.bairro_geocodificado || null;
     let geocodeFailed = false;
 
-    // 2a. Geocode se não tiver coordenadas
-    if (!lat || !lng) {
+    // 2a. Geocode se não tiver coordenadas (ou se coords fora de RP — dado ruim antigo)
+    const coordsValidas = lat && lng && dentroDeRP(lat, lng);
+    if (!coordsValidas) {
+      if (lat && lng) {
+        console.warn(`[rota] Coords salvas fora de RP para "${rep.endereco_entrega}": ${lat},${lng} — regeocodificando`);
+        lat = 0; lng = 0;
+      }
       try {
         const g = await geocode(rep.endereco_entrega);
         if (g) {
           lat = g.lat; lng = g.lng;
-          // Persiste coords — ignora erro se coluna não existir
           db.from('entregas').update({ lat_entrega: lat, lng_entrega: lng })
             .in('id', grupo.map(p => p.id)).catch(() => {});
-        } else { geocodeFailed = true; }
+        } else {
+          console.warn(`[rota] Geocode FALHOU para: "${rep.endereco_entrega}"`);
+          geocodeFailed = true;
+        }
       } catch(e) { geocodeFailed = true; }
     }
 
@@ -242,7 +288,12 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
       } catch(e) { /* falha silenciosa — bairro fica null, usa fallback */ }
     }
 
-    const dist = (geocodeFailed || !lat || !lng) ? 0 : distKm(baseLat, baseLng, lat, lng);
+    // 2c. Calcula distância real via OSRM (com fallback Haversine)
+    let dist = 0;
+    if (!geocodeFailed && lat && lng) {
+      const osrmDist = await distOSRM(baseLat, baseLng, lat, lng);
+      dist = osrmDist !== null ? osrmDist : distKm(baseLat, baseLng, lat, lng);
+    }
     return {
       ids: grupo.map(p => p.id),
       labels: grupo.map(p => p.numero_pedido ? '#' + p.numero_pedido : p.cliente_nome || 'Entrega'),
@@ -445,11 +496,17 @@ async function otimizarRota({ pedidos, entregadores, lojaLat, lojaLng, limiteGlo
       };
     });
 
+  // Paradas que falharam no geocode — avisa no resultado
+  const paradasSemGeo = paradasGeo.filter(p => p.geocodeFailed || (!p.lat && !p.lng));
+
   return {
     grupos: resultado,
     totalPedidos: pedidos.length,
     totalParadas: paradasGeo.length,
-    totalEntregadores: resultado.length
+    totalEntregadores: resultado.length,
+    avisos: paradasSemGeo.length > 0
+      ? paradasSemGeo.map(p => `⚠️ Endereço não encontrado no mapa: "${p.end}"`)
+      : []
   };
 }
 
