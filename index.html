@@ -2584,7 +2584,25 @@ function _navInicializarMarcadorAtivo(lat, lng) {
 }
 
 
-// ── Roteamento: tenta OSRM, fallback Valhalla ──────────────────────
+// ── Roteamento: OSRM com fallback Valhalla ─────────────────────────
+
+// Decodifica encoded polyline do Valhalla (precisão 6 casas decimais)
+function _decodePoly6(str) {
+  const coords = [];
+  let idx = 0, lat = 0, lng = 0;
+  while (idx < str.length) {
+    let b, shift = 0, result = 0;
+    do { b = str.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { b = str.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    // Valhalla usa [lng, lat] para GeoJSON
+    coords.push([lng / 1e6, lat / 1e6]);
+  }
+  return coords;
+}
+
 async function _fetchOSRM(coordsOSRM) {
   // coordsOSRM = "lng1,lat1;lng2,lat2" (formato OSRM)
   const partes = coordsOSRM.split(';').map(p => {
@@ -2592,7 +2610,7 @@ async function _fetchOSRM(coordsOSRM) {
     return { lat, lng };
   });
 
-  // 1) Tenta OSRM primeiro (mais rápido quando disponível)
+  // 1) Tenta OSRM
   const OSRM_SERVERS = [
     'https://routing.openstreetmap.de/routed-car',
     'https://router.project-osrm.org',
@@ -2600,7 +2618,7 @@ async function _fetchOSRM(coordsOSRM) {
   for (const server of OSRM_SERVERS) {
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 6000);
+      const t = setTimeout(() => ctrl.abort(), 7000);
       const url = `${server}/route/v1/driving/${coordsOSRM}?overview=full&geometries=geojson&steps=true`;
       const r = await fetch(url, { signal: ctrl.signal });
       clearTimeout(t);
@@ -2612,54 +2630,55 @@ async function _fetchOSRM(coordsOSRM) {
     } catch(e) { /* próximo */ }
   }
 
-  // 2) Fallback: Valhalla (openstreetmap.de) — gratuito, sem chave, funciona globalmente
+  // 2) Fallback: Valhalla (openstreetmap.de)
+  // Shape vem como encoded polyline com 6 casas decimais
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
+    const t = setTimeout(() => ctrl.abort(), 9000);
     const body = {
       locations: partes.map(p => ({ lon: p.lng, lat: p.lat })),
       costing: 'motorcycle',
-      directions_options: { units: 'km' },
-      shape_format: 'geojson'
+      directions_options: { units: 'km' }
     };
-    const r = await fetch('https://valhalla.openstreetmap.de/route', {
+    const r = await fetch('https://valhalla1.openstreetmap.de/route', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: ctrl.signal
     });
     clearTimeout(t);
-    if (!r.ok) throw new Error('Valhalla ' + r.status);
+    if (!r.ok) throw new Error('Valhalla HTTP ' + r.status);
     const d = await r.json();
-    // Converte resposta Valhalla para formato OSRM
-    if (d.trip?.legs) {
+    if (d.trip?.legs?.length) {
       const allCoords = [];
-      const allSteps = [];
+      const allSteps  = [];
       for (const leg of d.trip.legs) {
-        if (leg.shape?.coordinates) {
-          allCoords.push(...leg.shape.coordinates);
+        // shape é string encoded polyline — decodifica
+        if (typeof leg.shape === 'string') {
+          allCoords.push(..._decodePoly6(leg.shape));
         }
-        if (leg.maneuvers) {
-          for (const m of leg.maneuvers) {
-            allSteps.push({
-              distance: (m.length || 0) * 1000,
-              name: m.street_names?.[0] || '',
-              maneuver: {
-                type: m.type <= 1 ? 'depart' : m.type >= 4 && m.type <= 7 ? 'turn' : 'straight',
-                modifier: m.type === 5 ? 'left' : m.type === 7 ? 'right' : 'straight'
-              }
-            });
-          }
+        for (const m of (leg.maneuvers || [])) {
+          allSteps.push({
+            distance: (m.length || 0) * 1000,
+            name: m.street_names?.[0] || '',
+            maneuver: {
+              type: m.type <= 1 ? 'depart' : 'turn',
+              modifier: m.type === 5 || m.type === 15 ? 'left'
+                      : m.type === 7 || m.type === 17 ? 'right' : 'straight'
+            }
+          });
         }
       }
-      return {
-        geometry: { type: 'LineString', coordinates: allCoords },
-        legs: [{ steps: allSteps }],
-        distance: d.trip.summary?.length * 1000 || 0,
-        duration: d.trip.summary?.time || 0
-      };
+      if (allCoords.length > 1) {
+        return {
+          geometry: { type: 'LineString', coordinates: allCoords },
+          legs: [{ steps: allSteps }],
+          distance: (d.trip.summary?.length || 0) * 1000,
+          duration: d.trip.summary?.time || 0
+        };
+      }
     }
-  } catch(e) { console.warn('[Valhalla] falhou:', e.message); }
+  } catch(e) { console.warn('[Valhalla] erro:', e.message); }
 
   return null;
 }
