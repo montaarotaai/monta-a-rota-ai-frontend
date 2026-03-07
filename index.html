@@ -1971,6 +1971,7 @@ let _navModoAtivo = false;   // false=visão geral, true=navegação ativa
 let _navHeading = 0;
 let _navPosAnterior = null;
 let _navGPSContagem = 0;
+let _navRotaAjustada = false;
 
 // ── Abre a tela de navegação ──────────────────────────────────────
 function abrirNavInterna(entregas) {
@@ -1980,6 +1981,9 @@ function abrirNavInterna(entregas) {
   _navSegindoGPS = false;
   _navGPSContagem = 0;
   _navPosAnterior = null;
+  _navRotaAjustada = false;
+  // Salva estado para sobreviver a reload da página
+  try { localStorage.setItem('nav_ativa','1'); localStorage.setItem('nav_ent_idx','0'); } catch(e){}
 
   const pg = document.getElementById('pg-nav-interna');
   pg.style.display = 'flex';
@@ -1998,6 +2002,7 @@ function fecharNavInterna() {
 
   document.getElementById('pg-nav-interna').style.display = 'none';
   document.body.style.overflow = '';
+  try { localStorage.removeItem('nav_ativa'); localStorage.removeItem('nav_ent_idx'); } catch(e){}
   openM('rota-ent');
 }
 
@@ -2050,41 +2055,55 @@ async function navInicializarMapa(entregas) {
 
 // ── Desenha rota completa: loja → parada1 → parada2 → ... ────────
 async function navDesenharRotaCompleta(entregas) {
+  if (!_navMap) return;
   const pontos = entregas
-    .filter(e => e.lat_entrega && e.lng_entrega)
+    .filter(e => parseFloat(e.lat_entrega||0) && parseFloat(e.lng_entrega||0))
     .map(e => [parseFloat(e.lat_entrega), parseFloat(e.lng_entrega)]);
-  
   if (pontos.length === 0) return;
 
-  // Se tiver posição do entregador, começa dela
-  let origem = null;
-  if (_navUserMarker) origem = _navUserMarker.getLatLng();
-
-  const waypoints = origem ? [[origem.lat, origem.lng], ...pontos] : pontos;
-  
-  if (waypoints.length < 2) {
-    // Só marca o destino sem rota
-    return;
+  // Origem: posição GPS do entregador OU ponto de partida = 1º destino (evita rota sem origem)
+  let origemLat, origemLng;
+  if (_navUserMarker) {
+    const ll = _navUserMarker.getLatLng();
+    origemLat = ll.lat; origemLng = ll.lng;
+  } else {
+    // Sem GPS ainda: usa 1º destino como referência e só marca a rota entre destinos
+    origemLat = pontos[0][0]; origemLng = pontos[0][1];
   }
+
+  // Monta waypoints: origem → todos os destinos em sequência
+  const waypoints = [[origemLat, origemLng], ...pontos];
 
   try {
     const coords = waypoints.map(p => `${p[1]},${p[0]}`).join(';');
     const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`;
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 8000);
+    const t = setTimeout(() => ctrl.abort(), 9000);
     const r = await fetch(url, { signal: ctrl.signal });
     clearTimeout(t);
     const d = await r.json();
     if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
-      if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
-      if (_navRotaLayer) _navMap.removeLayer(_navRotaLayer);
-      _navRotaSombra = L.geoJSON(d.routes[0].geometry, { style: { color: '#000', weight: 11, opacity: .15 } }).addTo(_navMap);
-      _navRotaLayer  = L.geoJSON(d.routes[0].geometry, { style: { color: '#1565C0', weight: 6, opacity: .95, lineCap: 'round', lineJoin: 'round' } }).addTo(_navMap);
-      // Garante que destinos ficam por cima da rota
+      if (_navRotaSombra) { _navMap.removeLayer(_navRotaSombra); _navRotaSombra = null; }
+      if (_navRotaLayer)  { _navMap.removeLayer(_navRotaLayer);  _navRotaLayer  = null; }
+      _navRotaSombra = L.geoJSON(d.routes[0].geometry, {
+        style: { color: '#001a4d', weight: 12, opacity: .18 }
+      }).addTo(_navMap);
+      _navRotaLayer = L.geoJSON(d.routes[0].geometry, {
+        style: { color: '#1565C0', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round' }
+      }).addTo(_navMap);
       _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
       if (_navUserMarker) _navUserMarker.bringToFront();
+
+      // Se a rota ainda não foi ajustada ao mapa (primeira vez), faz fitBounds na rota
+      if (!_navRotaAjustada) {
+        _navRotaAjustada = true;
+        try {
+          const bounds = _navRotaLayer.getBounds();
+          if (bounds.isValid()) _navMap.fitBounds(bounds, { padding: [50, 50], animate: true });
+        } catch(e2) {}
+      }
     }
-  } catch(e) {}
+  } catch(e) { console.warn('[navRota]', e.message); }
 }
 
 // ── Inicia GPS watchPosition ──────────────────────────────────────
@@ -2316,6 +2335,7 @@ async function navConfirmarEntrega(id, refLat, refLng) {
     _rotaEntData=data;
     _navModoAtivo=false;
     _navEntregaAtual = Math.min(_navEntregaAtual, data.length-1);
+    try { localStorage.setItem('nav_ent_idx', _navEntregaAtual); } catch(e){}
     navAtualizarPainel(data, _navEntregaAtual);
     navVerRotaCompleta();
     await navDesenharRotaCompleta(data);
@@ -2624,7 +2644,7 @@ function showPg(tipo){
   pararIvs();
   if(tipo==='admin')initAdmin();
   else if(tipo==='loja')initLoja();
-  else if(tipo==='entregador')initEnt();
+  else if(tipo==='entregador'){initEnt();setTimeout(()=>navRestaurarSeAtiva(),1500);}
 }
 
 function sair(){
@@ -7872,6 +7892,26 @@ async function abrirRotaEnt(){
   carregarRotaEnt();
 }
 
+
+// ── Restaura navegação após reload da página ─────────────────────
+async function navRestaurarSeAtiva() {
+  try {
+    const ativa = localStorage.getItem('nav_ativa');
+    if (ativa !== '1') return;
+    const savedIdx = parseInt(localStorage.getItem('nav_ent_idx')||'0');
+    // Aguarda dados carregarem
+    const {data} = await db.from('entregas')
+      .select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)')
+      .eq('entregador_id',U.id)
+      .in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente'])
+      .order('ordem_rota');
+    if (!data || !data.length) { localStorage.removeItem('nav_ativa'); return; }
+    _rotaEntData = data;
+    _navEntregaAtual = Math.min(savedIdx, data.length-1);
+    // Reabre navegação automaticamente
+    abrirNavInterna(data);
+  } catch(e) {}
+}
 async function carregarRotaEnt(){
   const{data}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)').eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente']).order('ordem_rota');
   const el=$('rota-ent-lst');
