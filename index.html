@@ -5011,128 +5011,136 @@ async function carregarCobLoja() {
   const sec = $('lj-cob-section');
   if (!sec) return;
 
-  // 1. Busca cobranças formais (pendente / aguardando)
+  // Busca TODAS as cobranças desta loja (exceto canceladas)
   let cobs = [];
   try {
     const { data } = await db.from('cobrancas_lojas')
       .select('*')
       .eq('loja_id', U.id)
-      .in('status', ['pendente', 'aguardando_confirmacao'])
+      .neq('status', 'cancelado')
       .order('periodo_ini', { ascending: false });
     cobs = data || [];
   } catch(e) { cobs = []; }
 
-  // 2. Semana atual (seg–dom) — prévia só aparece se NÃO há cobrança formal cobrindo essa semana
-  let previaQtd = 0, previaValor = 0, previaIni = null, previaFim = null;
-  try {
-    const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
-    const dom = new Date(seg); dom.setDate(seg.getDate()+6); dom.setHours(23,59,59,999);
-    previaIni = seg; previaFim = dom;
-    // Verifica se já existe cobrança formal cobrindo esta semana
-    const semanaJaCoberta = cobs.some(c => {
-      const ci = new Date(c.periodo_ini + 'T00:00:00');
-      const cf = new Date(c.periodo_fim + 'T23:59:59');
-      return ci <= dom && cf >= seg;
-    });
-    if (!semanaJaCoberta) {
+  // Semana atual
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
+  const dom = new Date(seg); dom.setDate(seg.getDate()+6); dom.setHours(23,59,59,999);
+
+  // Cobranças pendentes (admin gerou, loja ainda não pagou)
+  const cobsPendentes = cobs.filter(c => c.status === 'pendente' || c.status === 'aguardando_confirmacao');
+
+  // Prévia: só mostra se NÃO há cobrança formal cobrindo a semana atual
+  let previaQtd = 0, previaValor = 0, previaEnts = [];
+  const semanaJaCoberta = cobs.some(c => {
+    const ci = new Date(c.periodo_ini + 'T00:00:00');
+    const cf = new Date(c.periodo_fim + 'T23:59:59');
+    return ci <= dom && cf >= seg;
+  });
+
+  if (!semanaJaCoberta) {
+    try {
       const taxa = parseFloat(U.taxa_sistema || 0.99);
       const { data: ents } = await db.from('entregas')
-        .select('id')
+        .select('id,numero_pedido,nome_cliente,cliente_nome,created_at')
         .eq('loja_id', U.id)
         .eq('status', 'entregue')
         .gte('created_at', seg.toISOString())
-        .lte('created_at', dom.toISOString());
-      previaQtd = (ents || []).length;
+        .lte('created_at', dom.toISOString())
+        .order('created_at', { ascending: true });
+      previaEnts = ents || [];
+      previaQtd = previaEnts.length;
       previaValor = parseFloat((previaQtd * taxa).toFixed(2));
-    }
-  } catch(e) {}
+    } catch(e) {}
+  }
 
-  // Se não tem nada pra mostrar, oculta seção
-  if (!cobs.length && previaQtd === 0) { sec.style.display = 'none'; return; }
-
-  _ljCobAtual = cobs[0] || null;
-
-  // Total a pagar = só cobranças PENDENTES (não inclui prévia se já há cobrança formal)
-  const totalCobs = cobs.filter(c => c.status === 'pendente').reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
-  const totalGeral = totalCobs + previaValor; // previaValor já é 0 se semana coberta
+  // Se não tem nada, oculta
+  if (!cobsPendentes.length && previaQtd === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  _ljCobAtual = cobsPendentes[0] || null;
 
   let html = '';
 
-  // ── Prévia da semana (se não há cobrança formal ainda) ──
-  if (previaQtd > 0 && cobs.length === 0) {
+  // ── PRÉVIA: semana atual ainda não cobrada pelo admin ──
+  if (previaQtd > 0 && cobsPendentes.length === 0) {
     const taxa = parseFloat(U.taxa_sistema || 0.99);
-    html += '<div style="background:linear-gradient(135deg,#1a3a5c,#004E89);border-radius:16px;padding:16px;color:white;margin-bottom:10px;">' +
+    const segFmt = seg.toLocaleDateString('pt-BR');
+    const domFmt = dom.toLocaleDateString('pt-BR');
+    // Lista de pedidos
+    let pedidosHtml = '';
+    previaEnts.forEach(function(p, idx) {
+      const dt = new Date(p.created_at);
+      const dtStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      const num = p.numero_pedido ? '#' + p.numero_pedido : ('#' + (idx+1));
+      const cli = p.nome_cliente || p.cliente_nome || '—';
+      pedidosHtml += '<div style="display:flex;align-items:center;padding:7px 12px;' + (idx < previaEnts.length-1 ? 'border-bottom:1px solid rgba(255,255,255,.1);' : '') + '">' +
+        '<span style="font-size:11px;font-weight:800;min-width:38px;opacity:.9;">' + num + '</span>' +
+        '<span style="font-size:11px;flex:1;opacity:.85;">' + cli + '</span>' +
+        '<span style="font-size:10px;opacity:.6;margin:0 8px;white-space:nowrap;">' + dtStr + '</span>' +
+        '<span style="font-size:11px;font-weight:800;opacity:.9;">R$' + taxa.toFixed(2) + '</span>' +
+        '</div>';
+    });
+    html += '<div style="background:linear-gradient(135deg,#1a3a5c,#004E89);border-radius:16px;overflow:hidden;margin-bottom:10px;">' +
+      '<div style="padding:14px 16px 10px;">' +
       '<div style="font-size:10px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📊 Taxa de Sistema — Esta Semana</div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;color:white;">' +
       '<div>' +
       '<div style="font-size:13px;opacity:.85;">' + previaQtd + ' entregas × R$' + taxa.toFixed(2) + '</div>' +
-      '<div style="font-size:11px;opacity:.65;margin-top:2px;">Cobrança gerada pelo admin na quarta-feira</div>' +
+      '<div style="font-size:11px;opacity:.65;margin-top:2px;">' + segFmt + ' — ' + domFmt + '</div>' +
+      '<div style="font-size:11px;opacity:.55;margin-top:2px;">Cobrança gerada pelo admin na quarta-feira</div>' +
       '</div>' +
-      '<div style="font-size:28px;font-weight:900;">' + fR(previaValor) + '</div>' +
-      '</div>' +
+      '<div style="font-size:28px;font-weight:900;color:white;">' + fR(previaValor) + '</div>' +
+      '</div></div>' +
+      (previaEnts.length > 0 ?
+        '<details style="color:white;">' +
+        '<summary style="padding:8px 16px;font-size:11px;font-weight:700;opacity:.7;cursor:pointer;background:rgba(0,0,0,.15);">Ver ' + previaQtd + ' pedidos ▼</summary>' +
+        '<div style="background:rgba(0,0,0,.2);">' + pedidosHtml + '</div>' +
+        '<div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,.25);font-size:12px;font-weight:800;color:white;">' +
+        '<span>Total previsto</span><span>' + fR(previaValor) + '</span></div>' +
+        '</details>' : '') +
       '</div>';
   }
 
-  // ── Cobranças formais ──
-  if (cobs.length > 0) {
-    // Banner total — mostra pendente + aguardando separados
-    const totalPendenteLj = cobs.filter(c=>c.status==='pendente').reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
-    const totalAguardandoLj = cobs.filter(c=>c.status==='aguardando_confirmacao').reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
-    html += '<div style="background:linear-gradient(135deg,#7c1d1d,#C8960C);border-radius:16px;padding:14px 16px;color:white;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">' +
+  // ── COBRANÇAS FORMAIS (enviadas pelo admin) ──
+  cobsPendentes.forEach(function(cob, idx) {
+    const vencFmt = new Date(cob.vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+    const iniFmt  = new Date(cob.periodo_ini + 'T12:00:00').toLocaleDateString('pt-BR');
+    const fimFmt  = new Date(cob.periodo_fim + 'T12:00:00').toLocaleDateString('pt-BR');
+    const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(cob.valor_total), 'MontaRotai');
+    const qrUrl = pixQRUrl(emv);
+    const emvSafe = emv.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const isAguardando = cob.status === 'aguardando_confirmacao';
+    const vencida = new Date(cob.vencimento+'T00:00:00') < hoje;
+    const corH = isAguardando ? 'linear-gradient(135deg,#78350f,#d97706)' : (vencida ? 'linear-gradient(135deg,#7c1d1d,#C8960C)' : 'linear-gradient(135deg,#7c1d1d,#C8960C)');
+    const borH = isAguardando ? '#f59e0b' : '#C8960C';
+
+    html += '<div style="border:2px solid ' + borH + ';border-radius:16px;overflow:hidden;margin-bottom:12px;background:white;">' +
+      // Header
+      '<div style="background:' + corH + ';padding:12px 14px;color:white;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
       '<div>' +
-      '<div style="font-size:10px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:1px;">⚠️ Cobranças em Aberto</div>' +
-      '<div style="font-size:12px;opacity:.75;margin-top:2px;">' + cobs.length + ' cobrança(s) pendente(s)</div>' +
-      (totalAguardandoLj > 0 ? '<div style="font-size:10px;opacity:.65;margin-top:1px;">🕐 ' + fR(totalAguardandoLj) + ' aguardando confirmação</div>' : '') +
+      '<div style="font-size:10px;font-weight:800;opacity:.85;text-transform:uppercase;">' + (isAguardando ? '🕐 Aguardando Confirmação' : (vencida ? '🚨 VENCIDA' : '⚠️ Aguardando Pagamento')) + '</div>' +
+      '<div style="font-size:11px;opacity:.8;margin-top:2px;">' + iniFmt + ' a ' + fimFmt + '</div>' +
+      '<div style="font-size:10px;opacity:.7;">' + (cob.qtd_entregas||0) + ' entregas · R$' + parseFloat(cob.taxa_unitaria||0.99).toFixed(2) + '/entrega</div>' +
+      '<div style="font-size:10px;opacity:.65;">Vence ' + vencFmt + '</div>' +
       '</div>' +
-      '<div style="text-align:right;">' +
-      '<div style="font-size:28px;font-weight:900;">' + fR(totalPendenteLj) + '</div>' +
-      (totalAguardandoLj > 0 ? '<div style="font-size:9px;opacity:.7;">só pendentes</div>' : '') +
-      '</div>' +
-      '</div>';
-
-    // Card por cobrança
-    cobs.forEach((cob, idx) => {
-      const vencFmt = new Date(cob.vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
-      const iniFmt  = new Date(cob.periodo_ini + 'T12:00:00').toLocaleDateString('pt-BR');
-      const fimFmt  = new Date(cob.periodo_fim + 'T12:00:00').toLocaleDateString('pt-BR');
-      const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(cob.valor_total), 'MontaRotai');
-      const qrUrl = pixQRUrl(emv);
-      const emvSafe = emv.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      const isAguardando = cob.status === 'aguardando_confirmacao';
-      const hoje2 = new Date(); hoje2.setHours(0,0,0,0);
-      const vencida = new Date(cob.vencimento+'T00:00:00') < hoje2;
-
-      html += '<div style="border:2px solid ' + (isAguardando ? '#f59e0b' : '#C8960C') + ';border-radius:16px;overflow:hidden;margin-bottom:12px;background:white;">' +
-        // Header vermelho/amarelo
-        '<div style="background:' + (isAguardando ? 'linear-gradient(135deg,#78350f,#d97706)' : 'linear-gradient(135deg,#7c1d1d,#C8960C)') + ';padding:12px 14px;color:white;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<div>' +
-        '<div style="font-size:10px;font-weight:800;opacity:.85;text-transform:uppercase;">' + (isAguardando ? '🕐 Aguardando Confirmação' : (vencida ? '🚨 VENCIDA' : '⚠️ Pagar')) + '</div>' +
-        '<div style="font-size:11px;opacity:.8;margin-top:2px;">' + iniFmt + ' a ' + fimFmt + '</div>' +
-        '<div style="font-size:10px;opacity:.7;">' + (cob.qtd_entregas||0) + ' entregas · R$' + parseFloat(cob.taxa_unitaria||0.99).toFixed(2) + '/ent</div>' +
-        '</div>' +
-        '<div style="text-align:right;">' +
-        '<div style="font-size:26px;font-weight:900;">' + fR(parseFloat(cob.valor_total)) + '</div>' +
-        '<div style="font-size:10px;opacity:.75;">Vence ' + vencFmt + '</div>' +
-        '</div></div></div>' +
-        // Corpo branco com QR
-        '<div style="padding:14px;background:#fff;">' +
-        '<div style="font-size:11px;font-weight:800;color:#C8960C;text-align:center;text-transform:uppercase;margin-bottom:10px;">Pix — Pague Agora</div>' +
-        '<img src="' + qrUrl + '" width="180" height="180" style="display:block;margin:0 auto 10px;border-radius:8px;" alt="QR Pix">' +
-        '<div style="font-size:8px;word-break:break-all;color:#64748b;font-family:monospace;background:#f8fafc;padding:8px;border-radius:6px;margin-bottom:10px;">' + emv + '</div>' +
-        '<button id="lj-copy-' + idx + '" onclick="(function(btn,emv){navigator.clipboard.writeText(emv).then(function(){btn.textContent=\'✅ Copiado!\';btn.style.background=\'#16a34a\';setTimeout(function(){btn.textContent=\'📋 Copiar Código Pix\';btn.style.background=\'#004E89\';},2500);}).catch(function(){btn.textContent=\'⚠️ Copie o código acima\';});})(document.getElementById(\'lj-copy-' + idx + '\'),\'' + emvSafe + '\')" ' +
-        'style="width:100%;background:#004E89;color:#fff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;margin-bottom:8px;letter-spacing:.3px;">📋 Copiar Código Pix</button>' +
-        (isAguardando
-          ? '<div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center;font-size:12px;color:#92400e;font-weight:700;border:1.5px solid #fcd34d;">⏳ Pagamento enviado — aguardando confirmação</div>'
-          : '<button onclick="lojaSolicitaConfirmacao(\'' + cob.id + '\',this)" style="width:100%;background:#fff;color:#C8960C;border:2px solid #C8960C;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">✅ Já Paguei — Informar Pagamento</button>'
-        ) +
-        '</div></div>';
-    });
-  }
+      '<div style="font-size:26px;font-weight:900;">' + fR(parseFloat(cob.valor_total)) + '</div>' +
+      '</div></div>' +
+      // Corpo Pix
+      '<div style="padding:14px;background:#fff;">' +
+      '<div style="font-size:11px;font-weight:800;color:#C8960C;text-align:center;text-transform:uppercase;margin-bottom:10px;">Pix — Pague Agora</div>' +
+      '<img src="' + qrUrl + '" width="180" height="180" style="display:block;margin:0 auto 10px;border-radius:8px;" alt="QR Pix">' +
+      '<div style="font-size:8px;word-break:break-all;color:#64748b;font-family:monospace;background:#f8fafc;padding:8px;border-radius:6px;margin-bottom:10px;">' + emv + '</div>' +
+      '<button id="lj-copy-' + idx + '" onclick="(function(btn,emv){navigator.clipboard.writeText(emv).then(function(){btn.textContent=\'✅ Copiado!\';btn.style.background=\'#16a34a\';setTimeout(function(){btn.textContent=\'📋 Copiar Código Pix\';btn.style.background=\'#004E89\';},2500);}).catch(function(){btn.textContent=\'⚠️ Copie o código acima\';});})(document.getElementById(\'lj-copy-' + idx + '\'),\'' + emvSafe + '\')" ' +
+      'style="width:100%;background:#004E89;color:#fff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;margin-bottom:8px;letter-spacing:.3px;">📋 Copiar Código Pix</button>' +
+      (isAguardando
+        ? '<div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center;font-size:12px;color:#92400e;font-weight:700;border:1.5px solid #fcd34d;">⏳ Pagamento enviado — aguardando confirmação do admin</div>'
+        : '<button onclick="lojaSolicitaConfirmacao(\'' + cob.id + '\',this)" style="width:100%;background:#fff;color:#C8960C;border:2px solid #C8960C;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">✅ Já Paguei — Informar Pagamento</button>'
+      ) +
+      '</div></div>';
+  });
 
   sec.innerHTML = html;
-  sec.style.display = 'block';
 }
 
 function lojaCopiaPix() {
@@ -5155,10 +5163,8 @@ async function lojaSolicitaConfirmacao(cobId, btnEl) {
   await db.from('cobrancas_lojas')
     .update({ status: 'aguardando_confirmacao', notificado_em: new Date().toISOString() })
     .eq('id', id);
-  // Recarrega para mostrar estado atualizado
   await carregarCobLoja();
 }
-
 async function pullLj(){
   const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id);
   const el=$('lista-on-lj');
