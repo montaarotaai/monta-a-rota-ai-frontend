@@ -2111,10 +2111,20 @@ async function navInicializarMapaGeral(entregas) {
   if (!el) return;
   if (_navMap) { _navMap.remove(); _navMap = null; }
 
-  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
-             .setView([-21.1775,-47.8103], 13);
+  // Usa posicao imediata do rastreamento (myLat/myLng) se disponivel
+  const origemLat = myLat || -21.1775;
+  const origemLng = myLng || -47.8103;
+  const zoom = myLat ? 15 : 13;
+
+  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false, preferCanvas:true })
+             .setView([origemLat, origemLng], zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
+
+  // Popula _navPosAnterior imediatamente com posicao conhecida
+  if (myLat && myLng && !_navPosAnterior) {
+    _navPosAnterior = { lat: myLat, lng: myLng };
+  }
 
   _navDestinoMarkers = [];
   entregas.forEach((e,i) => {
@@ -2131,7 +2141,8 @@ async function navInicializarMapaGeral(entregas) {
   });
 
   navAtualizarPainel(entregas, 0);
-  await navDesenharRotaGeral(entregas, null);
+  // Rota nao bloqueia — desenha em background
+  navDesenharRotaGeral(entregas, myLat ? {lat:myLat,lng:myLng} : null);
   navIniciarGPS(entregas);
 }
 
@@ -2145,28 +2156,22 @@ async function navDesenharRotaGeral(entregas, origemLL) {
   const oLng = origemLL ? origemLL.lng : pontos[0][1];
   const waypoints = [[oLat,oLng], ...pontos];
   const coords = waypoints.map(p=>`${p[1]},${p[0]}`).join(';');
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(()=>ctrl.abort(),9000);
-    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,{signal:ctrl.signal});
-    clearTimeout(t);
-    const d = await r.json();
-    if (d.code==='Ok' && d.routes?.[0]?.geometry) {
-      if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
-      if (_navRotaLayer)  _navMap.removeLayer(_navRotaLayer);
-      _navRotaSombra = L.geoJSON(d.routes[0].geometry,{style:{color:'#001a4d',weight:12,opacity:.18}}).addTo(_navMap);
-      _navRotaLayer  = L.geoJSON(d.routes[0].geometry,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
-      _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
-      if (_navUserMarker) _navUserMarker.bringToFront();
-      _navGeometriaCache = d.routes[0].geometry;  // Salva geometria raw para uso no modo ativo
-      _navStepsCache = d.routes[0].legs?.flatMap(l=>l.steps||[]) || [];
-      if (!_navRotaAjustada) {
-        _navRotaAjustada = true;
-        const b = _navRotaLayer.getBounds();
-        if (b.isValid()) _navMap.fitBounds(b, {padding:[55,55],animate:true});
-      }
+  const rota = await _fetchOSRM(coords);
+  if (rota) {
+    if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
+    if (_navRotaLayer)  _navMap.removeLayer(_navRotaLayer);
+    _navRotaSombra = L.geoJSON(rota.geometry,{style:{color:'#001a4d',weight:12,opacity:.18}}).addTo(_navMap);
+    _navRotaLayer  = L.geoJSON(rota.geometry,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
+    _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
+    if (_navUserMarker) _navUserMarker.bringToFront();
+    _navGeometriaCache = rota.geometry;
+    _navStepsCache = rota.legs?.flatMap(l=>l.steps||[]) || [];
+    if (!_navRotaAjustada) {
+      _navRotaAjustada = true;
+      const b = _navRotaLayer.getBounds();
+      if (b.isValid()) _navMap.fitBounds(b, {padding:[55,55],animate:true});
     }
-  } catch(e) { console.warn('[rotaGeral]', e.message); }
+  }
 }
 
 // ══ GPS ════════════════════════════════════════════════════════════
@@ -2178,16 +2183,21 @@ function navIniciarGPS(entregas) {
     return;
   }
   if (_navWatchId !== null) navigator.geolocation.clearWatch(_navWatchId);
-  navigator.geolocation.getCurrentPosition(pos => {
-    if (_navMap) _navMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
-  }, ()=>{}, {enableHighAccuracy:true, timeout:6000});
+
+  // Se ja tem posicao do rastreamento, usa imediatamente — nao espera o watcher
+  if (myLat && myLng) {
+    // Simula um evento GPS com a posicao atual conhecida
+    const fakePosEvent = { coords: { latitude: myLat, longitude: myLng, accuracy: 10, heading: null, speed: null } };
+    navOnGPS(fakePosEvent, entregas);
+  }
+
   _navWatchId = navigator.geolocation.watchPosition(
     pos => navOnGPS(pos, entregas),
     err => {
       const s = document.getElementById('nav-gps-status');
       if (s) s.textContent = err.code===1 ? '❌ GPS negado' : '📡 Aguardando...';
     },
-    {enableHighAccuracy:true, maximumAge:2000, timeout:15000}
+    {enableHighAccuracy:true, maximumAge:3000, timeout:10000}
   );
 }
 
@@ -2255,6 +2265,10 @@ async function navIniciarModoAtivo(entregas) {
   _navRotaSombraAtivo = null;
   _navDestinoMarkersAtivo = [];
 
+  // Usa myLat/myLng como fallback imediato se _navPosAnterior ainda nao foi definido pelo watcher
+  if (!_navPosAnterior && myLat && myLng) {
+    _navPosAnterior = { lat: myLat, lng: myLng };
+  }
   const centroInicial = _navPosAnterior ? [_navPosAnterior.lat, _navPosAnterior.lng] : [-21.1775, -47.8103];
   _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false, preferCanvas:true }).setView(centroInicial, 18);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMapAtivo);
@@ -2412,60 +2426,52 @@ function navMoverCameraAtiva(lat, lng) {
   _navMapAtivo.setView([aheadLat, aheadLng], 18, { animate: true, duration: 0.5 });
 }
 
+// Servidores OSRM em ordem de preferencia
+const _OSRM_SERVERS = [
+  'https://router.project-osrm.org',
+  'https://routing.openstreetmap.de/routed-car',
+];
+let _osrmServerIdx = 0;
+
+async function _fetchOSRM(coords) {
+  const params = '?overview=full&geometries=geojson&steps=true';
+  for (let i = 0; i < _OSRM_SERVERS.length; i++) {
+    const server = _OSRM_SERVERS[(_osrmServerIdx + i) % _OSRM_SERVERS.length];
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      const r = await fetch(`${server}/route/v1/driving/${coords}${params}`, { signal: ctrl.signal });
+      clearTimeout(t);
+      const d = await r.json();
+      if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
+        _osrmServerIdx = (_osrmServerIdx + i) % _OSRM_SERVERS.length;
+        return d.routes[0];
+      }
+    } catch(e) { /* tenta proximo servidor */ }
+  }
+  return null;
+}
+
 async function navDesenharRotaAtiva(lat, lng, entregas) {
   if (!_navMapAtivo) return;
   const e = entregas[_navEntregaAtual];
   if (!e?.lat_entrega || !e?.lng_entrega) return;
   const dLat = parseFloat(e.lat_entrega), dLng = parseFloat(e.lng_entrega);
 
-  // Função auxiliar para desenhar qualquer geometria GeoJSON no mapa ativo
-  function desenharGeometria(geo) {
-    if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
-    if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
-    _navRotaSombraAtivo = L.geoJSON(geo, {
-      style:{color:'#000d2e',weight:14,opacity:.22}
-    }).addTo(_navMapAtivo);
-    _navRotaLayerAtivo  = L.geoJSON(geo, {
-      style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}
-    }).addTo(_navMapAtivo);
-    _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
-    if (_navUserMarkerAtivo) _navUserMarkerAtivo.bringToFront();
-  }
-
-  try {
-    const ctrl = new AbortController();
-    const t = setTimeout(()=>ctrl.abort(), 8000);
-    const r = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${dLng},${dLat}?overview=full&geometries=geojson&steps=true`,
-      {signal:ctrl.signal}
-    );
-    clearTimeout(t);
-    const d = await r.json();
-    if (d.code==='Ok' && d.routes?.[0]?.geometry) {
-      _navGeometriaCache = d.routes[0].geometry;
-      desenharGeometria(d.routes[0].geometry);
-      _navStepsCache = d.routes[0].legs?.flatMap(l=>l.steps||[]) || [];
-      navAtualizarInstrucao(lat, lng);
-    } else {
-      throw new Error('OSRM sem rota');
-    }
-  } catch(err) {
-    console.warn('[rotaAtiva]', err.message);
-    // Fallback: linha reta ao destino
-    const linhaReta = {
-      type: 'LineString',
-      coordinates: [[lng, lat], [dLng, dLat]]
-    };
-    desenharGeometria(linhaReta);
-    // Sem steps — mostra instrução direcional simples
+  const rota = await _fetchOSRM(`${lng},${lat};${dLng},${dLat}`);
+  if (rota) {
+    _navGeometriaCache = rota.geometry;
+    _navDesenharGeometriaNoAtivo(rota.geometry);
+    _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
+    navAtualizarInstrucao(lat, lng);
+  } else {
+    // Fallback: linha reta imediata
+    _navDesenharGeometriaNoAtivo({ type:'LineString', coordinates:[[lng,lat],[dLng,dLat]] });
     const distM = navDistM(lat, lng, dLat, dLng);
-    const distStr = distM < 1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
     const el = document.getElementById('nav-dist-instrucao');
     const elR = document.getElementById('nav-rua-instrucao');
-    const elS = document.getElementById('nav-seta-instrucao');
-    if (el) el.textContent = distStr;
-    if (elR) elR.textContent = e.endereco_entrega || 'Siga para o destino';
-    if (elS) elS.textContent = '↑';
+    if (el) el.textContent = distM < 1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
+    if (elR) elR.textContent = e.endereco_entrega || 'Siga ao destino';
   }
 }
 
