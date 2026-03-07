@@ -1034,6 +1034,27 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div id="rota-ent-lst"></div>
 </div></div>
 
+<!-- TELA DE NAVEGACAO INTERNA -->
+<div id="pg-nav-interna" style="display:none;position:fixed;inset:0;z-index:2000;background:#1a1a2e;flex-direction:column;">
+  <div id="nav-topbar" style="background:linear-gradient(135deg,#004E89,#003060);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.4);">
+    <button onclick="fecharNavInterna()" style="background:rgba(255,255,255,.15);border:none;color:white;width:42px;height:42px;border-radius:50%;font-size:22px;cursor:pointer;flex-shrink:0;">←</button>
+    <div style="flex:1;min-width:0;">
+      <div id="nav-destino-label" style="color:white;font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Carregando...</div>
+      <div id="nav-info-linha" style="color:rgba(255,255,255,.75);font-size:11px;margin-top:1px;"></div>
+    </div>
+    <div id="nav-dist-badge" style="background:#F5A800;color:#1a1a1a;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:800;flex-shrink:0;display:none;"></div>
+  </div>
+  <div id="nav-mapa" style="flex:1;width:100%;position:relative;min-height:0;">
+    <button onclick="navCentralizar()" style="position:absolute;bottom:14px;right:14px;z-index:500;background:white;border:none;width:44px;height:44px;border-radius:12px;font-size:20px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);">📍</button>
+    <div id="nav-gps-status" style="position:absolute;top:10px;right:10px;z-index:500;background:rgba(0,0,0,.6);color:white;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;">📡 GPS...</div>
+  </div>
+  <div style="background:white;border-radius:16px 16px 0 0;padding:14px 16px 22px;flex-shrink:0;box-shadow:0 -4px 20px rgba(0,0,0,.15);">
+    <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
+    <div id="nav-entrega-info" style="margin-bottom:12px;"></div>
+    <div id="nav-acoes" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+  </div>
+</div>
+
 <!-- Editar Pedido -->
 <div id="m-editar" class="modal"><div class="modal-box">
   <button class="modal-close" onclick="closeM('editar')">&times;</button>
@@ -1908,6 +1929,262 @@ async function geocode(addr){
   }catch(e){}
   return null;
 }
+
+
+// ══════════════════════════════════════════════════════════
+//  NAVEGAÇÃO INTERNA — Mapa Leaflet com rota OSRM
+// ══════════════════════════════════════════════════════════
+let _rotaEntData = [];
+let _navMap = null;
+let _navWatchId = null;
+let _navUserMarker = null;
+let _navRotaLayer = null;
+let _navDestinoMarkers = [];
+let _navEntregaAtual = 0;
+let _navSegindoGPS = true;
+
+function abrirNavInterna(entregas) {
+  if (!entregas || !entregas.length) { alert('Sem entregas para navegar.'); return; }
+  _navEntregaAtual = 0;
+  _navSegindoGPS = true;
+
+  // Mostra a tela
+  const pg = document.getElementById('pg-nav-interna');
+  pg.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Fecha modal de entregas
+  closeM('rota-ent');
+
+  // Inicializa mapa após render
+  setTimeout(() => navInicializarMapa(entregas), 100);
+}
+
+function fecharNavInterna() {
+  const pg = document.getElementById('pg-nav-interna');
+  pg.style.display = 'none';
+  document.body.style.overflow = '';
+
+  // Para o GPS
+  if (_navWatchId !== null) { navigator.geolocation.clearWatch(_navWatchId); _navWatchId = null; }
+
+  // Destroi mapa para recriar limpo
+  if (_navMap) { _navMap.remove(); _navMap = null; }
+  _navDestinoMarkers = [];
+  _navRotaLayer = null;
+  _navUserMarker = null;
+
+  // Reabre modal de pedidos
+  openM('rota-ent');
+}
+
+async function navInicializarMapa(entregas) {
+  const mapaEl = document.getElementById('nav-mapa');
+  if (!mapaEl) return;
+
+  // Destrói mapa anterior
+  if (_navMap) { _navMap.remove(); _navMap = null; }
+
+  const RP_LAT_N = -21.1775, RP_LNG_N = -47.8103;
+  _navMap = L.map('nav-mapa', { zoomControl: true, attributionControl: false }).setView([RP_LAT_N, RP_LNG_N], 15);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'OSM', maxZoom: 19
+  }).addTo(_navMap);
+
+  // Marca todos os destinos
+  _navDestinoMarkers = [];
+  entregas.forEach((e, i) => {
+    const lat = parseFloat(e.lat_entrega || 0);
+    const lng = parseFloat(e.lng_entrega || 0);
+    if (!lat || !lng) return;
+    const cor = i === 0 ? '#e74c3c' : '#F5A800';
+    const icon = L.divIcon({
+      html: `<div style="background:${cor};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);">${i+1}</div>`,
+      className: '', iconSize: [32,32], iconAnchor: [16,16]
+    });
+    const m = L.marker([lat, lng], { icon }).addTo(_navMap);
+    m.bindPopup(`<strong>${i+1}. ${e.cliente_nome||'Entrega'}</strong><br>${e.endereco_entrega}`);
+    _navDestinoMarkers.push({ marker: m, entrega: e, idx: i });
+  });
+
+  // Atualiza painel
+  navAtualizarPainel(entregas, 0);
+
+  // Inicia GPS
+  navIniciarGPS(entregas);
+}
+
+function navIniciarGPS(entregas) {
+  if (!navigator.geolocation) {
+    document.getElementById('nav-gps-status').textContent = '❌ GPS indisponível';
+    return;
+  }
+  if (_navWatchId !== null) navigator.geolocation.clearWatch(_navWatchId);
+
+  _navWatchId = navigator.geolocation.watchPosition(
+    pos => navOnGPS(pos, entregas),
+    err => { document.getElementById('nav-gps-status').textContent = '❌ GPS erro'; },
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+  );
+}
+
+async function navOnGPS(pos, entregas) {
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  const acc = Math.round(pos.coords.accuracy);
+  const statusEl = document.getElementById('nav-gps-status');
+  if (statusEl) statusEl.textContent = acc <= 20 ? '📡 GPS ótimo' : acc <= 50 ? '📡 GPS ok' : `📡 ±${acc}m`;
+
+  if (!_navMap) return;
+
+  // Marcador do entregador
+  if (!_navUserMarker) {
+    const icon = L.divIcon({
+      html: `<div style="background:#004E89;border-radius:50%;width:20px;height:20px;border:3px solid white;box-shadow:0 0 0 3px rgba(0,78,137,.3),0 0 12px rgba(0,78,137,.5);"></div>`,
+      className: '', iconSize: [20,20], iconAnchor: [10,10]
+    });
+    _navUserMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(_navMap);
+  } else {
+    _navUserMarker.setLatLng([lat, lng]);
+  }
+
+  // Centraliza no GPS se seguindo
+  if (_navSegindoGPS) _navMap.setView([lat, lng], 16, { animate: true });
+
+  // Desenha rota até o destino atual
+  const entAtual = entregas[_navEntregaAtual];
+  if (entAtual && entAtual.lat_entrega && entAtual.lng_entrega) {
+    await navDesenharRota(lat, lng, parseFloat(entAtual.lat_entrega), parseFloat(entAtual.lng_entrega));
+    // Calcula distância restante
+    const distM = navDistM(lat, lng, parseFloat(entAtual.lat_entrega), parseFloat(entAtual.lng_entrega));
+    const badge = document.getElementById('nav-dist-badge');
+    if (badge) {
+      badge.style.display = 'block';
+      badge.textContent = distM < 1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
+    }
+  }
+}
+
+async function navDesenharRota(oLat, oLng, dLat, dLng) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    const d = await r.json();
+    if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
+      if (_navRotaLayer) _navMap.removeLayer(_navRotaLayer);
+      _navRotaLayer = L.geoJSON(d.routes[0].geometry, {
+        style: { color: '#004E89', weight: 6, opacity: .9 }
+      }).addTo(_navMap);
+    }
+  } catch(e) {}
+}
+
+function navCentralizar() {
+  _navSegindoGPS = true;
+  if (_navUserMarker && _navMap) {
+    _navMap.setView(_navUserMarker.getLatLng(), 16, { animate: true });
+  }
+}
+
+function navDistM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function navAtualizarPainel(entregas, idx) {
+  const e = entregas[idx];
+  if (!e) return;
+  const st = e.status_detalhado || e.status;
+  const fp = e.forma_pagamento || 'pago';
+  const vc = parseFloat(e.valor_cartao || 0);
+  const vp = parseFloat(e.valor_pedido || 0);
+  const tc = parseFloat(e.troco_calculado || 0);
+  const tv = parseFloat(e.troco_valor || 0);
+
+  let pgHtml = '';
+  if (fp==='pago') pgHtml = '<span style="background:#e8f5e9;color:#2e7d32;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;">✅ Já pago</span>';
+  else if (fp==='cartao') pgHtml = `<span style="background:#e3f2fd;color:#1565C0;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;">💳 Cartão${vc>0?' · '+fR(vc):''}</span>`;
+  else if (fp==='dinheiro') {
+    pgHtml = `<span style="background:#fffbea;color:#C8960C;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;">💵 Dinheiro${vp>0?' · '+fR(vp):''}${tc>0?' · Troco: '+fR(tc):''}</span>`;
+  }
+
+  const infoEl = document.getElementById('nav-entrega-info');
+  if (infoEl) infoEl.innerHTML = `
+    <div style="font-size:13px;font-weight:800;color:#333;margin-bottom:4px;">${idx+1}/${entregas.length} · ${e.cliente_nome||'Entrega'}</div>
+    <div style="font-size:12px;color:#555;margin-bottom:6px;">📍 ${e.endereco_entrega}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${pgHtml}${e.valor_corrida>0?`<span style="background:#e8f5e9;color:#2e7d32;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;">${fR(e.valor_corrida)}</span>`:''}</div>
+  `;
+
+  const lojaLat = e.loja?.loja_lat || RP_LAT;
+  const lojaLng = e.loja?.loja_lng || RP_LNG;
+  const temCod = !!(e.codigo_confirmacao);
+  let acoes = '';
+
+  if (st==='aceito'||st==='pendente') {
+    acoes += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">🏪 Cheguei na Loja</button>`;
+  }
+  if (st==='chegou_loja') {
+    acoes += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">🛵 Saindo para Entrega</button>`;
+  }
+  if (st==='saiu_entrega'||st==='em_rota') {
+    if (temCod) {
+      acoes += `<button onclick="confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG});fecharNavInterna();" style="background:#2e7d32;color:white;border:none;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">✅ Confirmar Entrega</button>`;
+    } else {
+      acoes += `<button onclick="navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})" style="background:#2e7d32;color:white;border:none;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">✅ Confirmar Entrega</button>`;
+    }
+  }
+
+  const acoesEl = document.getElementById('nav-acoes');
+  if (acoesEl) acoesEl.innerHTML = acoes;
+
+  // Atualiza topbar
+  const label = document.getElementById('nav-destino-label');
+  const info = document.getElementById('nav-info-linha');
+  if (label) label.textContent = e.endereco_entrega;
+  if (info) info.textContent = `${idx+1} de ${entregas.length} entrega${entregas.length>1?'s':''}`;
+}
+
+async function navEntStatus(id, novoStatus, refLat, refLng) {
+  await entStatus(id, novoStatus, refLat, refLng);
+  // Recarrega dados e atualiza painel
+  const {data} = await db.from('entregas').select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)').eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente']).order('ordem_rota');
+  if (data && data.length) { _rotaEntData = data; navAtualizarPainel(data, _navEntregaAtual); }
+}
+
+async function navConfirmarEntrega(id, refLat, refLng) {
+  await entStatus(id, 'entregue', refLat, refLng);
+  const {data} = await db.from('entregas').select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)').eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente']).order('ordem_rota');
+  if (data && data.length) {
+    _rotaEntData = data;
+    // Avança para próxima entrega se houver
+    if (_navEntregaAtual < data.length - 1) {
+      _navEntregaAtual++;
+      navAtualizarPainel(data, _navEntregaAtual);
+      // Centraliza no próximo destino
+      const prox = data[_navEntregaAtual];
+      if (prox?.lat_entrega && _navMap) _navMap.setView([parseFloat(prox.lat_entrega), parseFloat(prox.lng_entrega)], 15, {animate:true});
+    } else {
+      // Todas entregues
+      fecharNavInterna();
+      alert('✅ Todas as entregas concluídas!');
+    }
+  } else {
+    fecharNavInterna();
+    alert('✅ Entrega concluída!');
+  }
+}
+
+// Para de seguir GPS ao mexer no mapa manualmente
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('nav-mapa')?.addEventListener('touchstart', () => { _navSegindoGPS = false; });
+});
 
 // Sound beep
 function beep(freq=880,dur=0.4){
@@ -7465,6 +7742,7 @@ async function carregarRotaEnt(){
   const mapsUrlRota=`https://www.google.com/maps/dir/?api=1&destination=${dest}${wp?'&waypoints='+wp:''}&travelmode=two-wheeler`;
   const wazeUrlRota=`waze://ul?q=${dest}&navigate=yes`;
   const totalEnts=data.length;
+  _rotaEntData=data; // salva para navegacao interna
   // Totais de distância e tempo estimado
   const kmTotal = data.reduce((s,e) => s + parseFloat(e.distancia_km||0), 0);
   const minTotal = data.reduce((s,e) => s + parseInt(e.tempo_estimado_min||0), 0);
@@ -7476,11 +7754,9 @@ async function carregarRotaEnt(){
     </div>` : ''}
     <p style="font-size:11px;color:#888;margin-bottom:6px;text-align:center;">📍 ${totalEnts === 1 ? 'Navegar para a entrega' : 'Rota completa com '+totalEnts+' paradas'}</p>
     <div class="row" style="gap:7px;">
-      <a href="${mapsUrlRota}" target="_blank" style="flex:1;" onclick="marcarSaidaMapa()">
-        <button class="btn btn-blue" style="padding:10px;width:100%;font-size:13px;">🗺️ Google Maps</button>
-      </a>
-      <a href="${wazeUrlRota}" target="_blank" style="flex:1;" onclick="marcarSaidaMapa();if(!this.href.startsWith('waze'))return;setTimeout(()=>{if(document.hasFocus())this.href='https://waze.com/ul?q=${dest}&navigate=yes';},500)">
-        <button class="btn" style="padding:10px;width:100%;font-size:13px;background:#00BBCC;color:white;">🚗 Waze</button>
+      <button class="btn btn-blue" onclick="abrirNavInterna(_rotaEntData)" style="padding:12px;font-size:14px;font-weight:800;flex:2;">🗺️ Navegar</button>
+      <a href="${mapsUrlRota}" target="_blank" style="flex:1;">
+        <button class="btn" style="padding:12px;width:100%;font-size:12px;background:#555;color:white;">↗️ Maps</button>
       </a>
     </div>
   </div>`;
