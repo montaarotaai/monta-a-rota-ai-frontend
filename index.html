@@ -2253,25 +2253,57 @@ function navAtualizarPosGeral(lat, lng) {
 // ══ MODO NAVEGAÇÃO ATIVA — estilo Google Maps ══════════════════════
 
 async function navIniciarModoAtivo(entregas) {
-  _navModoAtivo = true;
+  _navModoAtivo  = true;
   _navSegindoGPS = true;
 
-  document.getElementById('nav-modo-geral').style.display = 'none';
-  document.getElementById('nav-modo-ativo').style.display = 'block';
-
-  if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
-  _navUserMarkerAtivo = null;
-  _navRotaLayerAtivo = null;
-  _navRotaSombraAtivo = null;
-  _navDestinoMarkersAtivo = [];
-
-  // Usa myLat/myLng como fallback imediato se _navPosAnterior ainda nao foi definido pelo watcher
+  // ── PASSO 1: garante posição GPS imediata ──────────────────────────
   if (!_navPosAnterior && myLat && myLng) {
     _navPosAnterior = { lat: myLat, lng: myLng };
   }
-  const centroInicial = _navPosAnterior ? [_navPosAnterior.lat, _navPosAnterior.lng] : [-21.1775, -47.8103];
-  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false, preferCanvas:true }).setView(centroInicial, 18);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMapAtivo);
+
+  // ── PASSO 2: exibe modo ativo e atualiza painéis ───────────────────
+  document.getElementById('nav-modo-geral').style.display = 'none';
+  document.getElementById('nav-modo-ativo').style.display = 'block';
+  navAtualizarPainelAtivo(entregas);
+
+  // Header: não deixa "Aguardando GPS..." — mostra destino imediatamente
+  const eAtual = entregas[_navEntregaAtual];
+  if (eAtual) {
+    const elS = document.getElementById('nav-seta-instrucao');
+    const elD = document.getElementById('nav-dist-instrucao');
+    const elR = document.getElementById('nav-rua-instrucao');
+    if (elS) elS.textContent = '↑';
+    if (elR) elR.textContent = eAtual.cliente_nome || eAtual.endereco_entrega || 'Calculando rota...';
+    if (elD && _navPosAnterior && eAtual.lat_entrega) {
+      const dm = navDistM(_navPosAnterior.lat, _navPosAnterior.lng,
+                          parseFloat(eAtual.lat_entrega), parseFloat(eAtual.lng_entrega));
+      elD.textContent = dm < 1000 ? Math.round(dm) + 'm' : (dm/1000).toFixed(1) + 'km';
+    } else if (elD) { elD.textContent = '--'; }
+  }
+
+  // ── PASSO 3: aguarda reflow do browser (CRÍTICO para Leaflet) ──────
+  // Sem isso, nav-mapa-ativo tem dimensão 0x0 → tiles não carregam
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // ── PASSO 4: destrói mapa anterior e recria ────────────────────────
+  if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
+  _navUserMarkerAtivo    = null;
+  _navRotaLayerAtivo     = null;
+  _navRotaSombraAtivo    = null;
+  _navDestinoMarkersAtivo = [];
+
+  const centro = _navPosAnterior
+    ? [_navPosAnterior.lat, _navPosAnterior.lng]
+    : [-21.1775, -47.8103];
+
+  _navMapAtivo = L.map('nav-mapa-ativo', {
+    zoomControl: false, attributionControl: false, preferCanvas: true
+  }).setView(centro, 18);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(_navMapAtivo);
+
+  // Força Leaflet a re-medir o container após o reflow
+  _navMapAtivo.invalidateSize({ animate: false });
 
   _navMapAtivo.on('dragstart', () => {
     _navSegindoGPS = false;
@@ -2279,44 +2311,164 @@ async function navIniciarModoAtivo(entregas) {
     if (btn) btn.style.display = 'block';
   });
 
-  navAtualizarPainelAtivo(entregas);
-
-  // Marcadores dos destinos
+  // ── PASSO 5: marcadores dos destinos ──────────────────────────────
   entregas.forEach((e, i) => {
     const lat = parseFloat(e.lat_entrega||0), lng = parseFloat(e.lng_entrega||0);
     if (!lat || !lng) return;
     const cor = i === _navEntregaAtual ? '#c0392b' : '#F5A800';
     const icon = L.divIcon({
       html: `<div style="background:${cor};color:white;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;border:3px solid white;box-shadow:0 3px 12px rgba(0,0,0,.5);">${i+1}</div>`,
-      className:'', iconSize:[38,38], iconAnchor:[19,19]
+      className: '', iconSize: [38,38], iconAnchor: [19,19]
     });
     _navDestinoMarkersAtivo.push(L.marker([lat,lng],{icon,zIndexOffset:900}).addTo(_navMapAtivo));
   });
 
-  // Posição do entregador imediata
+  // ── PASSO 6: marcador do entregador + linha + câmera ──────────────
   if (_navPosAnterior) {
     _navInicializarMarcadorAtivo(_navPosAnterior.lat, _navPosAnterior.lng);
-  }
 
-  // Rota: usa cache se disponivel, senao busca OSRM
-  if (_navGeometriaCache) {
-    _navDesenharGeometriaNoAtivo(_navGeometriaCache);
-    if (_navStepsCache.length && _navPosAnterior) navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
-    if (_navPosAnterior) setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 500);
-  } else {
-    const eAtual = entregas[_navEntregaAtual];
-    if (_navPosAnterior && eAtual?.lat_entrega && eAtual?.lng_entrega) {
-      _navDesenharGeometriaNoAtivo({ type:'LineString', coordinates:[[_navPosAnterior.lng,_navPosAnterior.lat],[parseFloat(eAtual.lng_entrega),parseFloat(eAtual.lat_entrega)]] });
+    // Linha reta IMEDIATA — não depende de OSRM
+    if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
+      _navDesenharGeometriaNoAtivo({
+        type: 'LineString',
+        coordinates: [
+          [_navPosAnterior.lng, _navPosAnterior.lat],
+          [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
+        ]
+      });
     }
-    if (_navPosAnterior) navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
-    else { const el=document.getElementById('nav-rua-instrucao'); if(el) el.textContent='Aguardando GPS...'; }
-  }
 
-  // Centra mapa apos tudo desenhado
-  if (_navPosAnterior) {
-    setTimeout(() => navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng), 100);
+    // Se cache disponível, usa rota real já calculada
+    if (_navGeometriaCache) {
+      _navDesenharGeometriaNoAtivo(_navGeometriaCache);
+      if (_navStepsCache.length) navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
+    }
+
+    navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
+
+    // Busca rota OSRM em background (atualiza linha reta com rota real)
+    navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
   }
 }
+
+function navAtualizarPainelAtivo(entregas) {
+  const e = entregas[_navEntregaAtual];
+  if (!e) return;
+
+  const el = document.getElementById('nav-ativo-cliente');
+  const ee = document.getElementById('nav-ativo-end');
+  if (el) el.textContent = `${_navEntregaAtual+1}/${entregas.length} · ${e.cliente_nome||'Entrega'}`;
+  if (ee) ee.textContent = e.endereco_entrega || '';
+
+  const lojaLat = e.loja?.loja_lat||RP_LAT, lojaLng = e.loja?.loja_lng||RP_LNG;
+  const st = e.status_detalhado || e.status;
+
+  // Função de confirmação de entrega
+  const fnEntr = e.codigo_confirmacao
+    ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
+    : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
+
+  let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕ Sair</button>`;
+
+  if (st==='aceito'||st==='pendente')
+    btns += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🏪 Na Loja</button>`;
+  if (st==='chegou_loja')
+    btns += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🛵 Saindo</button>`;
+
+  // Botão ENTREGUE — sempre visível e em destaque
+  btns += `<button onclick="${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
+
+  const ac = document.getElementById('nav-acoes-ativas');
+  if (ac) ac.innerHTML = btns;
+}
+
+function navPararModoAtivo() {
+  _navModoAtivo  = false;
+  _navSegindoGPS = false;
+  navPararMapaAtivo();
+  document.getElementById('nav-modo-geral').style.display = 'flex';
+  document.getElementById('nav-modo-ativo').style.display = 'none';
+  const btn = document.getElementById('nav-btn-recentrar');
+  if (btn) btn.style.display = 'none';
+}
+
+function navPararMapaAtivo() {
+  if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
+  _navUserMarkerAtivo = null;
+  _navRotaLayerAtivo  = null;
+  _navRotaSombraAtivo = null;
+  _navDestinoMarkersAtivo = [];
+}
+
+async function navAtualizarPosAtiva(lat, lng, entregas) {
+  if (!_navMapAtivo) return;
+  _navInicializarMarcadorAtivo(lat, lng);
+  if (_navSegindoGPS) navMoverCameraAtiva(lat, lng);
+
+  const e = entregas[_navEntregaAtual];
+  if (e?.lat_entrega) {
+    const distM = navDistM(lat, lng, parseFloat(e.lat_entrega), parseFloat(e.lng_entrega));
+    const elT = document.getElementById('nav-ativo-tempo');
+    const elD = document.getElementById('nav-ativo-dist');
+    if (elT) elT.textContent = Math.max(1, Math.round(distM/200)) + ' min';
+    if (elD) elD.textContent = distM < 1000 ? Math.round(distM) + 'm' : (distM/1000).toFixed(1) + 'km';
+    if (distM < 80) {
+      const elS = document.getElementById('nav-seta-instrucao');
+      const elR = document.getElementById('nav-rua-instrucao');
+      if (elS) elS.textContent = '🎯';
+      if (elR) elR.textContent = 'Chegando ao destino!';
+    }
+  }
+  if (_navGPSContagem % 5 === 1) await navDesenharRotaAtiva(lat, lng, entregas);
+  else navAtualizarInstrucao(lat, lng);
+}
+
+// Sem CSS 3D — mantidas para compatibilidade com chamadas existentes
+function navAplicarTilt(ativo) {}
+let _navTiltAtivo = false;
+function navToggleTilt() {}
+
+function navMoverCameraAtiva(lat, lng) {
+  if (!_navMapAtivo) return;
+  const sinH = Math.sin(_navHeading * Math.PI / 180);
+  const cosH = Math.cos(_navHeading * Math.PI / 180);
+  const avanco = 0.0003;
+  _navMapAtivo.setView([lat + avanco * cosH, lng + avanco * sinH], 18, { animate: true, duration: 0.5 });
+}
+
+async function navConfirmarEntrega(id, refLat, refLng) {
+  try {
+    const btn = event?.target;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Confirmando...'; }
+    await entStatus(id, 'entregue', refLat, refLng);
+    const {data, error} = await db.from('entregas')
+      .select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)')
+      .eq('entregador_id', U.id)
+      .in('status', ['aceito','em_rota','chegou_loja','saiu_entrega','pendente'])
+      .order('ordem_rota');
+    if (error) throw error;
+    if (data?.length) {
+      _rotaEntData   = data;
+      _navModoAtivo  = false;
+      navPararMapaAtivo();
+      document.getElementById('nav-modo-geral').style.display = 'flex';
+      document.getElementById('nav-modo-ativo').style.display = 'none';
+      _navEntregaAtual = Math.min(_navEntregaAtual, data.length - 1);
+      _navRotaAjustada = false;
+      try { localStorage.setItem('nav_ent_idx', _navEntregaAtual); } catch(e){}
+      navAtualizarPainel(data, _navEntregaAtual);
+      navDesenharRotaGeral(data, _navPosAnterior);
+    } else {
+      fecharNavInterna();
+      alert('✅ Todas as entregas concluídas!');
+    }
+  } catch(err) {
+    alert('Erro ao confirmar entrega: ' + (err.message || err));
+    const btn = document.querySelector('[onclick*="navConfirmarEntrega"]');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Entregue'; }
+  }
+}
+
 
 // Desenha geometria GeoJSON no mapa ativo
 function _navDesenharGeometriaNoAtivo(geo) {
@@ -2352,17 +2504,23 @@ function navAtualizarPainelAtivo(entregas) {
 
   const lojaLat = e.loja?.loja_lat||RP_LAT, lojaLng = e.loja?.loja_lng||RP_LNG;
   const st = e.status_detalhado||e.status;
-  let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">✕ Sair</button>`;
+
+  // Botão Entregue: SEMPRE disponível como ação principal
+  const fnEntr = e.codigo_confirmacao
+    ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
+    : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
+
+  let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕</button>`;
+
+  // Botões de status de fluxo (secundários)
   if (st==='aceito'||st==='pendente')
-    btns += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">🏪 Na Loja</button>`;
+    btns += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🏪 Na Loja</button>`;
   if (st==='chegou_loja')
-    btns += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex:1;">🛵 Saindo</button>`;
-  if (st==='saiu_entrega'||st==='em_rota') {
-    const fn = e.codigo_confirmacao
-      ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
-      : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
-    btns += `<button onclick="${fn}" style="background:#1B5E20;color:white;border:none;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;flex:1;">✅ Entregue</button>`;
-  }
+    btns += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🛵 Saindo</button>`;
+
+  // Entregue sempre presente e em destaque
+  btns += `<button onclick="${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
+
   document.getElementById('nav-acoes-ativas').innerHTML = btns;
 }
 
@@ -2410,11 +2568,6 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
     navAtualizarInstrucao(lat, lng);
   }
 }
-
-// Nao usa mais CSS 3D — funcoes mantidas para compatibilidade
-function navAplicarTilt(ativo) {}
-let _navTiltAtivo = false;
-function navToggleTilt() {}
 
 function navMoverCameraAtiva(lat, lng) {
   if (!_navMapAtivo) return;
@@ -7981,9 +8134,8 @@ async function entStatus(id,novoStatus,refLat,refLng){
         const{data:ped}=await db.from('entregas').select('loja_id').eq('id',id).single();
         if(ped?.loja_id){
           const{data:lj}=await db.from('usuarios').select('gps_validacao_obrigatorio').eq('id',ped.loja_id).single();
-          gpsObrigatorio=lj?.gps_validacao_obrigatorio||false;
-          // Sincroniza localStorage com banco
-          if(gpsObrigatorio)localStorage.setItem('adm_gps_global','1');
+          gpsObrigatorio=lj?.gps_validacao_obrigatorio??false;
+          localStorage.setItem('adm_gps_global',gpsObrigatorio?'1':'0');
         }
       }catch(e){}
     }
@@ -7992,14 +8144,13 @@ async function entStatus(id,novoStatus,refLat,refLng){
       try{
         const pos=await new Promise((resolve,reject)=>{
           const timer=setTimeout(()=>{
-            // Timeout: tenta usar a última posição conhecida mesmo que velha
             if(myLat&&myLng)resolve({lat:myLat,lng:myLng,stale:true});
             else reject('timeout');
-          },10000);
+          },5000);
           navigator.geolocation.getCurrentPosition(
             p=>{clearTimeout(timer);myLat=p.coords.latitude;myLng=p.coords.longitude;resolve({lat:p.coords.latitude,lng:p.coords.longitude,stale:false});},
             err=>{clearTimeout(timer);if(myLat&&myLng)resolve({lat:myLat,lng:myLng,stale:true});else reject('bloqueado');},
-            {enableHighAccuracy:true,timeout:9000,maximumAge:0}
+            {enableHighAccuracy:true,timeout:4500,maximumAge:5000}
           );
         });
         if(!refLat||!refLng||refLat===0){
@@ -8009,13 +8160,13 @@ async function entStatus(id,novoStatus,refLat,refLng){
           const dist=distKm(pos.lat,pos.lng,refLat,refLng)*1000;
           const aviso=pos.stale?' (GPS desatualizado)':'';
           if(dist>RAIO_M){
-            alert('📍 Validação de GPS ativa'+aviso+'\n\nVocê precisa estar a menos de '+RAIO_M+'m do local.\nDistância atual: '+Math.round(dist)+'m\n\nCertifique-se de estar no endereço correto antes de confirmar.');
-            return;
+            const conf=confirm('📍 GPS: você está a '+Math.round(dist)+'m do endereço.\n(Máximo permitido: '+RAIO_M+'m)'+aviso+'\n\nDeseja confirmar mesmo assim?');
+            if(!conf) return;
           }
         }
       }catch(e){
-        alert('📍 GPS obrigatório mas não disponível.\nAtive o GPS do celular e tente novamente.\n('+e+')');
-        return;
+        const conf=confirm('📍 GPS não disponível ('+e+').\nDeseja confirmar a entrega mesmo assim?');
+        if(!conf) return;
       }
     }
   }
