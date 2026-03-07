@@ -2376,7 +2376,7 @@ function navAtualizarPainelAtivo(entregas) {
     btns += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🛵 Saindo</button>`;
 
   // Botão ENTREGUE — sempre visível e em destaque
-  btns += `<button onclick="${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
+  btns += `<button onclick="this.disabled=true;this.textContent='⏳...';${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
 
   const ac = document.getElementById('nav-acoes-ativas');
   if (ac) ac.innerHTML = btns;
@@ -2438,9 +2438,12 @@ function navMoverCameraAtiva(lat, lng) {
 
 async function navConfirmarEntrega(id, refLat, refLng) {
   try {
-    const btn = event?.target;
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Confirmando...'; }
-    await entStatus(id, 'entregue', refLat, refLng);
+    const ok = await entStatus(id, 'entregue', refLat, refLng);
+    if (!ok) {
+      // GPS cancelou — restaura botão
+      navAtualizarPainelAtivo(_rotaEntData || []);
+      return;
+    }
     const {data, error} = await db.from('entregas')
       .select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)')
       .eq('entregador_id', U.id)
@@ -2737,7 +2740,8 @@ function navAtualizarPainel(entregas, idx) {
 }
 
 async function navEntStatus(id, novoStatus, refLat, refLng) {
-  await entStatus(id, novoStatus, refLat, refLng);
+  const ok = await entStatus(id, novoStatus, refLat, refLng);
+  if (ok === false) return; // GPS cancelou
   const {data} = await db.from('entregas').select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)')
     .eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente']).order('ordem_rota');
   if (data?.length) {
@@ -8140,7 +8144,6 @@ async function entStatus(id,novoStatus,refLat,refLng){
       }catch(e){}
     }
     if(gpsObrigatorio){
-      // Pede posição FRESCA (maximumAge:0 = não usa cache)
       try{
         const pos=await new Promise((resolve,reject)=>{
           const timer=setTimeout(()=>{
@@ -8153,20 +8156,17 @@ async function entStatus(id,novoStatus,refLat,refLng){
             {enableHighAccuracy:true,timeout:4500,maximumAge:5000}
           );
         });
-        if(!refLat||!refLng||refLat===0){
-          // Sem coordenada de referência — não bloqueia mas avisa
-          console.warn('[GPS] refLat/refLng ausente, pulando validação');
-        } else {
+        if(refLat&&refLng&&refLat!==0){
           const dist=distKm(pos.lat,pos.lng,refLat,refLng)*1000;
           const aviso=pos.stale?' (GPS desatualizado)':'';
           if(dist>RAIO_M){
-            const conf=confirm('📍 GPS: você está a '+Math.round(dist)+'m do endereço.\n(Máximo permitido: '+RAIO_M+'m)'+aviso+'\n\nDeseja confirmar mesmo assim?');
-            if(!conf) return;
+            const conf=confirm('📍 GPS: você está a '+Math.round(dist)+'m do endereço.\n(Máximo: '+RAIO_M+'m)'+aviso+'\n\nDeseja confirmar mesmo assim?');
+            if(!conf) return false; // ← retorna false para cancelado
           }
         }
       }catch(e){
-        const conf=confirm('📍 GPS não disponível ('+e+').\nDeseja confirmar a entrega mesmo assim?');
-        if(!conf) return;
+        const conf=confirm('📍 GPS indisponível.\nDeseja confirmar mesmo assim?');
+        if(!conf) return false; // ← retorna false para cancelado
       }
     }
   }
@@ -8175,18 +8175,18 @@ async function entStatus(id,novoStatus,refLat,refLng){
   if(novoStatus==='saiu_entrega'){
     upd.saiu_entrega_at=new Date().toISOString();
     upd.status='em_rota';
-    // Calcular rota ao sair para entrega
     try {
       const {data:ped} = await db.from('entregas').select('lat_entrega,lng_entrega,loja:loja_id(loja_lat,loja_lng)').eq('id',id).single();
       if (ped && ped.lat_entrega && ped.loja?.loja_lat) {
-        // Não bloqueia — roda em background
         calcularEAtualizarRota(id, ped.loja.loja_lat, ped.loja.loja_lng, ped.lat_entrega, ped.lng_entrega);
       }
     } catch(e) { console.warn('Erro ao calcular rota:', e); }
   }
   if(novoStatus==='entregue'){upd.status='entregue';upd.entregue_at=new Date().toISOString();upd.pedido_pronto=false;}
-  await db.from('entregas').update(upd).eq('id',id);
+  const {error:updErr} = await db.from('entregas').update(upd).eq('id',id);
+  if(updErr){ console.error('[entStatus]', updErr); alert('Erro ao salvar: '+updErr.message); return false; }
   carregarRotaEnt();initEnt();
+  return true; // ← sucesso confirmado
 }
 
 // ── Confirmação de Entrega com Código iFood (modal) ──
