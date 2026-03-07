@@ -1040,14 +1040,19 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       </div>
     </div>
 
-    <!-- Mapa de navegação ativa -->
-    <div id="nav-mapa-ativo" style="position:absolute;inset:0;z-index:600;"></div>
+    <!-- Mapa de navegação ativa — wrapper com perspectiva 3D -->
+    <div id="nav-mapa-ativo-wrap" style="position:absolute;inset:0;z-index:600;overflow:hidden;">
+      <div id="nav-mapa-ativo" style="position:absolute;left:-18%;right:-18%;top:-5%;bottom:-38%;"></div>
+    </div>
 
     <!-- GPS status -->
     <div id="nav-gps-status-ativo" style="position:absolute;top:0;right:10px;z-index:800;background:rgba(0,0,0,.55);color:white;border-radius:0 0 12px 12px;padding:3px 10px;font-size:10px;font-weight:700;">📡</div>
 
     <!-- Botão recentralizar -->
     <button id="nav-btn-recentrar" onclick="navCentralizar()" style="display:none;position:absolute;bottom:130px;right:14px;z-index:710;background:white;border:2px solid #004E89;color:#004E89;padding:9px 14px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.2);">▲ Recentralizar</button>
+
+    <!-- Botão alternar perspectiva 3D / flat -->
+    <button id="nav-btn-tilt" onclick="navToggleTilt()" style="position:absolute;bottom:130px;left:14px;z-index:710;background:white;border:2px solid #555;color:#555;padding:9px 14px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.2);">🗺️ 2D</button>
 
     <!-- Painel inferior flutuante -->
     <div style="position:absolute;bottom:0;left:0;right:0;z-index:700;background:white;border-radius:16px 16px 0 0;padding:12px 16px 16px;box-shadow:0 -4px 20px rgba(0,0,0,.2);">
@@ -2262,6 +2267,15 @@ async function navIniciarModoAtivo(entregas) {
     if (btn) btn.style.display = 'block';
   });
 
+  // Aplica perspectiva 3D estilo Google Maps após mapa criado
+  _navTiltAtivo = true;
+  setTimeout(() => {
+    navAplicarTilt(true);
+    const btn = document.getElementById('nav-btn-tilt');
+    if (btn) btn.textContent = '🗺️ 2D';
+    if (_navMapAtivo) _navMapAtivo.invalidateSize();
+  }, 200);
+
   // Destinos
   entregas.forEach((e,i) => {
     const lat = parseFloat(e.lat_entrega||0), lng = parseFloat(e.lng_entrega||0);
@@ -2276,10 +2290,44 @@ async function navIniciarModoAtivo(entregas) {
   // Painel inferior modo ativo
   navAtualizarPainelAtivo(entregas);
 
-  // Posição inicial + rota
+  // ══ ROTA INSTANTÂNEA: reutiliza a geometria já calculada na visão geral ══
   if (_navPosAnterior) {
-    await navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
+    // Desenha rota já disponível IMEDIATAMENTE (sem esperar OSRM)
+    if (_navRotaLayer) {
+      try {
+        const geoExistente = _navRotaLayer.toGeoJSON();
+        _navRotaSombraAtivo = L.geoJSON(geoExistente, {
+          style:{color:'#000d2e',weight:14,opacity:.22}
+        }).addTo(_navMapAtivo);
+        _navRotaLayerAtivo = L.geoJSON(geoExistente, {
+          style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}
+        }).addTo(_navMapAtivo);
+        _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
+        // Instrução imediata com cache já disponível
+        if (_navStepsCache.length) {
+          navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
+        }
+      } catch(e) { console.warn('[rota-instant]', e); }
+    }
+    // Centra mapa na posição atual
     navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
+    // Desenha posição do entregador imediatamente
+    const heading = _navHeading;
+    const icon = L.divIcon({
+      html:`<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
+        <div style="transform:rotate(${heading}deg);width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
+          <svg width="60" height="60" viewBox="0 0 60 60">
+            <circle cx="30" cy="30" r="28" fill="white" opacity="0.95" filter="drop-shadow(0 3px 8px rgba(0,0,0,.35))"/>
+            <polygon points="30,8 46,50 30,40 14,50" fill="#1a5276" stroke="white" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>`,
+      className:'', iconSize:[60,60], iconAnchor:[30,40]
+    });
+    _navUserMarkerAtivo = L.marker([_navPosAnterior.lat,_navPosAnterior.lng],{icon,zIndexOffset:1000}).addTo(_navMapAtivo);
+    _navUserMarkerAtivo.bringToFront();
+    // Atualiza rota em background (para pegar rota a partir da posição atual exata)
+    setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 800);
   }
 }
 
@@ -2308,6 +2356,7 @@ function navAtualizarPainelAtivo(entregas) {
 function navPararModoAtivo() {
   _navModoAtivo = false;
   _navSegindoGPS = false;
+  navAplicarTilt(false); // Remove perspectiva 3D
   navPararMapaAtivo();
   document.getElementById('nav-modo-geral').style.display = 'flex';
   document.getElementById('nav-modo-ativo').style.display = 'none';
@@ -2371,22 +2420,43 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
   }
 }
 
+// ══ PERSPECTIVA 3D ESTILO GOOGLE MAPS ═════════════════════════════
+
+function navAplicarTilt(ativo) {
+  const wrap = document.getElementById('nav-mapa-ativo-wrap');
+  const mapa = document.getElementById('nav-mapa-ativo');
+  if (!wrap || !mapa) return;
+  if (ativo) {
+    wrap.style.perspective = '750px';
+    wrap.style.perspectiveOrigin = '50% 100%';
+    mapa.style.transform = 'rotateX(40deg)';
+    mapa.style.transformOrigin = '50% 68%';
+    mapa.style.transition = 'transform 0.6s ease';
+  } else {
+    wrap.style.perspective = '';
+    wrap.style.perspectiveOrigin = '';
+    mapa.style.transform = 'none';
+    mapa.style.transition = 'transform 0.4s ease';
+  }
+}
+
+let _navTiltAtivo = true;
+function navToggleTilt() {
+  _navTiltAtivo = !_navTiltAtivo;
+  navAplicarTilt(_navTiltAtivo);
+  const btn = document.getElementById('nav-btn-tilt');
+  if (btn) btn.textContent = _navTiltAtivo ? '🗺️ 2D' : '🧭 3D';
+  setTimeout(() => { if (_navMapAtivo) _navMapAtivo.invalidateSize(); }, 400);
+}
+
 function navMoverCameraAtiva(lat, lng) {
   if (!_navMapAtivo) return;
-  // Rotação do mapa via CSS transform — funciona sem plugin
-  try {
-    const container = _navMapAtivo.getContainer();
-    // Inclina visualmente o container para simular perspectiva
-    // (rotação real do mapa via CSS)
-    const mapPane = container.querySelector('.leaflet-map-pane');
-    if (mapPane) {
-      // Aplica rotação no mapa pelo heading
-      const angle = -_navHeading;
-      mapPane.style.transformOrigin = '50% 60%';
-      // Não rotaciona o pane pois quebra os tiles — usa só a câmera
-    }
-  } catch(e){}
-  _navMapAtivo.setView([lat,lng], 18, {animate:true,duration:0.4});
+  // Desloca câmera para frente do entregador (igual Google Maps)
+  const rad = _navHeading * Math.PI / 180;
+  const avanco = 0.00035;
+  const aheadLat = lat + avanco * Math.cos(rad);
+  const aheadLng = lng + avanco * Math.sin(rad);
+  _navMapAtivo.setView([aheadLat, aheadLng], 18, { animate: true, duration: 0.5 });
 }
 
 async function navDesenharRotaAtiva(lat, lng, entregas) {
@@ -2481,8 +2551,10 @@ function navCentralizar() {
   _navSegindoGPS = true;
   const btn = document.getElementById('nav-btn-recentrar');
   if (btn) btn.style.display = 'none';
-  if (_navUserMarkerAtivo && _navMapAtivo)
-    _navMapAtivo.setView(_navUserMarkerAtivo.getLatLng(), 18, {animate:true});
+  if (_navUserMarkerAtivo && _navMapAtivo) {
+    const ll = _navUserMarkerAtivo.getLatLng();
+    navMoverCameraAtiva(ll.lat, ll.lng);
+  }
 }
 
 function navDistM(lat1,lng1,lat2,lng2) {
