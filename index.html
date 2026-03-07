@@ -697,9 +697,6 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div class="mitem" onclick="abrirNovoPedido()"><div class="ico">&#128247;</div><h3>Novo Pedido</h3></div>
       <div class="mitem" onclick="abrirPedidosLj()"><div class="ico">&#128230;</div><h3>Pedidos / Rota</h3></div>
       <div class="mitem" onclick="abrirRelLj()"><div class="ico">&#128202;</div><h3>Relatorio</h3></div>
-      <!-- COBRANÇAS DA LOJA — preenchido dinamicamente -->
-      <div id="lj-cob-section" style="display:none;margin-bottom:14px;"></div>
-
       <div class="mitem" onclick="abrirGerEnt()"><div class="ico">&#128101;</div><h3>Entregadores</h3></div>
       <div class="mitem" onclick="abrirCfgLj()" style="grid-column:1/-1;max-width:170px;margin:0 auto;"><div class="ico">&#9881;</div><h3>Configuracoes</h3></div>
     </div>
@@ -931,6 +928,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div style="font-size:11px;color:#888;margin-top:1px;">Visão completa por período</div>
     </div>
   </div>
+  <div id="lj-cob-section" style="display:none;margin-bottom:14px;"></div>
   <div id="rel-f" style="margin-bottom:14px;"></div>
   <div id="rel-dados"></div>
 </div></div>
@@ -6525,6 +6523,7 @@ async function abrirRelLj(){
   if(!$('rel-f')?._cpGetValue){
     _CalPicker.init('rel-f','semana',(per,range)=>{ carregarRel(); });
   }
+  carregarCobLoja();
   carregarRel();
 }
 async function carregarRel(){
