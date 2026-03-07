@@ -4149,9 +4149,13 @@ async function _carregarCobrancasInterno(filtroLojaId, filtroIni, filtroFim) {
   if (!el) return;
 
   // ── Busca lojas ──
-  const { data: lojas = [] } = await db.from('usuarios')
-    .select('id,nome_loja,nome,taxa_sistema,cnpj,telefone')
-    .eq('tipo','loja');
+  let lojas = [];
+  try {
+    const { data: lojasData } = await db.from('usuarios')
+      .select('id,nome_loja,nome,taxa_sistema,cnpj,telefone')
+      .eq('tipo','loja');
+    lojas = lojasData || [];
+  } catch(e) { lojas = []; }
 
   // ── Busca TODAS as cobranças ──
   let cobs = [];
@@ -4171,12 +4175,16 @@ async function _carregarCobrancasInterno(filtroLojaId, filtroIni, filtroFim) {
   const pFim = filtroFim ? new Date(filtroFim + 'T23:59:59') : sFim;
 
   // ── Busca entregas do período selecionado (com detalhes para prévia) ──
-  const { data: entsPeriodo = [] } = await db.from('entregas')
-    .select('id,loja_id,status,created_at,numero_pedido,nome_cliente,cliente_nome')
-    .eq('status','entregue')
-    .gte('created_at', pIni.toISOString())
-    .lte('created_at', pFim.toISOString())
-    .order('created_at', { ascending: true });
+  let entsPeriodo = [];
+  try {
+    const { data: entsData } = await db.from('entregas')
+      .select('id,loja_id,status,created_at,numero_pedido,nome_cliente,cliente_nome')
+      .eq('status','entregue')
+      .gte('created_at', pIni.toISOString())
+      .lte('created_at', pFim.toISOString())
+      .order('created_at', { ascending: true });
+    entsPeriodo = entsData || [];
+  } catch(e) { entsPeriodo = []; }
 
   // Conta entregas por loja e agrupa pedidos
   const entPorLoja = {};
