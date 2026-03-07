@@ -2288,6 +2288,7 @@ function navAtualizarPosGeral(lat, lng) {
 async function navIniciarModoAtivo(entregas) {
   _navModoAtivo  = true;
   _navSegindoGPS = true;
+  _navPosInicialAtivo = myLat && myLng ? {lat:myLat, lng:myLng} : null;
 
   // ── PASSO 1: garante posição GPS imediata ──────────────────────────
   if (!_navPosAnterior && myLat && myLng) {
@@ -2450,7 +2451,13 @@ function navPararMapaAtivo() {
 async function navAtualizarPosAtiva(lat, lng, entregas) {
   if (!_navMapAtivo) return;
   _navInicializarMarcadorAtivo(lat, lng);
-  if (_navSegindoGPS) navMoverCameraAtiva(lat, lng);
+  // Só segue com zoom 18 se o entregador já se moveu > 15m da posição inicial
+  // Evita que o fitBounds inicial seja destruído antes da linha aparecer na tela
+  if (_navSegindoGPS) {
+    const deslocou = !_navPosInicialAtivo ||
+      navDistM(lat, lng, _navPosInicialAtivo.lat, _navPosInicialAtivo.lng) > 15;
+    if (deslocou) navMoverCameraAtiva(lat, lng);
+  }
 
   const e = entregas[_navEntregaAtual];
   if (e?.lat_entrega) {
@@ -2474,6 +2481,7 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
 function navAplicarTilt(ativo) {}
 let _navTiltAtivo = false;
 function navToggleTilt() {}
+let _navPosInicialAtivo = null; // posição no momento de abrir modo ativo — câmera não segue até mover
 
 function navMoverCameraAtiva(lat, lng) {
   if (!_navMapAtivo) return;
@@ -2586,6 +2594,8 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
     _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
     navAtualizarInstrucao(lat, lng);
     // Após OSRM: se GPS ativo, muda para câmera de navegação (zoom 18 seguindo entregador)
+    // OSRM respondeu com rota real — agora inicia modo de câmera navegando
+    _navPosInicialAtivo = null; // libera câmera para seguir entregador
     if (_navSegindoGPS) navMoverCameraAtiva(lat, lng);
   } else {
     // Fallback: linha reta já está desenhada — só atualiza texto
