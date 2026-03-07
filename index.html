@@ -2072,6 +2072,7 @@ let _navGPSContagem = 0;
 let _navRotaAjustada = false;
 let _navStepsCache = [];
 let _navGeometriaCache = null;  // Geometria raw do OSRM — usada para rota instantânea
+let _navRotaAjustaComRota = false; // true quando câmera foi ajustada com rota real
 
 // ══ ABRIR / FECHAR ════════════════════════════════════════════════
 
@@ -2132,6 +2133,7 @@ async function abrirNavInterna(entregas) {
   _navRotaAjustada = false;
   _navStepsCache = [];
   _navGeometriaCache = null;
+  _navRotaAjustaComRota = false;
   _navRotaOSRMOk = false;
   try { localStorage.setItem('nav_ativa','1'); localStorage.setItem('nav_ent_idx','0'); } catch(e){}
 
@@ -2206,22 +2208,19 @@ async function navDesenharRotaGeral(entregas, origemLL) {
   const oLat = origemLL ? origemLL.lat : pontos[0][0];
   const oLng = origemLL ? origemLL.lng : pontos[0][1];
 
-  // LINHA IMEDIATA: reta ligando todos os pontos — aparece antes do OSRM responder
-  const retaCoords = [[oLng,oLat], ...pontos.map(p=>[p[1],p[0]])];
-  const geomReta = { type:'LineString', coordinates: retaCoords };
-  if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
-  if (_navRotaLayer)  _navMap.removeLayer(_navRotaLayer);
-  _navRotaSombra = L.geoJSON(geomReta,{style:{color:'#001a4d',weight:12,opacity:.18}}).addTo(_navMap);
-  _navRotaLayer  = L.geoJSON(geomReta,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
-  _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
-  if (_navUserMarker) _navUserMarker.bringToFront();
+  // Mostra indicador de carregamento sem desenhar linha reta
+  _rotaToast('⏳ Calculando rota pelas ruas...', '#1565C0');
+
+  // Enquadra câmera nos pontos de destino enquanto aguarda OSRM
   if (!_navRotaAjustada) {
-    _navRotaAjustada = true;
-    const b = _navRotaLayer.getBounds();
-    if (b.isValid()) _navMap.fitBounds(b, {padding:[55,55],animate:false});
+    const bounds = L.latLngBounds([[oLat,oLng], ...pontos]);
+    if (bounds.isValid()) {
+      _navRotaAjustada = true;
+      _navMap.fitBounds(bounds, {padding:[55,55],animate:false});
+    }
   }
 
-  // OSRM em background — substitui linha reta pela rota real
+  // Aguarda OSRM/Valhalla retornar rota real pelas ruas
   const waypoints = [[oLat,oLng], ...pontos];
   const coords = waypoints.map(p=>`${p[1]},${p[0]}`).join(';');
   const rota = await _fetchOSRM(coords);
@@ -2232,7 +2231,24 @@ async function navDesenharRotaGeral(entregas, origemLL) {
     _navRotaLayer  = L.geoJSON(rota.geometry,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => { try{dm.marker.bringToFront();}catch(e){} });
     if (_navUserMarker) { try{_navUserMarker.bringToFront();}catch(e){} }
+    // Reajusta câmera para mostrar a rota completa pelas ruas
+    if (!_navRotaAjustaComRota) {
+      _navRotaAjustaComRota = true;
+      const b = _navRotaLayer.getBounds();
+      if (b.isValid()) _navMap.fitBounds(b, {padding:[55,55],animate:true});
+    }
     console.log('[OSRM geral] rota desenhada, pontos:', rota.geometry.coordinates.length);
+  } else {
+    // OSRM e Valhalla falharam — desenha linha de referência com aviso
+    _rotaToast('⚠️ Roteamento indisponível — exibindo referência visual', '#D4A017');
+    const retaCoords = [[oLng,oLat], ...pontos.map(p=>[p[1],p[0]])];
+    const geomReta = { type:'LineString', coordinates: retaCoords };
+    if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} }
+    if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer);}catch(e){} }
+    _navRotaSombra = L.geoJSON(geomReta,{style:{color:'#888',weight:8,opacity:.18,dashArray:'8,8'}}).addTo(_navMap);
+    _navRotaLayer  = L.geoJSON(geomReta,{style:{color:'#888',weight:4,opacity:.7,lineCap:'round',lineJoin:'round',dashArray:'8,8'}}).addTo(_navMap);
+    _navDestinoMarkers.forEach(dm => { try{dm.marker.bringToFront();}catch(e){} });
+    if (_navUserMarker) { try{_navUserMarker.bringToFront();}catch(e){} }
   }
 }
 
@@ -2285,7 +2301,8 @@ async function navOnGPS(pos, entregas) {
     await navAtualizarPosAtiva(lat, lng, entregas);
   } else {
     navAtualizarPosGeral(lat, lng);
-    // Só redesenha rota se ainda não temos rota OSRM real (evita apagar rota real com linha reta)
+    // Redesenha rota a cada 8 ticks de GPS apenas se ainda não temos rota OSRM
+    // Nunca desenha linha reta — navDesenharRotaGeral já aguarda OSRM
     if (_navGPSContagem % 8 === 1 && !_navRotaOSRMOk) navDesenharRotaGeral(entregas, {lat,lng});
   }
 
@@ -2409,22 +2426,28 @@ async function navIniciarModoAtivo(entregas) {
     const dLat = parseFloat(eAtual.lat_entrega);
     const dLng = parseFloat(eAtual.lng_entrega);
 
-    // LINHA RETA IMEDIATA — aparece instantaneamente
-    _navDesenharGeometriaNoAtivo({
-      type: 'LineString',
-      coordinates: [
-        [_navPosAnterior.lng, _navPosAnterior.lat],
-        [dLng, dLat]
-      ]
-    });
+    // Se já temos geometria em cache (calculada na visão geral), usa imediatamente
+    if (_navGeometriaCache) {
+      _navDesenharGeometriaNoAtivo(_navGeometriaCache);
+      const b = _navRotaLayerAtivo?.getBounds?.();
+      if (b?.isValid()) {
+        _navMapAtivo.fitBounds(b, { padding: [70, 70], maxZoom: 17, animate: false });
+      } else {
+        _navMapAtivo.fitBounds(
+          L.latLngBounds([_navPosAnterior.lat, _navPosAnterior.lng], [dLat, dLng]),
+          { padding: [70, 70], maxZoom: 16, animate: false }
+        );
+      }
+    } else {
+      // Sem cache: enquadra câmera e aguarda OSRM calcular a rota
+      _rotaToast('⏳ Calculando rota pelas ruas...', '#1565C0');
+      _navMapAtivo.fitBounds(
+        L.latLngBounds([_navPosAnterior.lat, _navPosAnterior.lng], [dLat, dLng]),
+        { padding: [70, 70], maxZoom: 16, animate: false }
+      );
+    }
 
-    // Câmera enquadra ENTREGADOR + DESTINO — linha fica visível na tela inteira
-    _navMapAtivo.fitBounds(
-      L.latLngBounds([_navPosAnterior.lat, _navPosAnterior.lng], [dLat, dLng]),
-      { padding: [70, 70], maxZoom: 16, animate: false }
-    );
-
-    // OSRM em background — substitui linha reta pela rota real pelas ruas
+    // Solicita/atualiza rota OSRM para este destino específico
     navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
 
   } else if (_navPosAnterior) {
@@ -2545,6 +2568,9 @@ async function navConfirmarEntrega(id, refLat, refLng) {
       document.getElementById('nav-modo-ativo').style.display = 'none';
       _navEntregaAtual = Math.min(_navEntregaAtual, data.length - 1);
       _navRotaAjustada = false;
+      _navRotaAjustaComRota = false;
+      _navGeometriaCache = null;
+      _navRotaOSRMOk = false;
       try { localStorage.setItem('nav_ent_idx', _navEntregaAtual); } catch(e){}
       navAtualizarPainel(data, _navEntregaAtual);
       navDesenharRotaGeral(data, _navPosAnterior);
@@ -2723,7 +2749,8 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
     console.log('[OSRM ativo] rota desenhada, pontos:', rota.geometry.coordinates.length);
     // NÃO mexe na câmera — _navPosInicialAtivo continua guardando até entregador mover 15m
   } else {
-    // Fallback: linha reta já está desenhada — só atualiza texto
+    // Roteamento falhou — avisa usuário, atualiza texto mas não desenha linha reta
+    _rotaToast('⚠️ Roteamento indisponível. Verifique sua conexão.', '#D4A017');
     const distM = navDistM(lat, lng, dLat, dLng);
     const el = document.getElementById('nav-dist-instrucao');
     const elR = document.getElementById('nav-rua-instrucao');
@@ -2862,6 +2889,9 @@ async function navConfirmarEntrega(id, refLat, refLng) {
     document.getElementById('nav-modo-ativo').style.display = 'none';
     _navEntregaAtual = Math.min(_navEntregaAtual, data.length-1);
     _navRotaAjustada = false;
+    _navRotaAjustaComRota = false;
+    _navGeometriaCache = null;
+    _navRotaOSRMOk = false;
     try { localStorage.setItem('nav_ent_idx', _navEntregaAtual); } catch(e){}
     navAtualizarPainel(data, _navEntregaAtual);
     navDesenharRotaGeral(data, _navPosAnterior);
@@ -8326,7 +8356,9 @@ async function finalizarSemCodigoIfood(){
       _navEntregaAtual = 0;
       _navModoAtivo = false;
       _navRotaAjustada = false;
+      _navRotaAjustaComRota = false;
       _navGeometriaCache = null;
+      _navRotaOSRMOk = false;
       _navStepsCache = [];
       _navPosInicialAtivo = {lat: oriLat, lng: oriLng}; // segura câmera até mover
       navPararMapaAtivo();
