@@ -1562,8 +1562,10 @@ window.onload=()=>{
   // Set logo and wallpaper on login screen immediately
   const li=$('login-logo');if(li)li.src=LOGO_URL;
   const bg=$('login-bg-img');if(bg)bg.src=HEADER_BG_URL;
-  const _us=carregarU();
-  if(_us){U=_us;showPg(U.tipo);}
+  try{
+    const _us=carregarU();
+    if(_us&&_us.id&&_us.tipo){U=_us;showPg(U.tipo);}
+  }catch(e){console.warn('onload: erro ao restaurar sessão',e);}
   // Inicia agendador de auto-logout às 03:00h
   agendarAutoLogout();
 };
@@ -4077,19 +4079,21 @@ async function admForcarStatus(id,status){
 
 // ============ LOJA ============
 async function initLoja(){
-  const{data}=await db.from('usuarios').select('*').eq('id',U.id).single();
-  if(data){
-    // Preserva campos locais importantes que podem não existir no banco
-    const lojaAtivaLocal=U.loja_ativa_id||null;
-    const lojaNomeLocal=U._loja_ativa_nome||null;
-    const lojaCodLocal=U._loja_ativa_codigo||null;
-    U={...U,...data};
-    // Se o banco retornou null mas temos valor local, mantém o local
-    if(!U.loja_ativa_id&&lojaAtivaLocal)U.loja_ativa_id=lojaAtivaLocal;
-    if(!U._loja_ativa_nome&&lojaNomeLocal)U._loja_ativa_nome=lojaNomeLocal;
-    if(!U._loja_ativa_codigo&&lojaCodLocal)U._loja_ativa_codigo=lojaCodLocal;
-    salvarU();
-  }
+  try{
+    const{data,error}=await db.from('usuarios').select('*').eq('id',U.id).single();
+    if(data&&!error){
+      // Preserva campos locais importantes que podem não existir no banco
+      const lojaAtivaLocal=U.loja_ativa_id||null;
+      const lojaNomeLocal=U._loja_ativa_nome||null;
+      const lojaCodLocal=U._loja_ativa_codigo||null;
+      U={...U,...data};
+      // Se o banco retornou null mas temos valor local, mantém o local
+      if(!U.loja_ativa_id&&lojaAtivaLocal)U.loja_ativa_id=lojaAtivaLocal;
+      if(!U._loja_ativa_nome&&lojaNomeLocal)U._loja_ativa_nome=lojaNomeLocal;
+      if(!U._loja_ativa_codigo&&lojaCodLocal)U._loja_ativa_codigo=lojaCodLocal;
+      salvarU();
+    }
+  }catch(e){console.warn('initLoja: erro ao buscar dados, usando cache local',e);}
   $('loja-nome').textContent=U.nome_loja||U.nome;
   $('loja-cod').textContent=U.codigo_loja||'------';
   $('lj-ts').textContent=fR(U.taxa_sistema);
@@ -4146,13 +4150,13 @@ async function carregarCobLoja() {
   const sec = $('lj-cob-section');
   if (!sec) return;
 
-  // Busca cobrança pendente mais recente desta loja
+  // Busca cobrança pendente OU aguardando confirmação mais recente desta loja
   let cob = null;
   try {
     const { data } = await db.from('cobrancas_lojas')
       .select('*')
       .eq('loja_id', U.id)
-      .eq('status', 'pendente')
+      .in('status', ['pendente', 'aguardando_confirmacao'])
       .order('created_at', { ascending: false })
       .limit(1);
     cob = data && data.length ? data[0] : null;
