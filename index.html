@@ -854,6 +854,14 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
         <div id="p-troco-resumo" style="font-size:13px;font-weight:700;color:#333;"></div>
       </div>
     </div>
+
+    <div id="p-cartao-area" style="display:none;margin-top:8px;">
+      <div class="fg" style="margin-bottom:0;">
+        <label style="font-size:11px;font-weight:700;color:#1565C0;">💳 Valor a cobrar no cartão</label>
+        <input type="number" id="p-valor-cartao" placeholder="Ex: 120,00" step="0.01" min="0"
+          style="padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;width:100%;">
+      </div>
+    </div>
   </div>
 
   <div id="p-codconf-area" class="hidden" style="margin-bottom:11px;background:#f3e5f5;border-radius:8px;padding:10px;">
@@ -4694,6 +4702,8 @@ function selecionarPagamento(tipo){
   });
   const trocoArea = document.getElementById('p-troco-area');
   if(trocoArea) trocoArea.style.display = tipo === 'dinheiro' ? 'block' : 'none';
+  const cartaoArea = document.getElementById('p-cartao-area');
+  if(cartaoArea) cartaoArea.style.display = tipo === 'cartao' ? 'block' : 'none';
   if(tipo !== 'dinheiro') {
     const res = document.getElementById('p-troco-resultado');
     if(res) res.style.display = 'none';
@@ -5078,7 +5088,8 @@ async function salvarPedido(){
     forma_pagamento:_pedidoPagamento||'pago',
     troco_valor:_pedidoPagamento==='dinheiro'?parseFloat(v('p-troco-valor')||0):null,
     valor_pedido:_pedidoPagamento==='dinheiro'?parseFloat(document.getElementById('p-valor-pedido')?.value||0):null,
-    troco_calculado:_pedidoPagamento==='dinheiro'?(()=>{const vp=parseFloat(document.getElementById('p-valor-pedido')?.value||0);const vg=parseFloat(v('p-troco-valor')||0);return vg>vp?vg-vp:0;})():null
+    troco_calculado:_pedidoPagamento==='dinheiro'?(()=>{const vp=parseFloat(document.getElementById('p-valor-pedido')?.value||0);const vg=parseFloat(v('p-troco-valor')||0);return vg>vp?vg-vp:0;})():null,
+    valor_cartao:_pedidoPagamento==='cartao'?parseFloat(document.getElementById('p-valor-cartao')?.value||0):null
   };
   const{error}=await db.from('entregas').insert([dados]);
   if(error){showM('ped-msg','Erro: '+error.message);return;}
@@ -5254,6 +5265,15 @@ async function gerarRotaComIA(){
       }).join('');
     btn.textContent='Gerar Rota com IA';btn.disabled=false;
     $('qtd-msg').textContent='';
+    // Mostra avisos de endereços não encontrados no mapa
+    if(r.avisos&&r.avisos.length>0){
+      const avisoEl=document.createElement('div');
+      avisoEl.style.cssText='background:#fffbea;border:2px solid #F5A800;border-radius:10px;padding:10px 14px;margin-bottom:12px;';
+      avisoEl.innerHTML='<div style="font-size:12px;font-weight:700;color:#C8960C;margin-bottom:4px;">⚠️ ATENÇÃO — Endereços não encontrados no mapa:</div>'
+        +r.avisos.map(a=>'<div style="font-size:12px;color:#555;padding:2px 0;">'+a+'</div>').join('')
+        +'<div style="font-size:11px;color:#888;margin-top:5px;">Verifique o endereço completo desses pedidos. A distância e o valor da corrida podem estar incorretos.</div>';
+      body.insertBefore(avisoEl,body.firstChild);
+    }
     closeM('qtd-ent');openM('rota-plano');
   }catch(e){
     showM('qtd-msg','Falha na conexao com servidor: '+e.message,false);
@@ -5281,7 +5301,15 @@ async function otimizarRotaInteligente(){
     _rotaIAGrupos=r.grupos;_rotaPlanoGrupos=r.grupos;
     const body=$('rota-plano-body');
     const cores=['#004E89','#F5A800','#00C9A7','#8e44ad','#D4A017','#27ae60'];
-    body.innerHTML='<div style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#2e7d32;">'
+    let htmlAvisos='';
+    if(r.avisos&&r.avisos.length>0){
+      htmlAvisos='<div style="background:#fffbea;border:2px solid #F5A800;border-radius:10px;padding:10px 14px;margin-bottom:12px;">'
+        +'<div style="font-size:12px;font-weight:700;color:#C8960C;margin-bottom:4px;">⚠️ ATENÇÃO — Endereços não encontrados no mapa:</div>'
+        +r.avisos.map(a=>'<div style="font-size:12px;color:#555;padding:2px 0;">'+a+'</div>').join('')
+        +'<div style="font-size:11px;color:#888;margin-top:5px;">Verifique o endereço completo desses pedidos. A distância e o valor da corrida podem estar incorretos.</div>'
+        +'</div>';
+    }
+    body.innerHTML=htmlAvisos+'<div style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;font-weight:700;color:#2e7d32;">'
       +r.totalPedidos+' entrega(s) em '+r.totalParadas+' grupo(s) por direcao</div>'
       +r.grupos.map((g,gi)=>'<div class="secao" style="margin-bottom:10px;">'
         +'<div class="s-title" style="color:'+cores[gi%cores.length]+';">'+g.entNome+' - '+g.pedidos.length+' entrega(s)</div>'
@@ -7495,7 +7523,7 @@ async function carregarRotaEnt(){
         const trocoCalculado = parseFloat(e.troco_calculado||0);
         const trocoValorPago = parseFloat(e.troco_valor||0);
         if(fp==='pago') return '<div style="display:inline-flex;align-items:center;gap:5px;background:#e8f5e9;border-radius:8px;padding:5px 10px;margin-top:5px;"><span style="font-size:14px;">✅</span><span style="font-size:12px;font-weight:700;color:#2e7d32;">Já pago — não cobrar</span></div>';
-        if(fp==='cartao') return '<div style="display:inline-flex;align-items:center;gap:5px;background:#e3f2fd;border-radius:8px;padding:5px 10px;margin-top:5px;"><span style="font-size:14px;">💳</span><span style="font-size:12px;font-weight:700;color:#1565C0;">Cobrar no cartão — levar máquina'+(valorPedido>0?' · '+fR(valorPedido):'')+'</span></div>';
+        if(fp==='cartao'){const vc=parseFloat(e.valor_cartao||0);return '<div style="background:#e3f2fd;border:1.5px solid #90caf9;border-radius:10px;padding:8px 12px;margin-top:6px;font-size:12px;font-weight:700;color:#1565C0;">💳 Cobrar no cartão — levar máquina'+(vc>0?' · <strong>'+fR(vc)+'</strong>':'')+'</div>';}
         if(fp==='dinheiro'){
           let partes = ['💵 Cobrar em dinheiro'];
           if(valorPedido>0) partes.push('Valor: <strong>'+fR(valorPedido)+'</strong>');
