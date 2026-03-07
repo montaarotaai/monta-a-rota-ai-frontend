@@ -1931,13 +1931,65 @@ function formatarTempo(min) {
   return m > 0 ? `~${h}h${m}min` : `~${h}h`;
 }
 
+// ── Bounding box de Ribeirão Preto para validar resultados ──
+const RP_BOUNDS={latMin:-21.35,latMax:-20.95,lngMin:-48.05,lngMax:-47.60};
+function dentroDeRP(lat,lng){return lat>=RP_BOUNDS.latMin&&lat<=RP_BOUNDS.latMax&&lng>=RP_BOUNDS.lngMin&&lng<=RP_BOUNDS.lngMax;}
+
+// Normaliza endereço removendo lixo que confunde o Nominatim
+function normalizarEndereco(addr){
+  let a = addr||'';
+  // Remove complementos entre parênteses: (Apt 22), (Ap802), (S-7), etc
+  a = a.replace(/\s*\([^)]*\)/gi,'').trim();
+  // Remove "Subsetor Sul - 7 (S-7)", "Subsetor Norte", etc
+  a = a.replace(/,?\s*Subsetor\s+\w[^,]*/gi,'').trim();
+  // Remove sufixos de andar/apartamento depois da vírgula
+  a = a.replace(/,\s*(Ap|Apt|Apto|Apartamento|Sala|Loja|Bloco|Bl|Cj|Conjunto)\s*[\w-]*/gi,'').trim();
+  // Garante que começa com tipo de logradouro — adiciona "Rua" se não tiver
+  if(!/^(Rua|Av(enida)?|R\.|Alameda|Travessa|Estrada|Rod(ovia)?|Pça|Praça|Via |Viela|Beco|Largo|Trav)/i.test(a)){
+    a = 'Rua '+a;
+  }
+  // Remove vírgulas duplas
+  a = a.replace(/,\s*,/g,',').trim();
+  return a;
+}
+
 async function geocode(addr){
   if(geocodeCache[addr])return geocodeCache[addr];
-  try{
-    const r=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(addr+', Ribeirao Preto, SP, Brasil')+'&format=json&limit=1',{headers:{'User-Agent':'MontaARotaAi/1.0'}});
-    const d=await r.json();
-    if(d&&d[0]){const res={lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};geocodeCache[addr]=res;return res;}
-  }catch(e){}
+  const NOM = 'https://nominatim.openstreetmap.org/search';
+  const HDR = {'User-Agent':'MontaARotaAi/1.0'};
+
+  // Monta lista de variações para tentar em sequência
+  const variantes = [];
+  const limpo   = normalizarEndereco(addr);
+  // Extrai partes: logradouro, número, bairro
+  const partes  = limpo.split(',').map(s=>s.trim()).filter(Boolean);
+  const logNum  = partes.slice(0,2).join(', ');  // ex: "Rua Pascoal Bardaro, 650"
+  const bairro  = partes[2]||'';
+  const cidade  = 'Ribeirão Preto, SP, Brasil';
+
+  variantes.push(limpo + ', ' + cidade);
+  if(bairro) variantes.push(logNum + ', ' + bairro + ', ' + cidade);
+  variantes.push(logNum + ', ' + cidade);
+  if(partes[0]) variantes.push(partes[0] + ', ' + cidade);  // só o nome da rua + cidade
+
+  for(const q of variantes){
+    try{
+      const url = NOM+'?q='+encodeURIComponent(q)+'&format=json&limit=3&countrycodes=br';
+      const r   = await fetch(url,{headers:HDR});
+      const d   = await r.json();
+      if(!d||!d.length) continue;
+      // Prefere resultado dentro de RP
+      const rpRes = d.find(x=>dentroDeRP(parseFloat(x.lat),parseFloat(x.lon)));
+      const res   = rpRes||d[0];
+      const lat   = parseFloat(res.lat), lng = parseFloat(res.lon);
+      if(!dentroDeRP(lat,lng)) continue; // resultado fora de RP — tenta próxima variante
+      const out = {lat,lng};
+      geocodeCache[addr] = out;
+      return out;
+    }catch(e){}
+    // Pequeno delay para não bater rate-limit do Nominatim
+    await new Promise(ok=>setTimeout(ok,300));
+  }
   return null;
 }
 
