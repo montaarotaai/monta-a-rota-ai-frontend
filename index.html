@@ -2053,6 +2053,7 @@ let _rotaEntData = [];
 let _navMap = null;
 let _navMapAtivo = null;
 let _navWatchId = null;
+let _navPosInicialAtivo = null;
 let _navUserMarker = null;
 let _navUserMarkerAtivo = null;
 let _navRotaLayer = null;
@@ -2307,7 +2308,11 @@ function navAtualizarPosGeral(lat, lng) {
   if (!_navUserMarker) _navUserMarker = L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(_navMap);
   else _navUserMarker.setLatLng([lat,lng]).setIcon(icon);
   _navUserMarker.bringToFront();
-  if (_navSegindoGPS) _navMap.setView([lat,lng], 16, {animate:true,duration:0.5});
+  // Só segue GPS na câmera se a linha ainda não foi desenhada
+  // Quando tem linha, o fitBounds já enquadrou tudo — GPS não deve destruir isso
+  if (_navSegindoGPS && !_navRotaLayer) {
+    _navMap.setView([lat,lng], 16, {animate:true,duration:0.5});
+  }
 }
 
 // ══ MODO NAVEGAÇÃO ATIVA — estilo Google Maps ══════════════════════
@@ -2322,7 +2327,9 @@ async function navIniciarComGeocode() {
 async function navIniciarModoAtivo(entregas) {
   _navModoAtivo  = true;
   _navSegindoGPS = true;
-  _navPosInicialAtivo = myLat && myLng ? {lat:myLat, lng:myLng} : null;
+  // Garante posição de referência para a guarda da câmera — usa qualquer fonte disponível
+  const _posRef = (myLat && myLng) ? {lat:myLat,lng:myLng} : _navPosAnterior;
+  _navPosInicialAtivo = _posRef ? {lat:_posRef.lat, lng:_posRef.lng} : {lat:RP_LAT, lng:RP_LNG};
 
   // ── PASSO 1: garante posição GPS imediata ──────────────────────────
   if (!_navPosAnterior && myLat && myLng) {
@@ -2477,9 +2484,10 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
   // Só segue com zoom 18 se o entregador já se moveu > 15m da posição inicial
   // Evita que o fitBounds inicial seja destruído antes da linha aparecer na tela
   if (_navSegindoGPS) {
-    const deslocou = !_navPosInicialAtivo ||
-      navDistM(lat, lng, _navPosInicialAtivo.lat, _navPosInicialAtivo.lng) > 15;
-    if (deslocou) navMoverCameraAtiva(lat, lng);
+    const ref = _navPosInicialAtivo;
+    // Se não tem referência inicial, usa a posição anterior como base
+    const semMovimento = ref && navDistM(lat, lng, ref.lat, ref.lng) < 15;
+    if (!semMovimento) navMoverCameraAtiva(lat, lng);
   }
 
   const e = entregas[_navEntregaAtual];
@@ -2504,7 +2512,6 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
 function navAplicarTilt(ativo) {}
 let _navTiltAtivo = false;
 function navToggleTilt() {}
-let _navPosInicialAtivo = null; // posição no momento de abrir modo ativo — câmera não segue até mover
 
 function navMoverCameraAtiva(lat, lng) {
   if (!_navMapAtivo) return;
