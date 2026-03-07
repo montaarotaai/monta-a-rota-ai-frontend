@@ -8180,7 +8180,41 @@ async function finalizarComCodigoIfood(){
 async function finalizarSemCodigoIfood(){
   showM('ifood-conf-msg','Finalizando...', true);
   closeM('ifood-conf');
-  await entStatus(_ifoodPedId,'entregue',_ifoodRefLat,_ifoodRefLng);
+
+  const ok = await entStatus(_ifoodPedId,'entregue',_ifoodRefLat,_ifoodRefLng);
+  if (ok === false) return; // GPS cancelou
+
+  // Se estiver no modo de navegação interna, avança para próxima entrega
+  if (document.getElementById('pg-nav-interna')?.style.display !== 'none') {
+    const {data} = await db.from('entregas')
+      .select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)')
+      .eq('entregador_id', U.id)
+      .in('status', ['aceito','em_rota','chegou_loja','saiu_entrega','pendente'])
+      .order('ordem_rota');
+
+    if (data?.length) {
+      // Reordena pelo nearest-neighbor a partir de onde está agora
+      const oriLat = myLat || RP_LAT, oriLng = myLng || RP_LNG;
+      const reordenadas = _reordenarNearestNeighbor(data, oriLat, oriLng);
+      _rotaEntData = reordenadas;
+      _navEntregaAtual = 0;
+      _navModoAtivo = false;
+      _navRotaAjustada = false;
+      _navGeometriaCache = null;
+      _navStepsCache = [];
+      _navPosInicialAtivo = {lat: oriLat, lng: oriLng}; // segura câmera até mover
+      navPararMapaAtivo();
+      document.getElementById('nav-modo-geral').style.display = 'flex';
+      document.getElementById('nav-modo-ativo').style.display = 'none';
+      try { localStorage.setItem('nav_ent_idx','0'); } catch(e){}
+      navAtualizarPainel(reordenadas, 0);
+      navDesenharRotaGeral(reordenadas, myLat ? {lat:myLat,lng:myLng} : null);
+    } else {
+      // Todas entregas concluídas
+      fecharNavInterna();
+      alert('✅ Todas as entregas concluídas!');
+    }
+  }
 }
 
 // ── Admin: Finalizar entrega manualmente ──
