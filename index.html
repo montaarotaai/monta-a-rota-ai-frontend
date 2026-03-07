@@ -2882,7 +2882,7 @@ function pararIvs(){
   // rast usa watchPosition, nao setInterval
   if(ivs.rast){navigator.geolocation&&navigator.geolocation.clearWatch(ivs.rast);ivs.rast=null;}
   // os demais sao setInterval
-  ['rastPush','mAdm','mLj','alerta'].forEach(k=>{if(ivs[k]){clearInterval(ivs[k]);ivs[k]=null;}});
+  ['rastPush','mAdm','mLj','alerta','mCobKpi','mCobLj'].forEach(k=>{if(ivs[k]){clearInterval(ivs[k]);ivs[k]=null;}});
   // Fecha canal realtime
   if(realtimeCh){try{realtimeCh.unsubscribe();}catch(e){}realtimeCh=null;}
 }
@@ -2961,6 +2961,7 @@ async function initAdmin(){
   await carregarAdmGpsToggle();
   criarMapa('admin');await pullAdm();
   ivs.mAdm=setInterval(pullAdm,5000);
+  ivs.mCobKpi=setInterval(atualizarKpisCob,30000); // atualiza KPIs de cobrança a cada 30s
   iniciarRealtimeDrivers('admin');
   await carregarAdmImpersonar();
   // Carrega foto de perfil do admin
@@ -3352,6 +3353,37 @@ async function carregarDadosAdmin(){
       </div>
     </div>`;
   }).join('');
+}
+
+async function atualizarKpisCob() {
+  // Só roda se os elementos existirem na tela (aba cobranças aberta)
+  const vEl = $('kpi-a-receber-v');
+  const rEl = $('kpi-recebido-v');
+  if (!vEl && !rEl) return;
+  try {
+    const { data } = await db.from('cobrancas_lojas')
+      .select('status,valor_total,vencimento')
+      .neq('status','cancelado');
+    if (!data) return;
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    let aReceber = 0, recebido = 0, vencidas = 0;
+    data.forEach(c => {
+      const val = parseFloat(c.valor_total || 0);
+      if (c.status === 'pago') {
+        recebido += val;
+      } else {
+        aReceber += val;
+        if (c.vencimento && new Date(c.vencimento+'T00:00:00') < hoje) vencidas++;
+      }
+    });
+    if (vEl) vEl.textContent = fR(aReceber);
+    if (rEl) rEl.textContent = fR(recebido);
+    const vcEl = $('kpi-vencidas-v');
+    if (vcEl) {
+      vcEl.textContent = vencidas;
+      vcEl.style.color = vencidas > 0 ? '#C8960C' : '#94a3b8';
+    }
+  } catch(e) {}
 }
 
 async function pullAdm(){
@@ -4334,16 +4366,16 @@ async function _carregarCobrancasInterno(filtroLojaId, filtroIni, filtroFim) {
   html += '<div class="cob-card">' +
     '<div class="cob-title">💰 Resumo — ' + pIni.toLocaleDateString('pt-BR') + ' a ' + pFim.toLocaleDateString('pt-BR') + '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:12px;">' +
-    '<div class="cob-kpi" style="border-color:#ffe0b2;">' +
-      '<div class="cob-kpi-v" style="color:#9a6f00;">' + fR(totalAReceber) + '</div>' +
+    '<div class="cob-kpi" id="kpi-a-receber" style="border-color:#ffe0b2;">' +
+      '<div class="cob-kpi-v" id="kpi-a-receber-v" style="color:#9a6f00;">' + fR(totalAReceber) + '</div>' +
       '<div class="cob-kpi-l">A Receber</div>' +
     '</div>' +
-    '<div class="cob-kpi" style="border-color:#c8e6c9;">' +
-      '<div class="cob-kpi-v" style="color:#2e7d32;">' + fR(totalPago) + '</div>' +
+    '<div class="cob-kpi" id="kpi-recebido" style="border-color:#c8e6c9;">' +
+      '<div class="cob-kpi-v" id="kpi-recebido-v" style="color:#2e7d32;">' + fR(totalPago) + '</div>' +
       '<div class="cob-kpi-l">Recebido</div>' +
     '</div>' +
-    '<div class="cob-kpi" style="border-color:' + (vencidas.length > 0 ? '#ffcdd2' : '#e2e8f0') + ';">' +
-      '<div class="cob-kpi-v" style="color:' + (vencidas.length > 0 ? '#C8960C' : '#94a3b8') + ';">' + vencidas.length + '</div>' +
+    '<div class="cob-kpi" id="kpi-vencidas" style="border-color:' + (vencidas.length > 0 ? '#ffcdd2' : '#e2e8f0') + ';">' +
+      '<div class="cob-kpi-v" id="kpi-vencidas-v" style="color:' + (vencidas.length > 0 ? '#C8960C' : '#94a3b8') + ';">' + vencidas.length + '</div>' +
       '<div class="cob-kpi-l">Vencidas</div>' +
     '</div>' +
     '<div class="cob-kpi" style="border-color:#ddd6fe;">' +
@@ -5047,6 +5079,7 @@ async function initLoja(){
   else if(U.endereco){geocode(U.endereco).then(g=>{if(g){lojaGeoCache=g;db.from('usuarios').update({loja_lat:g.lat,loja_lng:g.lng}).eq('id',U.id);}});}
   criarMapa('loja');await pullLj();
   ivs.mLj=setInterval(pullLj,5000);
+  ivs.mCobLj=setInterval(carregarCobLoja,30000); // atualiza cobrança pendente a cada 30s
   iniciarRealtimeDrivers('loja');
   // Inicializa incentivo chuva
   initPromocaoChuva();
