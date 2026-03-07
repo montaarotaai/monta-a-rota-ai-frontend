@@ -697,6 +697,36 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div class="mitem" onclick="abrirNovoPedido()"><div class="ico">&#128247;</div><h3>Novo Pedido</h3></div>
       <div class="mitem" onclick="abrirPedidosLj()"><div class="ico">&#128230;</div><h3>Pedidos / Rota</h3></div>
       <div class="mitem" onclick="abrirRelLj()"><div class="ico">&#128202;</div><h3>Relatorio</h3></div>
+      <!-- COBRANÇAS DA LOJA -->
+      <div id="lj-cob-section" style="display:none;margin-bottom:14px;">
+        <div style="background:linear-gradient(135deg,#7c1d1d,#c62828);border-radius:16px;padding:16px;color:white;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;opacity:.8;font-weight:700;text-transform:uppercase;letter-spacing:1px;">⚠️ Cobrança Pendente</div>
+              <div id="lj-cob-nome" style="font-size:16px;font-weight:900;margin-top:2px;"></div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:28px;font-weight:900;" id="lj-cob-valor"></div>
+              <div style="font-size:10px;opacity:.8;">Vence <span id="lj-cob-venc"></span></div>
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,.12);border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px;text-align:center;">
+            <div id="lj-cob-detalhe" style="opacity:.9;"></div>
+          </div>
+          <!-- QR Code Pix -->
+          <div style="background:white;border-radius:12px;padding:12px;text-align:center;margin-bottom:10px;">
+            <div style="font-size:10px;color:#c62828;font-weight:800;text-transform:uppercase;margin-bottom:8px;">Pix — Escaneie e Pague</div>
+            <img id="lj-cob-qr" src="" width="180" height="180" style="border-radius:6px;display:block;margin:0 auto 8px;" alt="QR Pix">
+            <div id="lj-cob-emv" style="font-size:8px;word-break:break-all;color:#64748b;font-family:monospace;background:#f8fafc;padding:6px;border-radius:6px;max-height:48px;overflow-y:auto;text-align:left;"></div>
+            <button id="lj-cob-copy" onclick="lojaCopiaPix()" style="width:100%;margin-top:8px;background:#004E89;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copiar Código Pix</button>
+          </div>
+          <!-- Botão já paguei -->
+          <button onclick="lojaSolicitaConfirmacao()" style="width:100%;background:white;color:#c62828;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">
+            ✅ Já Paguei — Aguardar Confirmação
+          </button>
+        </div>
+      </div>
+
       <div class="mitem" onclick="abrirGerEnt()"><div class="ico">&#128101;</div><h3>Entregadores</h3></div>
       <div class="mitem" onclick="abrirCfgLj()" style="grid-column:1/-1;max-width:170px;margin:0 auto;"><div class="ico">&#9881;</div><h3>Configuracoes</h3></div>
     </div>
@@ -3276,6 +3306,22 @@ async function notificarLoja(cobId, lojaId, nomeLoja, valor, vencimento) {
   }
 }
 
+async function confirmarPagCob(cobId, nomeLoja, valor) {
+  await db.from('cobrancas_lojas')
+    .update({ status: 'pago', pago_em: new Date().toISOString() })
+    .eq('id', cobId);
+  // Notifica a loja via campo na tabela (ela recarrega ao abrir o app)
+  alert('✅ Pagamento de ' + nomeLoja + ' confirmado! ' + fR(valor));
+  carregarCobrancas();
+}
+
+async function rejeitarPagCob(cobId) {
+  await db.from('cobrancas_lojas')
+    .update({ status: 'pendente', notificado_em: null })
+    .eq('id', cobId);
+  carregarCobrancas();
+}
+
 async function gerarCobrancaLoja(lojaId, nomeLoja, qtd, taxa, valor) {
   const { ini: sIni, fim: sFim } = semanaAtual();
   const semRef = semanaISO(sIni);
@@ -3394,9 +3440,10 @@ async function carregarCobrancas() {
   });
 
   const hoje = new Date(); hoje.setHours(0,0,0,0);
-  const totalPendente = cobs.filter(c=>c.status==='pendente').reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
+  const totalPendente = cobs.filter(c=>['pendente','aguardando_confirmacao'].includes(c.status)).reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
   const totalPago     = cobs.filter(c=>c.status==='pago').reduce((s,c)=>s+parseFloat(c.valor_total||0),0);
   const vencidas      = cobs.filter(c=>c.status==='pendente' && new Date(c.vencimento+'T00:00:00') < hoje);
+  const aguardando    = cobs.filter(c=>c.status==='aguardando_confirmacao');
   const semRef = semanaISO(sIni);
 
   // Resumo por loja (pendentes)
@@ -3428,6 +3475,22 @@ async function carregarCobrancas() {
     '<div class="cob-kpi" style="border-color:#c8e6c9;"><div class="cob-kpi-v" style="color:#2e7d32;">' + fR(totalPago) + '</div><div class="cob-kpi-l">Recebido</div></div>' +
     '<div class="cob-kpi" style="border-color:' + (vencidas.length > 0 ? '#ffcdd2' : '#e2e8f0') + ';"><div class="cob-kpi-v" style="color:' + (vencidas.length > 0 ? '#c62828' : '#94a3b8') + ';">' + vencidas.length + '</div><div class="cob-kpi-l">Vencidas</div></div>' +
     '</div>' +
+    // Alerta aguardando confirmação
+    (aguardando.length > 0 ?
+      '<div style="background:linear-gradient(135deg,#e65100,#ff7043);border-radius:10px;padding:12px;margin-bottom:8px;color:white;">' +
+      '<div style="font-size:12px;font-weight:900;margin-bottom:8px;">🔔 ' + aguardando.length + ' loja(s) dizem que pagaram — Confirme!</div>' +
+      aguardando.map(c => {
+        const nLoja = c.loja?.nome_loja || c.loja?.nome || lojas.find(l=>l.id===c.loja_id)?.nome_loja || '?';
+        return '<div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><div style="font-size:12px;font-weight:800;">' + nLoja + '</div>' +
+          '<div style="font-size:10px;opacity:.85;">' + fR(parseFloat(c.valor_total)) + ' · ' + c.semana_ref + '</div></div>' +
+          '<div style="display:flex;gap:6px;">' +
+          '<button class="cob-btn" onclick="confirmarPagCob(\'' + c.id + '\',\'' + nLoja.replace(/\'/g,"\\\'") + '\',' + c.valor_total + ')" style="background:white;color:#e65100;">✅ Confirmar</button>' +
+          '<button class="cob-btn" onclick="rejeitarPagCob(\'' + c.id + '\')" style="background:rgba(0,0,0,.2);color:white;">❌</button>' +
+          '</div></div>';
+      }).join('') +
+      '</div>'
+    : '') +
     // Resumo pendente por loja
     (resumoPend.length > 0 ? '<div style="background:#fff8f0;border-radius:10px;padding:10px;margin-bottom:12px;border:1.5px solid #ffe0b2;">' +
       '<div style="font-size:9px;font-weight:800;color:#e65100;text-transform:uppercase;margin-bottom:8px;">Lojas com saldo pendente</div>' +
@@ -4069,6 +4132,72 @@ async function initLoja(){
   iniciarRealtimeDrivers('loja');
   // Inicializa incentivo chuva
   initPromocaoChuva();
+  // Verifica cobrança pendente
+  carregarCobLoja();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// COBRANÇAS — VISÃO DA LOJA
+// ═══════════════════════════════════════════════════════════════
+let _ljCobAtual = null;
+
+async function carregarCobLoja() {
+  const sec = $('lj-cob-section');
+  if (!sec) return;
+
+  // Busca cobrança pendente mais recente desta loja
+  let cob = null;
+  try {
+    const { data } = await db.from('cobrancas_lojas')
+      .select('*')
+      .eq('loja_id', U.id)
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    cob = data && data.length ? data[0] : null;
+  } catch(e) { return; } // tabela não existe ainda
+
+  if (!cob) { sec.style.display = 'none'; return; }
+
+  _ljCobAtual = cob;
+  const vencFmt = new Date(cob.vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+  const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(cob.valor_total), 'MontaRotai');
+  const qrUrl = pixQRUrl(emv);
+
+  $('lj-cob-nome').textContent = 'Taxa do sistema — ' + (cob.semana_ref || '');
+  $('lj-cob-valor').textContent = fR(parseFloat(cob.valor_total));
+  $('lj-cob-venc').textContent = vencFmt;
+  $('lj-cob-detalhe').textContent = (cob.qtd_entregas || 0) + ' entregas × R$' + parseFloat(cob.taxa_unitaria||0.99).toFixed(2) + ' esta semana';
+  $('lj-cob-qr').src = qrUrl;
+  $('lj-cob-emv').textContent = emv;
+  sec.style.display = 'block';
+}
+
+function lojaCopiaPix() {
+  if (!_ljCobAtual) return;
+  const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(_ljCobAtual.valor_total), 'MontaRotai');
+  const btn = $('lj-cob-copy');
+  navigator.clipboard.writeText(emv).then(() => {
+    btn.textContent = '✅ Copiado!';
+    btn.style.background = '#27ae60';
+    setTimeout(() => { btn.textContent = '📋 Copiar Código Pix'; btn.style.background = '#004E89'; }, 2500);
+  }).catch(() => {
+    btn.textContent = '⚠️ Copie o código acima manualmente';
+  });
+}
+
+async function lojaSolicitaConfirmacao() {
+  if (!_ljCobAtual) return;
+  const btn = document.querySelector('#lj-cob-section button:last-child');
+  if (btn) { btn.textContent = '⏳ Aguardando confirmação...'; btn.disabled = true; }
+  await db.from('cobrancas_lojas')
+    .update({ status: 'aguardando_confirmacao', notificado_em: new Date().toISOString() })
+    .eq('id', _ljCobAtual.id);
+  if (btn) {
+    btn.textContent = '⏳ Pagamento enviado — Admin vai confirmar';
+    btn.style.background = '#e65100';
+  }
 }
 
 async function pullLj(){
