@@ -1021,49 +1021,45 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     </div>
   </div>
 
-  <!-- MODO NAVEGAÇÃO ATIVA — tela cheia estilo Google Maps -->
-  <div id="nav-modo-ativo" style="display:none;position:absolute;inset:0;flex-direction:column;">
+  <!-- MODO NAVEGAÇÃO ATIVA — estilo Google Maps -->
+  <div id="nav-modo-ativo" style="display:none;position:absolute;inset:0;">
 
-    <!-- Instrução topo estilo Google Maps -->
-    <div id="nav-instrucao-ativa" style="position:absolute;top:0;left:0;right:0;z-index:700;background:#1a5276;box-shadow:0 3px 16px rgba(0,0,0,.5);">
-      <div style="display:flex;align-items:center;gap:0;padding:14px 16px 10px;">
-        <div id="nav-seta-instrucao" style="font-size:44px;line-height:1;margin-right:14px;min-width:50px;text-align:center;">↑</div>
+    <!-- Mapa ocupa tela toda — tamanho fixo inset:0 para Leaflet carregar tiles corretamente -->
+    <div id="nav-mapa-ativo" style="position:absolute;inset:0;z-index:600;"></div>
+
+    <!-- Header verde estilo Google Maps -->
+    <div id="nav-instrucao-ativa" style="position:absolute;top:0;left:0;right:0;z-index:700;background:#1B5E20;box-shadow:0 4px 20px rgba(0,0,0,.6);">
+      <div style="display:flex;align-items:center;padding:16px 14px 12px;gap:12px;">
+        <div id="nav-seta-instrucao" style="font-size:52px;line-height:1;min-width:56px;text-align:center;color:white;">↑</div>
         <div style="flex:1;">
-          <div id="nav-dist-instrucao" style="font-size:32px;font-weight:900;color:white;line-height:1;">--</div>
-          <div id="nav-rua-instrucao" style="font-size:17px;font-weight:700;color:rgba(255,255,255,.9);margin-top:2px;">Calculando...</div>
+          <div id="nav-dist-instrucao" style="font-size:36px;font-weight:900;color:white;line-height:1;">--</div>
+          <div id="nav-rua-instrucao" style="font-size:16px;font-weight:700;color:rgba(255,255,255,.92);margin-top:4px;">Aguardando GPS...</div>
         </div>
       </div>
-      <div id="nav-depois-linha" style="background:rgba(0,0,0,.25);padding:7px 16px;display:none;align-items:center;gap:10px;">
-        <span style="color:rgba(255,255,255,.7);font-size:12px;">Depois,</span>
-        <span id="nav-depois-seta" style="font-size:18px;">↑</span>
-        <span id="nav-depois-rua" style="color:rgba(255,255,255,.85);font-size:13px;font-weight:600;"></span>
+      <div id="nav-depois-linha" style="background:rgba(0,0,0,.28);padding:8px 16px;display:none;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.12);">
+        <span style="color:rgba(255,255,255,.7);font-size:13px;font-weight:600;">Depois,</span>
+        <span id="nav-depois-seta" style="font-size:22px;color:white;">↑</span>
+        <span id="nav-depois-rua" style="color:rgba(255,255,255,.88);font-size:14px;font-weight:600;"></span>
       </div>
     </div>
 
-    <!-- Mapa de navegação ativa — wrapper com perspectiva 3D -->
-    <div id="nav-mapa-ativo-wrap" style="position:absolute;inset:0;z-index:600;overflow:hidden;">
-      <div id="nav-mapa-ativo" style="position:absolute;left:-18%;right:-18%;top:-5%;bottom:-38%;"></div>
-    </div>
-
-    <!-- GPS status -->
-    <div id="nav-gps-status-ativo" style="position:absolute;top:0;right:10px;z-index:800;background:rgba(0,0,0,.55);color:white;border-radius:0 0 12px 12px;padding:3px 10px;font-size:10px;font-weight:700;">📡</div>
+    <!-- GPS badge -->
+    <div id="nav-gps-status-ativo" style="position:absolute;top:4px;right:10px;z-index:800;background:rgba(0,0,0,.55);color:white;border-radius:0 0 10px 10px;padding:3px 10px;font-size:10px;font-weight:700;">📡</div>
 
     <!-- Botão recentralizar -->
-    <button id="nav-btn-recentrar" onclick="navCentralizar()" style="display:none;position:absolute;bottom:130px;right:14px;z-index:710;background:white;border:2px solid #004E89;color:#004E89;padding:9px 14px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.2);">▲ Recentralizar</button>
+    <button id="nav-btn-recentrar" onclick="navCentralizar()" style="display:none;position:absolute;bottom:145px;right:14px;z-index:710;background:white;border:none;color:#1B5E20;padding:10px 16px;border-radius:28px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.28);">▲ Centralizar</button>
 
-    <!-- Botão alternar perspectiva 3D / flat -->
-    <button id="nav-btn-tilt" onclick="navToggleTilt()" style="position:absolute;bottom:130px;left:14px;z-index:710;background:white;border:2px solid #555;color:#555;padding:9px 14px;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.2);">🗺️ 2D</button>
-
-    <!-- Painel inferior flutuante -->
-    <div style="position:absolute;bottom:0;left:0;right:0;z-index:700;background:white;border-radius:16px 16px 0 0;padding:12px 16px 16px;box-shadow:0 -4px 20px rgba(0,0,0,.2);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <!-- Painel inferior -->
+    <div style="position:absolute;bottom:0;left:0;right:0;z-index:700;background:white;border-radius:20px 20px 0 0;padding:14px 16px 22px;box-shadow:0 -6px 24px rgba(0,0,0,.22);">
+      <div style="width:40px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 12px;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="flex:1;min-width:0;">
-          <div id="nav-ativo-cliente" style="font-size:14px;font-weight:800;color:#222;"></div>
-          <div id="nav-ativo-end" style="font-size:11px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+          <div id="nav-ativo-cliente" style="font-size:15px;font-weight:800;color:#111;"></div>
+          <div id="nav-ativo-end" style="font-size:12px;color:#666;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
         </div>
-        <div style="text-align:right;flex-shrink:0;margin-left:12px;">
-          <div id="nav-ativo-tempo" style="font-size:22px;font-weight:900;color:#004E89;"></div>
-          <div id="nav-ativo-dist" style="font-size:11px;color:#888;"></div>
+        <div style="text-align:right;flex-shrink:0;margin-left:14px;">
+          <div id="nav-ativo-tempo" style="font-size:24px;font-weight:900;color:#1B5E20;"></div>
+          <div id="nav-ativo-dist" style="font-size:12px;color:#888;font-weight:600;"></div>
         </div>
       </div>
       <div id="nav-acoes-ativas" style="display:flex;gap:8px;"></div>
@@ -2253,16 +2249,15 @@ async function navIniciarModoAtivo(entregas) {
   document.getElementById('nav-modo-geral').style.display = 'none';
   document.getElementById('nav-modo-ativo').style.display = 'block';
 
-  // Cria mapa de navegação ativa
   if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
   _navUserMarkerAtivo = null;
   _navRotaLayerAtivo = null;
   _navRotaSombraAtivo = null;
   _navDestinoMarkersAtivo = [];
 
-  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false }).setView([-21.1775,-47.8103], 18);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:20}).addTo(_navMapAtivo);
+  const centroInicial = _navPosAnterior ? [_navPosAnterior.lat, _navPosAnterior.lng] : [-21.1775, -47.8103];
+  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false, preferCanvas:true }).setView(centroInicial, 18);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMapAtivo);
 
   _navMapAtivo.on('dragstart', () => {
     _navSegindoGPS = false;
@@ -2270,102 +2265,69 @@ async function navIniciarModoAtivo(entregas) {
     if (btn) btn.style.display = 'block';
   });
 
-  // Aplica perspectiva 3D estilo Google Maps após mapa criado
-  _navTiltAtivo = true;
-  setTimeout(() => {
-    navAplicarTilt(true);
-    const btn = document.getElementById('nav-btn-tilt');
-    if (btn) btn.textContent = '🗺️ 2D';
-    if (_navMapAtivo) _navMapAtivo.invalidateSize();
-  }, 200);
+  navAtualizarPainelAtivo(entregas);
 
-  // Destinos
-  entregas.forEach((e,i) => {
+  // Marcadores dos destinos
+  entregas.forEach((e, i) => {
     const lat = parseFloat(e.lat_entrega||0), lng = parseFloat(e.lng_entrega||0);
     if (!lat || !lng) return;
+    const cor = i === _navEntregaAtual ? '#c0392b' : '#F5A800';
     const icon = L.divIcon({
-      html:`<div style="background:${i===_navEntregaAtual?'#c0392b':'#F5A800'};color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.5);">${i+1}</div>`,
-      className:'', iconSize:[36,36], iconAnchor:[18,18]
+      html: `<div style="background:${cor};color:white;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;border:3px solid white;box-shadow:0 3px 12px rgba(0,0,0,.5);">${i+1}</div>`,
+      className:'', iconSize:[38,38], iconAnchor:[19,19]
     });
     _navDestinoMarkersAtivo.push(L.marker([lat,lng],{icon,zIndexOffset:900}).addTo(_navMapAtivo));
   });
 
-  // Painel inferior modo ativo
-  navAtualizarPainelAtivo(entregas);
-
-  // ══ ROTA INSTANTÂNEA: usa geometria raw salva na visão geral ══
+  // Posição do entregador imediata
   if (_navPosAnterior) {
-    // Desenha rota imediatamente com a geometria já disponível
-    if (_navGeometriaCache) {
-      try {
-        if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
-        if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
-        _navRotaSombraAtivo = L.geoJSON(_navGeometriaCache, {
-          style:{color:'#000d2e',weight:14,opacity:.22}
-        }).addTo(_navMapAtivo);
-        _navRotaLayerAtivo = L.geoJSON(_navGeometriaCache, {
-          style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}
-        }).addTo(_navMapAtivo);
-        _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
-        // Atualiza instrução com steps já em cache
-        if (_navStepsCache.length) {
-          navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
-        } else {
-          // Fallback instrucional enquanto busca OSRM
-          const elR = document.getElementById('nav-rua-instrucao');
-          const elS = document.getElementById('nav-seta-instrucao');
-          if (elR) elR.textContent = 'Rota calculada — aguarde instruções';
-          if (elS) elS.textContent = '↑';
-        }
-      } catch(e) { console.warn('[rota-instant]', e); }
-    } else {
-      // Sem cache: desenha linha reta ao destino atual imediatamente
-      const eAtual = entregas[_navEntregaAtual];
-      if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
-        const linhaReta = {
-          type: 'LineString',
-          coordinates: [
-            [_navPosAnterior.lng, _navPosAnterior.lat],
-            [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
-          ]
-        };
-        if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
-        if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
-        _navRotaSombraAtivo = L.geoJSON(linhaReta, {style:{color:'#000d2e',weight:14,opacity:.22}}).addTo(_navMapAtivo);
-        _navRotaLayerAtivo  = L.geoJSON(linhaReta, {style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMapAtivo);
-        _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
-      }
-    }
-
-    // Centra mapa na posição atual
-    navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
-
-    // Desenha marcador do entregador imediatamente
-    const heading = _navHeading;
-    const icon = L.divIcon({
-      html:`<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
-        <div style="transform:rotate(${heading}deg);width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
-          <svg width="60" height="60" viewBox="0 0 60 60">
-            <circle cx="30" cy="30" r="28" fill="white" opacity="0.95" filter="drop-shadow(0 3px 8px rgba(0,0,0,.35))"/>
-            <polygon points="30,8 46,50 30,40 14,50" fill="#1a5276" stroke="white" stroke-width="2"/>
-          </svg>
-        </div>
-      </div>`,
-      className:'', iconSize:[60,60], iconAnchor:[30,40]
-    });
-    _navUserMarkerAtivo = L.marker([_navPosAnterior.lat,_navPosAnterior.lng],{icon,zIndexOffset:1000}).addTo(_navMapAtivo);
-    _navUserMarkerAtivo.bringToFront();
-
-    // Atualiza rota precisa em background (da posição atual até destino atual)
-    setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 600);
-  } else {
-    // Sem posição GPS ainda — tenta pegar agora
-    navigator.geolocation && navigator.geolocation.getCurrentPosition(pos => {
-      _navPosAnterior = {lat: pos.coords.latitude, lng: pos.coords.longitude};
-      navDesenharRotaAtiva(pos.coords.latitude, pos.coords.longitude, entregas);
-      navMoverCameraAtiva(pos.coords.latitude, pos.coords.longitude);
-    }, ()=>{}, {enableHighAccuracy:true, timeout:8000});
+    _navInicializarMarcadorAtivo(_navPosAnterior.lat, _navPosAnterior.lng);
   }
+
+  // Rota: usa cache se disponivel, senao busca OSRM
+  if (_navGeometriaCache) {
+    _navDesenharGeometriaNoAtivo(_navGeometriaCache);
+    if (_navStepsCache.length && _navPosAnterior) navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
+    if (_navPosAnterior) setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 500);
+  } else {
+    const eAtual = entregas[_navEntregaAtual];
+    if (_navPosAnterior && eAtual?.lat_entrega && eAtual?.lng_entrega) {
+      _navDesenharGeometriaNoAtivo({ type:'LineString', coordinates:[[_navPosAnterior.lng,_navPosAnterior.lat],[parseFloat(eAtual.lng_entrega),parseFloat(eAtual.lat_entrega)]] });
+    }
+    if (_navPosAnterior) navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
+    else { const el=document.getElementById('nav-rua-instrucao'); if(el) el.textContent='Aguardando GPS...'; }
+  }
+
+  // Centra mapa apos tudo desenhado
+  if (_navPosAnterior) {
+    setTimeout(() => navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng), 100);
+  }
+}
+
+// Desenha geometria GeoJSON no mapa ativo
+function _navDesenharGeometriaNoAtivo(geo) {
+  if (!_navMapAtivo) return;
+  try {
+    if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
+    if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
+    _navRotaSombraAtivo = L.geoJSON(geo, { style:{color:'#0a2200',weight:14,opacity:.2} }).addTo(_navMapAtivo);
+    _navRotaLayerAtivo  = L.geoJSON(geo, { style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'} }).addTo(_navMapAtivo);
+    _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
+    if (_navUserMarkerAtivo) _navUserMarkerAtivo.bringToFront();
+  } catch(e) { console.warn('[geo]',e); }
+}
+
+// Cria/atualiza marcador seta do entregador
+function _navInicializarMarcadorAtivo(lat, lng) {
+  if (!_navMapAtivo) return;
+  const h = _navHeading;
+  const icon = L.divIcon({
+    html:`<div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;"><svg width="56" height="56" viewBox="0 0 56 56" style="filter:drop-shadow(0 3px 8px rgba(0,0,0,.4));transform:rotate(${h}deg);transform-origin:28px 28px;"><circle cx="28" cy="28" r="26" fill="white"/><polygon points="28,5 44,48 28,37 12,48" fill="#1a5276"/></svg></div>`,
+    className:'', iconSize:[56,56], iconAnchor:[28,38]
+  });
+  if (!_navUserMarkerAtivo) _navUserMarkerAtivo = L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(_navMapAtivo);
+  else _navUserMarkerAtivo.setLatLng([lat,lng]).setIcon(icon);
+  _navUserMarkerAtivo.bringToFront();
 }
 
 function navAtualizarPainelAtivo(entregas) {
@@ -2385,7 +2347,7 @@ function navAtualizarPainelAtivo(entregas) {
     const fn = e.codigo_confirmacao
       ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
       : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
-    btns += `<button onclick="${fn}" style="background:#1e8449;color:white;border:none;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;flex:1;">✅ Entregue</button>`;
+    btns += `<button onclick="${fn}" style="background:#1B5E20;color:white;border:none;padding:12px 14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;flex:1;">✅ Entregue</button>`;
   }
   document.getElementById('nav-acoes-ativas').innerHTML = btns;
 }
@@ -2393,7 +2355,6 @@ function navAtualizarPainelAtivo(entregas) {
 function navPararModoAtivo() {
   _navModoAtivo = false;
   _navSegindoGPS = false;
-  navAplicarTilt(false); // Remove perspectiva 3D
   navPararMapaAtivo();
   document.getElementById('nav-modo-geral').style.display = 'flex';
   document.getElementById('nav-modo-ativo').style.display = 'none';
@@ -2410,31 +2371,9 @@ function navPararMapaAtivo() {
 
 async function navAtualizarPosAtiva(lat, lng, entregas) {
   if (!_navMapAtivo) return;
-
-  // Seta com rotação via CSS transform na div — sem plugin
-  const heading = _navHeading;
-  const icon = L.divIcon({
-    html:`<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
-      <div style="transform:rotate(${heading}deg);width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
-        <svg width="60" height="60" viewBox="0 0 60 60">
-          <circle cx="30" cy="30" r="28" fill="white" opacity="0.95" filter="drop-shadow(0 3px 8px rgba(0,0,0,.35))"/>
-          <polygon points="30,8 46,50 30,40 14,50" fill="#1a5276" stroke="white" stroke-width="2"/>
-        </svg>
-      </div>
-    </div>`,
-    className:'', iconSize:[60,60], iconAnchor:[30,40]
-  });
-
-  if (!_navUserMarkerAtivo) {
-    _navUserMarkerAtivo = L.marker([lat,lng],{icon,zIndexOffset:1000}).addTo(_navMapAtivo);
-  } else {
-    _navUserMarkerAtivo.setLatLng([lat,lng]).setIcon(icon);
-  }
-  _navUserMarkerAtivo.bringToFront();
-
+  _navInicializarMarcadorAtivo(lat, lng);
   if (_navSegindoGPS) navMoverCameraAtiva(lat, lng);
 
-  // ETA
   const e = entregas[_navEntregaAtual];
   if (e?.lat_entrega) {
     const distM = navDistM(lat,lng,parseFloat(e.lat_entrega),parseFloat(e.lng_entrega));
@@ -2444,12 +2383,13 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
     if (elT) elT.textContent = `${etaMin} min`;
     if (elD) elD.textContent = distM<1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
     if (distM < 80) {
-      document.getElementById('nav-seta-instrucao').textContent = '🎯';
-      document.getElementById('nav-rua-instrucao').textContent = 'Chegando ao destino!';
+      const elS = document.getElementById('nav-seta-instrucao');
+      const elR = document.getElementById('nav-rua-instrucao');
+      if (elS) elS.textContent = '🎯';
+      if (elR) elR.textContent = 'Chegando ao destino!';
     }
   }
 
-  // Redesenha rota + instrução a cada 5 updates
   if (_navGPSContagem % 5 === 1) {
     await navDesenharRotaAtiva(lat, lng, entregas);
   } else {
@@ -2457,42 +2397,18 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
   }
 }
 
-// ══ PERSPECTIVA 3D ESTILO GOOGLE MAPS ═════════════════════════════
-
-function navAplicarTilt(ativo) {
-  const wrap = document.getElementById('nav-mapa-ativo-wrap');
-  const mapa = document.getElementById('nav-mapa-ativo');
-  if (!wrap || !mapa) return;
-  if (ativo) {
-    wrap.style.perspective = '750px';
-    wrap.style.perspectiveOrigin = '50% 100%';
-    mapa.style.transform = 'rotateX(40deg)';
-    mapa.style.transformOrigin = '50% 68%';
-    mapa.style.transition = 'transform 0.6s ease';
-  } else {
-    wrap.style.perspective = '';
-    wrap.style.perspectiveOrigin = '';
-    mapa.style.transform = 'none';
-    mapa.style.transition = 'transform 0.4s ease';
-  }
-}
-
-let _navTiltAtivo = true;
-function navToggleTilt() {
-  _navTiltAtivo = !_navTiltAtivo;
-  navAplicarTilt(_navTiltAtivo);
-  const btn = document.getElementById('nav-btn-tilt');
-  if (btn) btn.textContent = _navTiltAtivo ? '🗺️ 2D' : '🧭 3D';
-  setTimeout(() => { if (_navMapAtivo) _navMapAtivo.invalidateSize(); }, 400);
-}
+// Nao usa mais CSS 3D — funcoes mantidas para compatibilidade
+function navAplicarTilt(ativo) {}
+let _navTiltAtivo = false;
+function navToggleTilt() {}
 
 function navMoverCameraAtiva(lat, lng) {
   if (!_navMapAtivo) return;
-  // Desloca câmera para frente do entregador (igual Google Maps)
-  const rad = _navHeading * Math.PI / 180;
-  const avanco = 0.00035;
-  const aheadLat = lat + avanco * Math.cos(rad);
-  const aheadLng = lng + avanco * Math.sin(rad);
+  const sinH = Math.sin(_navHeading * Math.PI / 180);
+  const cosH = Math.cos(_navHeading * Math.PI / 180);
+  const avanco = 0.0003;
+  const aheadLat = lat + avanco * cosH;
+  const aheadLng = lng + avanco * sinH;
   _navMapAtivo.setView([aheadLat, aheadLng], 18, { animate: true, duration: 0.5 });
 }
 
