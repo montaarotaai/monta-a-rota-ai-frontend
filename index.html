@@ -4532,9 +4532,14 @@ async function lojaInformarPagamentoPreviа(valor, periodoIni, periodoFim, qtd, 
     }
 
     if (btnEl) { btnEl.textContent = '✅ Informado! Aguardando admin confirmar'; btnEl.style.background = '#fef3c7'; btnEl.style.color = '#92400e'; btnEl.style.borderColor = '#fcd34d'; }
+    // Atualiza badge e botão no menu
+    await carregarCobLoja();
+    // Recarrega modal após 1s para mostrar status atualizado
     setTimeout(() => abrirModalTaxaSistema(), 1200);
   } catch(e) {
+    const msg = e?.message || JSON.stringify(e) || 'Erro desconhecido';
     if (btnEl) { btnEl.textContent = '❌ Erro — tente novamente'; btnEl.disabled = false; }
+    alert('❌ Erro ao registrar pagamento:\n' + msg + '\n\nSe o problema persistir, peça ao admin para verificar o banco de dados.');
     console.error(e);
   }
 }
