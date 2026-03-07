@@ -1045,8 +1045,12 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <div id="nav-dist-badge" style="background:#F5A800;color:#1a1a1a;border-radius:20px;padding:5px 12px;font-size:13px;font-weight:800;flex-shrink:0;display:none;"></div>
   </div>
   <div id="nav-mapa" style="flex:1;width:100%;position:relative;min-height:0;">
-    <button onclick="navCentralizar()" style="position:absolute;bottom:14px;right:14px;z-index:500;background:white;border:none;width:44px;height:44px;border-radius:12px;font-size:20px;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);">📍</button>
-    <div id="nav-gps-status" style="position:absolute;top:10px;right:10px;z-index:500;background:rgba(0,0,0,.6);color:white;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;">📡 GPS...</div>
+    <!-- Instrução próxima curva -->
+    <div id="nav-instrucao" style="position:absolute;top:10px;left:10px;right:54px;z-index:500;background:rgba(0,30,80,.88);color:white;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;display:none;backdrop-filter:blur(4px);"></div>
+    <!-- Status GPS -->
+    <div id="nav-gps-status" style="position:absolute;top:10px;right:10px;z-index:500;background:rgba(0,0,0,.7);color:white;border-radius:20px;padding:5px 11px;font-size:11px;font-weight:700;">📡 GPS...</div>
+    <!-- Botão recentralizar -->
+    <button onclick="navCentralizar()" id="nav-btn-centro" style="position:absolute;bottom:14px;right:14px;z-index:500;background:white;border:none;width:48px;height:48px;border-radius:14px;font-size:22px;cursor:pointer;box-shadow:0 3px 14px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;">🎯</button>
   </div>
   <div style="background:white;border-radius:16px 16px 0 0;padding:14px 16px 22px;flex-shrink:0;box-shadow:0 -4px 20px rgba(0,0,0,.15);">
     <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 12px;"></div>
@@ -1978,18 +1982,30 @@ function fecharNavInterna() {
   openM('rota-ent');
 }
 
+// ── Variáveis de navegação avançada ──
+let _navHeading = 0;          // direção do entregador em graus
+let _navPosAnterior = null;   // última posição para calcular heading
+let _navSteps = [];           // passos da rota OSRM (curvas/ruas)
+let _navStepAtual = 0;        // passo atual
+let _navUltimaRota = null;    // hash da última rota para não redesenhar sempre
+let _navGPSContagem = 0;      // contador de updates GPS
+
 async function navInicializarMapa(entregas) {
   const mapaEl = document.getElementById('nav-mapa');
   if (!mapaEl) return;
-
-  // Destrói mapa anterior
   if (_navMap) { _navMap.remove(); _navMap = null; }
 
   const RP_LAT_N = -21.1775, RP_LNG_N = -47.8103;
-  _navMap = L.map('nav-mapa', { zoomControl: true, attributionControl: false }).setView([RP_LAT_N, RP_LNG_N], 15);
+
+  // Mapa com zoom alto já pronto para navegação
+  _navMap = L.map('nav-mapa', {
+    zoomControl: false,
+    attributionControl: false,
+    rotate: false  // rotação via CSS
+  }).setView([RP_LAT_N, RP_LNG_N], 18);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'OSM', maxZoom: 19
+    attribution: 'OSM', maxZoom: 20
   }).addTo(_navMap);
 
   // Marca todos os destinos
@@ -1998,34 +2014,49 @@ async function navInicializarMapa(entregas) {
     const lat = parseFloat(e.lat_entrega || 0);
     const lng = parseFloat(e.lng_entrega || 0);
     if (!lat || !lng) return;
-    const cor = i === 0 ? '#e74c3c' : '#F5A800';
+    const isAtual = i === _navEntregaAtual;
     const icon = L.divIcon({
-      html: `<div style="background:${cor};color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);">${i+1}</div>`,
-      className: '', iconSize: [32,32], iconAnchor: [16,16]
+      html: `<div style="background:${isAtual?'#e74c3c':'#F5A800'};color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,.5);">${i+1}</div>`,
+      className: '', iconSize: [36,36], iconAnchor: [18,18]
     });
-    const m = L.marker([lat, lng], { icon }).addTo(_navMap);
-    m.bindPopup(`<strong>${i+1}. ${e.cliente_nome||'Entrega'}</strong><br>${e.endereco_entrega}`);
+    const m = L.marker([lat, lng], { icon, zIndexOffset: 900 }).addTo(_navMap);
     _navDestinoMarkers.push({ marker: m, entrega: e, idx: i });
   });
 
-  // Atualiza painel
-  navAtualizarPainel(entregas, 0);
+  // Instrução de navegação no topo do mapa
+  if (!document.getElementById('nav-instrucao')) {
+    const instrEl = document.createElement('div');
+    instrEl.id = 'nav-instrucao';
+    instrEl.style.cssText = 'position:absolute;top:10px;left:10px;right:54px;z-index:500;background:rgba(0,30,80,.88);color:white;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;display:none;backdrop-filter:blur(4px);';
+    document.getElementById('nav-mapa').appendChild(instrEl);
+  }
 
-  // Inicia GPS
+  navAtualizarPainel(entregas, 0);
   navIniciarGPS(entregas);
 }
 
 function navIniciarGPS(entregas) {
   if (!navigator.geolocation) {
     document.getElementById('nav-gps-status').textContent = '❌ GPS indisponível';
+    // Mesmo sem GPS, centraliza no destino
+    const e = entregas[_navEntregaAtual];
+    if (e?.lat_entrega && _navMap) _navMap.setView([parseFloat(e.lat_entrega), parseFloat(e.lng_entrega)], 17);
     return;
   }
   if (_navWatchId !== null) navigator.geolocation.clearWatch(_navWatchId);
 
+  // Primeiro fix rápido para centrar imediatamente
+  navigator.geolocation.getCurrentPosition(pos => {
+    if (_navMap) _navMap.setView([pos.coords.latitude, pos.coords.longitude], 18);
+  }, () => {}, { enableHighAccuracy: true, timeout: 5000 });
+
   _navWatchId = navigator.geolocation.watchPosition(
     pos => navOnGPS(pos, entregas),
-    err => { document.getElementById('nav-gps-status').textContent = '❌ GPS erro'; },
-    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    err => {
+      const s = document.getElementById('nav-gps-status');
+      if (s) s.textContent = err.code === 1 ? '❌ GPS negado' : '📡 Aguardando GPS...';
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 }
   );
 }
 
@@ -2033,60 +2064,143 @@ async function navOnGPS(pos, entregas) {
   const lat = pos.coords.latitude;
   const lng = pos.coords.longitude;
   const acc = Math.round(pos.coords.accuracy);
+  const speed = pos.coords.speed || 0; // m/s
+
+  // Status GPS
   const statusEl = document.getElementById('nav-gps-status');
-  if (statusEl) statusEl.textContent = acc <= 20 ? '📡 GPS ótimo' : acc <= 50 ? '📡 GPS ok' : `📡 ±${acc}m`;
+  if (statusEl) statusEl.textContent = acc <= 15 ? '📡 GPS ótimo' : acc <= 40 ? '📡 GPS ok' : `📡 ±${acc}m`;
 
   if (!_navMap) return;
+  _navGPSContagem++;
 
-  // Marcador do entregador
-  if (!_navUserMarker) {
-    const icon = L.divIcon({
-      html: `<div style="background:#004E89;border-radius:50%;width:20px;height:20px;border:3px solid white;box-shadow:0 0 0 3px rgba(0,78,137,.3),0 0 12px rgba(0,78,137,.5);"></div>`,
-      className: '', iconSize: [20,20], iconAnchor: [10,10]
-    });
-    _navUserMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(_navMap);
-  } else {
-    _navUserMarker.setLatLng([lat, lng]);
+  // Calcula heading pela diferença de posição (mais confiável que heading da API)
+  if (_navPosAnterior) {
+    const dLat = lat - _navPosAnterior.lat;
+    const dLng = lng - _navPosAnterior.lng;
+    if (Math.abs(dLat) > 0.00001 || Math.abs(dLng) > 0.00001) {
+      const h = Math.atan2(dLng, dLat) * 180 / Math.PI;
+      _navHeading = (h + 360) % 360;
+    }
+  }
+  // Usa heading do dispositivo se disponível e movendo
+  if (pos.coords.heading !== null && pos.coords.heading !== undefined && !isNaN(pos.coords.heading) && speed > 0.5) {
+    _navHeading = pos.coords.heading;
+  }
+  _navPosAnterior = { lat, lng };
+
+  // Seta direcional do entregador
+  navAtualizarSetaEntregador(lat, lng, _navHeading);
+
+  // Câmera: centraliza com o entregador no baixo do mapa, destino visível acima
+  if (_navSegindoGPS) {
+    const entAtual = entregas[_navEntregaAtual];
+    const dLat2 = entAtual?.lat_entrega ? parseFloat(entAtual.lat_entrega) - lat : 0;
+    const dLng2 = entAtual?.lng_entrega ? parseFloat(entAtual.lng_entrega) - lng : 0;
+    // Offset: coloca o entregador no terço inferior do mapa
+    const offsetLat = dLat2 * 0.15;
+    const offsetLng = dLng2 * 0.15;
+    _navMap.setView([lat + offsetLat, lng + offsetLng], 17, { animate: true, duration: 0.8 });
   }
 
-  // Centraliza no GPS se seguindo
-  if (_navSegindoGPS) _navMap.setView([lat, lng], 16, { animate: true });
-
-  // Desenha rota até o destino atual
+  // Redesenha rota a cada 5 updates GPS ou na primeira vez
   const entAtual = entregas[_navEntregaAtual];
-  if (entAtual && entAtual.lat_entrega && entAtual.lng_entrega) {
+  if (entAtual?.lat_entrega && entAtual?.lng_entrega && _navGPSContagem % 5 === 1) {
     await navDesenharRota(lat, lng, parseFloat(entAtual.lat_entrega), parseFloat(entAtual.lng_entrega));
-    // Calcula distância restante
+  }
+
+  // Distância restante
+  if (entAtual?.lat_entrega) {
     const distM = navDistM(lat, lng, parseFloat(entAtual.lat_entrega), parseFloat(entAtual.lng_entrega));
     const badge = document.getElementById('nav-dist-badge');
     if (badge) {
       badge.style.display = 'block';
       badge.textContent = distM < 1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
+      // Alerta de chegada
+      if (distM < 80) {
+        badge.style.background = '#2e7d32';
+        badge.style.color = 'white';
+        const instrEl = document.getElementById('nav-instrucao');
+        if (instrEl) { instrEl.style.display = 'block'; instrEl.textContent = '🎯 Chegando ao destino!'; }
+      } else {
+        badge.style.background = '#F5A800';
+        badge.style.color = '#1a1a1a';
+      }
     }
+  }
+}
+
+function navAtualizarSetaEntregador(lat, lng, heading) {
+  if (!_navMap) return;
+  const icon = L.divIcon({
+    html: `<div style="
+      width:0;height:0;
+      filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));
+      transform:rotate(${heading}deg);
+      transition:transform 0.4s ease;
+    ">
+      <svg width="36" height="44" viewBox="0 0 36 44">
+        <polygon points="18,0 36,40 18,30 0,40" fill="#004E89" stroke="white" stroke-width="2.5"/>
+      </svg>
+    </div>`,
+    className: '', iconSize: [36,44], iconAnchor: [18,30]
+  });
+  if (!_navUserMarker) {
+    _navUserMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(_navMap);
+  } else {
+    _navUserMarker.setLatLng([lat, lng]).setIcon(icon);
   }
 }
 
 async function navDesenharRota(oLat, oLng, dLat, dLng) {
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson&steps=true&annotations=false`;
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
+    const t = setTimeout(() => ctrl.abort(), 6000);
     const r = await fetch(url, { signal: ctrl.signal });
     clearTimeout(t);
     const d = await r.json();
-    if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
+    if (d.code === 'Ok' && d.routes?.[0]) {
+      // Rota
       if (_navRotaLayer) _navMap.removeLayer(_navRotaLayer);
-      _navRotaLayer = L.geoJSON(d.routes[0].geometry, {
-        style: { color: '#004E89', weight: 6, opacity: .9 }
+      // Sombra da rota
+      const sombra = L.geoJSON(d.routes[0].geometry, {
+        style: { color: '#000', weight: 10, opacity: .2 }
       }).addTo(_navMap);
+      _navRotaLayer = L.geoJSON(d.routes[0].geometry, {
+        style: { color: '#004E89', weight: 7, opacity: 1 }
+      }).addTo(_navMap);
+      // Guarda sombra junto para remover depois
+      _navRotaLayer._sombra = sombra;
+
+      // Instrução da próxima curva
+      const steps = d.routes[0].legs?.[0]?.steps || [];
+      if (steps.length > 0) {
+        _navSteps = steps;
+        const prox = steps.find(s => s.distance > 20);
+        if (prox) {
+          const instrEl = document.getElementById('nav-instrucao');
+          if (instrEl) {
+            const nome = prox.name || 'Continue';
+            const dist = prox.distance < 1000 ? `${Math.round(prox.distance)}m` : `${(prox.distance/1000).toFixed(1)}km`;
+            const manobra = prox.maneuver?.type || '';
+            const seta = manobra === 'turn' ? (prox.maneuver?.modifier?.includes('left') ? '↰' : '↱') :
+                         manobra === 'arrive' ? '🎯' : '↑';
+            instrEl.style.display = 'block';
+            instrEl.textContent = `${seta} ${dist} — ${nome}`;
+          }
+        }
+      }
     }
-  } catch(e) {}
+  } catch(e) {
+    // Se falhar, remove sombra antiga também
+    if (_navRotaLayer?._sombra) _navMap.removeLayer(_navRotaLayer._sombra);
+  }
 }
 
 function navCentralizar() {
   _navSegindoGPS = true;
   if (_navUserMarker && _navMap) {
-    _navMap.setView(_navUserMarker.getLatLng(), 16, { animate: true });
+    _navMap.setView(_navUserMarker.getLatLng(), 17, { animate: true });
   }
 }
 
