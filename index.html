@@ -2072,6 +2072,7 @@ let _navPosAnterior = null;
 let _navGPSContagem = 0;
 let _navRotaAjustada = false;
 let _navStepsCache = [];
+let _navGeometriaCache = null;  // Geometria raw do OSRM — usada para rota instantânea
 
 // ══ ABRIR / FECHAR ════════════════════════════════════════════════
 
@@ -2084,6 +2085,7 @@ function abrirNavInterna(entregas) {
   _navPosAnterior = null;
   _navRotaAjustada = false;
   _navStepsCache = [];
+  _navGeometriaCache = null;
   try { localStorage.setItem('nav_ativa','1'); localStorage.setItem('nav_ent_idx','0'); } catch(e){}
 
   const pg = document.getElementById('pg-nav-interna');
@@ -2160,6 +2162,7 @@ async function navDesenharRotaGeral(entregas, origemLL) {
       _navRotaLayer  = L.geoJSON(d.routes[0].geometry,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
       _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
       if (_navUserMarker) _navUserMarker.bringToFront();
+      _navGeometriaCache = d.routes[0].geometry;  // Salva geometria raw para uso no modo ativo
       _navStepsCache = d.routes[0].legs?.flatMap(l=>l.steps||[]) || [];
       if (!_navRotaAjustada) {
         _navRotaAjustada = true;
@@ -2290,28 +2293,54 @@ async function navIniciarModoAtivo(entregas) {
   // Painel inferior modo ativo
   navAtualizarPainelAtivo(entregas);
 
-  // ══ ROTA INSTANTÂNEA: reutiliza a geometria já calculada na visão geral ══
+  // ══ ROTA INSTANTÂNEA: usa geometria raw salva na visão geral ══
   if (_navPosAnterior) {
-    // Desenha rota já disponível IMEDIATAMENTE (sem esperar OSRM)
-    if (_navRotaLayer) {
+    // Desenha rota imediatamente com a geometria já disponível
+    if (_navGeometriaCache) {
       try {
-        const geoExistente = _navRotaLayer.toGeoJSON();
-        _navRotaSombraAtivo = L.geoJSON(geoExistente, {
+        if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
+        if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
+        _navRotaSombraAtivo = L.geoJSON(_navGeometriaCache, {
           style:{color:'#000d2e',weight:14,opacity:.22}
         }).addTo(_navMapAtivo);
-        _navRotaLayerAtivo = L.geoJSON(geoExistente, {
+        _navRotaLayerAtivo = L.geoJSON(_navGeometriaCache, {
           style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}
         }).addTo(_navMapAtivo);
         _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
-        // Instrução imediata com cache já disponível
+        // Atualiza instrução com steps já em cache
         if (_navStepsCache.length) {
           navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
+        } else {
+          // Fallback instrucional enquanto busca OSRM
+          const elR = document.getElementById('nav-rua-instrucao');
+          const elS = document.getElementById('nav-seta-instrucao');
+          if (elR) elR.textContent = 'Rota calculada — aguarde instruções';
+          if (elS) elS.textContent = '↑';
         }
       } catch(e) { console.warn('[rota-instant]', e); }
+    } else {
+      // Sem cache: desenha linha reta ao destino atual imediatamente
+      const eAtual = entregas[_navEntregaAtual];
+      if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
+        const linhaReta = {
+          type: 'LineString',
+          coordinates: [
+            [_navPosAnterior.lng, _navPosAnterior.lat],
+            [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
+          ]
+        };
+        if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
+        if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
+        _navRotaSombraAtivo = L.geoJSON(linhaReta, {style:{color:'#000d2e',weight:14,opacity:.22}}).addTo(_navMapAtivo);
+        _navRotaLayerAtivo  = L.geoJSON(linhaReta, {style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMapAtivo);
+        _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
+      }
     }
+
     // Centra mapa na posição atual
     navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
-    // Desenha posição do entregador imediatamente
+
+    // Desenha marcador do entregador imediatamente
     const heading = _navHeading;
     const icon = L.divIcon({
       html:`<div style="width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
@@ -2326,8 +2355,16 @@ async function navIniciarModoAtivo(entregas) {
     });
     _navUserMarkerAtivo = L.marker([_navPosAnterior.lat,_navPosAnterior.lng],{icon,zIndexOffset:1000}).addTo(_navMapAtivo);
     _navUserMarkerAtivo.bringToFront();
-    // Atualiza rota em background (para pegar rota a partir da posição atual exata)
-    setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 800);
+
+    // Atualiza rota precisa em background (da posição atual até destino atual)
+    setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 600);
+  } else {
+    // Sem posição GPS ainda — tenta pegar agora
+    navigator.geolocation && navigator.geolocation.getCurrentPosition(pos => {
+      _navPosAnterior = {lat: pos.coords.latitude, lng: pos.coords.longitude};
+      navDesenharRotaAtiva(pos.coords.latitude, pos.coords.longitude, entregas);
+      navMoverCameraAtiva(pos.coords.latitude, pos.coords.longitude);
+    }, ()=>{}, {enableHighAccuracy:true, timeout:8000});
   }
 }
 
@@ -2464,6 +2501,21 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
   const e = entregas[_navEntregaAtual];
   if (!e?.lat_entrega || !e?.lng_entrega) return;
   const dLat = parseFloat(e.lat_entrega), dLng = parseFloat(e.lng_entrega);
+
+  // Função auxiliar para desenhar qualquer geometria GeoJSON no mapa ativo
+  function desenharGeometria(geo) {
+    if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
+    if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
+    _navRotaSombraAtivo = L.geoJSON(geo, {
+      style:{color:'#000d2e',weight:14,opacity:.22}
+    }).addTo(_navMapAtivo);
+    _navRotaLayerAtivo  = L.geoJSON(geo, {
+      style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}
+    }).addTo(_navMapAtivo);
+    _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
+    if (_navUserMarkerAtivo) _navUserMarkerAtivo.bringToFront();
+  }
+
   try {
     const ctrl = new AbortController();
     const t = setTimeout(()=>ctrl.abort(), 8000);
@@ -2474,20 +2526,31 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
     clearTimeout(t);
     const d = await r.json();
     if (d.code==='Ok' && d.routes?.[0]?.geometry) {
-      if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo);
-      if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);
-      _navRotaSombraAtivo = L.geoJSON(d.routes[0].geometry,{
-        style:{color:'#000d2e',weight:14,opacity:.22}
-      }).addTo(_navMapAtivo);
-      _navRotaLayerAtivo  = L.geoJSON(d.routes[0].geometry,{
-        style:{color:'#1a73e8',weight:8,opacity:1,lineCap:'round',lineJoin:'round'}
-      }).addTo(_navMapAtivo);
-      _navDestinoMarkersAtivo.forEach(m => m.bringToFront());
-      if (_navUserMarkerAtivo) _navUserMarkerAtivo.bringToFront();
+      _navGeometriaCache = d.routes[0].geometry;
+      desenharGeometria(d.routes[0].geometry);
       _navStepsCache = d.routes[0].legs?.flatMap(l=>l.steps||[]) || [];
       navAtualizarInstrucao(lat, lng);
+    } else {
+      throw new Error('OSRM sem rota');
     }
-  } catch(e) { console.warn('[rotaAtiva]', e.message); }
+  } catch(err) {
+    console.warn('[rotaAtiva]', err.message);
+    // Fallback: linha reta ao destino
+    const linhaReta = {
+      type: 'LineString',
+      coordinates: [[lng, lat], [dLng, dLat]]
+    };
+    desenharGeometria(linhaReta);
+    // Sem steps — mostra instrução direcional simples
+    const distM = navDistM(lat, lng, dLat, dLng);
+    const distStr = distM < 1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
+    const el = document.getElementById('nav-dist-instrucao');
+    const elR = document.getElementById('nav-rua-instrucao');
+    const elS = document.getElementById('nav-seta-instrucao');
+    if (el) el.textContent = distStr;
+    if (elR) elR.textContent = e.endereco_entrega || 'Siga para o destino';
+    if (elS) elS.textContent = '↑';
+  }
 }
 
 function navAtualizarInstrucao(lat, lng) {
