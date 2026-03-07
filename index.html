@@ -4131,7 +4131,22 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
   _cobFiltro = { lojaId: filtroLojaId || null, ini: filtroIni || null, fim: filtroFim || null };
   const el = $('adm-cob-dados');
   if (!el) return;
-  el.innerHTML = '<p style="text-align:center;padding:24px;color:#888;">Carregando...</p>';
+  el.innerHTML = '<p style="text-align:center;padding:24px;color:#888;">⏳ Carregando...</p>';
+  try {
+    await _carregarCobrancasInterno(filtroLojaId, filtroIni, filtroFim);
+  } catch(err) {
+    el.innerHTML = '<div style="background:#fff5f5;border:1.5px solid #fca5a5;border-radius:12px;padding:16px;margin:8px;">' +
+      '<div style="font-size:13px;font-weight:800;color:#C8960C;margin-bottom:6px;">❌ Erro ao carregar cobranças</div>' +
+      '<div style="font-size:11px;color:#666;font-family:monospace;background:#f8fafc;padding:8px;border-radius:6px;">' + (err.message || String(err)) + '</div>' +
+      '<button onclick="carregarCobrancas()" style="margin-top:10px;background:#004E89;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Tentar Novamente</button>' +
+      '</div>';
+    console.error('carregarCobrancas erro:', err);
+  }
+}
+
+async function _carregarCobrancasInterno(filtroLojaId, filtroIni, filtroFim) {
+  const el = $('adm-cob-dados');
+  if (!el) return;
 
   // ── Busca lojas ──
   const { data: lojas = [] } = await db.from('usuarios')
@@ -4188,9 +4203,9 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
     const cIni = new Date(c.periodo_ini + 'T00:00:00');
     const cFim = new Date(c.periodo_fim + 'T23:59:59');
     // Sobreposição de período
-    const dentroDoPeríodo = cIni <= pFim && cFim >= pIni;
+    const dentroDoPeriodo = cIni <= pFim && cFim >= pIni;
     const dentroLoja = !filtroLojaId || c.loja_id === filtroLojaId;
-    return dentroDoPeríodo && dentroLoja;
+    return dentroDoPeriodo && dentroLoja;
   });
 
   // ── KPIs baseados em cobranças FILTRADAS ──
