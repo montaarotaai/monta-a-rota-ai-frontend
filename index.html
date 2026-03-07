@@ -2188,23 +2188,35 @@ async function navDesenharRotaGeral(entregas, origemLL) {
   if (!pontos.length) return;
   const oLat = origemLL ? origemLL.lat : pontos[0][0];
   const oLng = origemLL ? origemLL.lng : pontos[0][1];
+
+  // LINHA IMEDIATA: reta ligando todos os pontos — aparece antes do OSRM responder
+  const retaCoords = [[oLng,oLat], ...pontos.map(p=>[p[1],p[0]])];
+  const geomReta = { type:'LineString', coordinates: retaCoords };
+  if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
+  if (_navRotaLayer)  _navMap.removeLayer(_navRotaLayer);
+  _navRotaSombra = L.geoJSON(geomReta,{style:{color:'#001a4d',weight:12,opacity:.18}}).addTo(_navMap);
+  _navRotaLayer  = L.geoJSON(geomReta,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
+  _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
+  if (_navUserMarker) _navUserMarker.bringToFront();
+  if (!_navRotaAjustada) {
+    _navRotaAjustada = true;
+    const b = _navRotaLayer.getBounds();
+    if (b.isValid()) _navMap.fitBounds(b, {padding:[55,55],animate:false});
+  }
+
+  // OSRM em background — substitui linha reta pela rota real
   const waypoints = [[oLat,oLng], ...pontos];
   const coords = waypoints.map(p=>`${p[1]},${p[0]}`).join(';');
   const rota = await _fetchOSRM(coords);
-  if (rota) {
+  if (rota && _navMap) {
     if (_navRotaSombra) _navMap.removeLayer(_navRotaSombra);
     if (_navRotaLayer)  _navMap.removeLayer(_navRotaLayer);
     _navRotaSombra = L.geoJSON(rota.geometry,{style:{color:'#001a4d',weight:12,opacity:.18}}).addTo(_navMap);
     _navRotaLayer  = L.geoJSON(rota.geometry,{style:{color:'#1a73e8',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}}).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => dm.marker.bringToFront());
     if (_navUserMarker) _navUserMarker.bringToFront();
-    _navGeometriaCache = rota.geometry;
-    _navStepsCache = rota.legs?.flatMap(l=>l.steps||[]) || [];
-    if (!_navRotaAjustada) {
-      _navRotaAjustada = true;
-      const b = _navRotaLayer.getBounds();
-      if (b.isValid()) _navMap.fitBounds(b, {padding:[55,55],animate:true});
-    }
+    _navGeometriaCache = null; // cache da geral NÃO serve para a navegação ativa
+    _navStepsCache = [];
   }
 }
 
@@ -2286,6 +2298,37 @@ function navAtualizarPosGeral(lat, lng) {
 
 // ══ MODO NAVEGAÇÃO ATIVA — estilo Google Maps ══════════════════════
 
+// Garante geocode antes de abrir o mapa — sem coordenadas não tem linha
+async function navIniciarComGeocode() {
+  const entregas = _rotaEntData;
+  if (!entregas?.length) { alert('Sem entregas para navegar.'); return; }
+
+  const btn = document.getElementById('nav-btn-iniciar');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Calculando...'; }
+
+  // Geocodifica TODAS as entregas que estão sem coordenadas
+  for (const e of entregas) {
+    if (!e.lat_entrega || !e.lng_entrega) {
+      try {
+        const geo = await geocode(e.endereco_entrega || '');
+        if (geo) {
+          e.lat_entrega  = geo.lat;
+          e.lng_entrega  = geo.lng;
+          // Salva no banco em background
+          db.from('entregas').update({ lat_entrega: geo.lat, lng_entrega: geo.lng }).eq('id', e.id).then(() => {});
+        } else {
+          console.warn('[geocode] falhou para:', e.endereco_entrega);
+        }
+      } catch(err) {
+        console.warn('[geocode erro]', err);
+      }
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '▶  Iniciar Navegação'; }
+  navIniciarModoAtivo(entregas);
+}
+
 async function navIniciarModoAtivo(entregas) {
   _navModoAtivo  = true;
   _navSegindoGPS = true;
@@ -2358,58 +2401,35 @@ async function navIniciarModoAtivo(entregas) {
     _navDestinoMarkersAtivo.push(L.marker([lat,lng],{icon,zIndexOffset:900}).addTo(_navMapAtivo));
   });
 
-  // ── PASSO 6: geocode se necessário, depois linha azul + câmera ────
+  // ── PASSO 6: linha azul + câmera ──────────────────────────────────
   if (_navPosAnterior) {
     _navInicializarMarcadorAtivo(_navPosAnterior.lat, _navPosAnterior.lng);
   }
 
-  // Se lat_entrega está faltando, geocodifica agora antes de desenhar
-  if (eAtual && (!eAtual.lat_entrega || !eAtual.lng_entrega) && eAtual.endereco_entrega) {
-    const elR = document.getElementById('nav-rua-instrucao');
-    if (elR) elR.textContent = 'Calculando rota...';
-    try {
-      const geo = await geocode(eAtual.endereco_entrega);
-      if (geo) {
-        eAtual.lat_entrega = geo.lat;
-        eAtual.lng_entrega = geo.lng;
-        // Salva no banco para não geocodificar de novo
-        db.from('entregas').update({lat_entrega: geo.lat, lng_entrega: geo.lng}).eq('id', eAtual.id).then(()=>{});
-      }
-    } catch(e) { console.warn('[geocode nav]', e); }
-  }
+  if (_navPosAnterior && eAtual?.lat_entrega && eAtual?.lng_entrega) {
+    const dLat = parseFloat(eAtual.lat_entrega);
+    const dLng = parseFloat(eAtual.lng_entrega);
 
-  if (_navPosAnterior) {
-    // LINHA AZUL IMEDIATA — linha reta do entregador ao destino
-    if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
-      const geoReta = _navGeometriaCache || {
-        type: 'LineString',
-        coordinates: [
-          [_navPosAnterior.lng, _navPosAnterior.lat],
-          [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
-        ]
-      };
-      _navDesenharGeometriaNoAtivo(geoReta);
+    // LINHA RETA IMEDIATA — aparece instantaneamente
+    _navDesenharGeometriaNoAtivo({
+      type: 'LineString',
+      coordinates: [
+        [_navPosAnterior.lng, _navPosAnterior.lat],
+        [dLng, dLat]
+      ]
+    });
 
-      if (_navGeometriaCache && _navStepsCache.length) {
-        navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
-      }
+    // Câmera enquadra ENTREGADOR + DESTINO — linha fica visível na tela inteira
+    _navMapAtivo.fitBounds(
+      L.latLngBounds([_navPosAnterior.lat, _navPosAnterior.lng], [dLat, dLng]),
+      { padding: [70, 70], maxZoom: 16, animate: false }
+    );
 
-      // Câmera: enquadra entregador + destino — linha fica VISÍVEL na tela
-      const dLat = parseFloat(eAtual.lat_entrega), dLng = parseFloat(eAtual.lng_entrega);
-      const bounds = L.latLngBounds(
-        [_navPosAnterior.lat, _navPosAnterior.lng],
-        [dLat, dLng]
-      );
-      _navMapAtivo.fitBounds(bounds, { padding: [60, 60], maxZoom: 17, animate: false });
-    } else {
-      navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
-    }
-  }
+    // OSRM em background — substitui linha reta pela rota real pelas ruas
+    navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
 
-  // OSRM em background — substitui linha reta pela rota real pelas ruas
-  const _posParaOSRM = _navPosAnterior;
-  if (_posParaOSRM && eAtual?.lat_entrega) {
-    navDesenharRotaAtiva(_posParaOSRM.lat, _posParaOSRM.lng, entregas);
+  } else if (_navPosAnterior) {
+    navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
   }
 }
 
@@ -2429,10 +2449,7 @@ function navAtualizarPainelAtivo(entregas) {
   // Modal de confirmação SEMPRE aparece — independente de codigo_confirmacao
   const fnEntr = `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
 
-  const endWaze = encodeURIComponent(e.endereco_entrega||'');
-  const latW = e.lat_entrega||RP_LAT, lngW = e.lng_entrega||RP_LNG;
   let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕ Sair</button>`;
-  btns += `<a href="waze://?ll=${latW},${lngW}&navigate=yes" target="_blank" style="background:#33CCFF;color:#111;border:none;padding:11px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;text-decoration:none;display:flex;align-items:center;">🚗 Waze</a>`;
 
   if (st==='aceito'||st==='pendente')
     btns += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🏪 Na Loja</button>`;
@@ -2712,7 +2729,7 @@ function navAtualizarPainel(entregas, idx) {
     <div style="display:flex;gap:6px;flex-wrap:wrap;">${pgBadge}${e.valor_corrida>0?`<span style="background:#e8f5e9;color:#2e7d32;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;">${fR(e.valor_corrida)}</span>`:''}</div>`;
 
   const lojaLat=e.loja?.loja_lat||RP_LAT, lojaLng=e.loja?.loja_lng||RP_LNG;
-  let acoes = `<button id="nav-btn-iniciar" onclick="navIniciarModoAtivo(_rotaEntData)" style="background:linear-gradient(135deg,#004E89,#1a73e8);color:white;border:none;padding:14px 18px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">▶  Iniciar Navegação</button>`;
+  let acoes = `<button id="nav-btn-iniciar" onclick="navIniciarComGeocode()" style="background:linear-gradient(135deg,#004E89,#1a73e8);color:white;border:none;padding:14px 18px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">▶  Iniciar Navegação</button>`;
   if (st==='aceito'||st==='pendente')
     acoes += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:14px 14px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;">🏪</button>`;
   if (st==='chegou_loja')
