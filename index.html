@@ -2013,11 +2013,11 @@ async function geocode(addr){
       const d   = await r.json();
       if(!d||!d.length) continue;
       // Prefere resultado dentro de RP
+      // Prefere resultado dentro do bounds da cidade, mas aceita qualquer coisa (entregas fora da cidade)
       const rpRes = d.find(x=>dentroDeRP(parseFloat(x.lat),parseFloat(x.lon)));
       const res   = rpRes||d[0];
       const lat   = parseFloat(res.lat), lng = parseFloat(res.lon);
-      // Se não está em RP mas é a última variante, aceita mesmo assim (entregas fora da cidade)
-      if(!dentroDeRP(lat,lng) && variantes.indexOf(q) < variantes.length-1) continue;
+      // Sem restrição de bounds — aceita o melhor resultado disponível
       const out = {lat,lng};
       geocodeCache[addr] = out;
       return out;
@@ -2429,7 +2429,10 @@ function navAtualizarPainelAtivo(entregas) {
   // Modal de confirmação SEMPRE aparece — independente de codigo_confirmacao
   const fnEntr = `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
 
+  const endWaze = encodeURIComponent(e.endereco_entrega||'');
+  const latW = e.lat_entrega||RP_LAT, lngW = e.lng_entrega||RP_LNG;
   let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕ Sair</button>`;
+  btns += `<a href="waze://?ll=${latW},${lngW}&navigate=yes" target="_blank" style="background:#33CCFF;color:#111;border:none;padding:11px 10px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;text-decoration:none;display:flex;align-items:center;">🚗 Waze</a>`;
 
   if (st==='aceito'||st==='pendente')
     btns += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🏪 Na Loja</button>`;
@@ -2606,9 +2609,7 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
     _navDesenharGeometriaNoAtivo(rota.geometry);
     _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
     navAtualizarInstrucao(lat, lng);
-    // Libera câmera para seguir entregador nos próximos ticks de GPS
-    // Mas NÃO move agora — o GPS tick cuidará disso
-    _navPosInicialAtivo = null;
+    // NÃO mexe na câmera — _navPosInicialAtivo continua guardando até entregador mover 15m
   } else {
     // Fallback: linha reta já está desenhada — só atualiza texto
     const distM = navDistM(lat, lng, dLat, dLng);
