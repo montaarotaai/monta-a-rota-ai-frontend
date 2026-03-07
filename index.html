@@ -7476,10 +7476,10 @@ async function carregarRotaEnt(){
     </div>` : ''}
     <p style="font-size:11px;color:#888;margin-bottom:6px;text-align:center;">📍 ${totalEnts === 1 ? 'Navegar para a entrega' : 'Rota completa com '+totalEnts+' paradas'}</p>
     <div class="row" style="gap:7px;">
-      <a href="${mapsUrlRota}" target="_blank" style="flex:1;">
+      <a href="${mapsUrlRota}" target="_blank" style="flex:1;" onclick="marcarSaidaMapa()">
         <button class="btn btn-blue" style="padding:10px;width:100%;font-size:13px;">🗺️ Google Maps</button>
       </a>
-      <a href="${wazeUrlRota}" target="_blank" style="flex:1;" onclick="if(!this.href.startsWith('waze'))return;setTimeout(()=>{if(document.hasFocus())this.href='https://waze.com/ul?q=${dest}&navigate=yes';},500)">
+      <a href="${wazeUrlRota}" target="_blank" style="flex:1;" onclick="marcarSaidaMapa();if(!this.href.startsWith('waze'))return;setTimeout(()=>{if(document.hasFocus())this.href='https://waze.com/ul?q=${dest}&navigate=yes';},500)">
         <button class="btn" style="padding:10px;width:100%;font-size:13px;background:#00BBCC;color:white;">🚗 Waze</button>
       </a>
     </div>
@@ -9108,4 +9108,45 @@ async function downloadPdfTermo(id,nome){
     </div>
   </div>
 </body>
+
+<!-- ── Botão flutuante: Voltar aos Pedidos (entregador) ── -->
+<div id="btn-voltar-pedidos" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;animation:slideUpIn .35s cubic-bezier(.34,1.56,.64,1);">
+  <button onclick="voltarAosPedidos()" style="background:linear-gradient(135deg,#004E89,#0077cc);color:white;border:none;border-radius:50px;padding:15px 28px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 6px 24px rgba(0,78,137,.55);display:flex;align-items:center;gap:10px;white-space:nowrap;">
+    <span style="font-size:20px;">🛵</span> Voltar aos Meus Pedidos
+  </button>
+</div>
+<style>
+@keyframes slideUpIn{from{opacity:0;transform:translateX(-50%) translateY(30px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+</style>
+<script>
+let _saiuParaMapa=false,_btnVoltarTimer=null;
+function marcarSaidaMapa(){_saiuParaMapa=true;}
+function voltarAosPedidos(){
+  esconderBtnVoltar();
+  const rotaEl=document.getElementById('rota-ent-lst');
+  if(rotaEl){rotaEl.scrollIntoView({behavior:'smooth',block:'start'});}
+  else{window.scrollTo({top:0,behavior:'smooth'});}
+}
+function mostrarBtnVoltar(){
+  const btn=document.getElementById('btn-voltar-pedidos');
+  if(!btn)return;
+  btn.style.display='block';
+  clearTimeout(_btnVoltarTimer);
+  _btnVoltarTimer=setTimeout(esconderBtnVoltar,12000);
+}
+function esconderBtnVoltar(){
+  const btn=document.getElementById('btn-voltar-pedidos');
+  if(btn)btn.style.display='none';
+  clearTimeout(_btnVoltarTimer);
+  _saiuParaMapa=false;
+}
+function _checarRetornoPedidos(){
+  if(!_saiuParaMapa)return;
+  const pgEnt=document.getElementById('pg-entregador');
+  if(pgEnt&&!pgEnt.classList.contains('hidden'))mostrarBtnVoltar();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')_checarRetornoPedidos();});
+window.addEventListener('pageshow',()=>_checarRetornoPedidos());
+window.addEventListener('focus',()=>_checarRetornoPedidos());
+</script>
 </html>
