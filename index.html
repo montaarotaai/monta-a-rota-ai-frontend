@@ -2379,11 +2379,20 @@ async function navIniciarModoAtivo(entregas) {
       navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
     }
 
-    navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
+    // Câmera: mostra entregador + destino para linha azul ficar VISÍVEL
+    if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
+      const dLat = parseFloat(eAtual.lat_entrega), dLng = parseFloat(eAtual.lng_entrega);
+      const bounds = L.latLngBounds(
+        [_navPosAnterior.lat, _navPosAnterior.lng],
+        [dLat, dLng]
+      );
+      _navMapAtivo.fitBounds(bounds, { padding: [60, 60], maxZoom: 17, animate: false });
+    } else {
+      navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
+    }
   }
 
-  // Busca rota OSRM — substitui a linha com rota precisa pelas ruas
-  // Roda mesmo sem posição GPS (usa coords do destino para enquadrar)
+  // Busca rota OSRM em background — substitui linha reta pela rota real pelas ruas
   const _posParaOSRM = _navPosAnterior;
   if (_posParaOSRM) {
     navDesenharRotaAtiva(_posParaOSRM.lat, _posParaOSRM.lng, entregas);
@@ -2414,7 +2423,7 @@ function navAtualizarPainelAtivo(entregas) {
     btns += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🛵 Saindo</button>`;
 
   // Botão ENTREGUE — sempre visível e em destaque
-  btns += `<button onclick="this.disabled=true;this.textContent='⏳...';${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
+  btns += `<button onclick="${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
 
   const ac = document.getElementById('nav-acoes-ativas');
   if (ac) ac.innerHTML = btns;
@@ -2576,9 +2585,10 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
     _navDesenharGeometriaNoAtivo(rota.geometry);
     _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
     navAtualizarInstrucao(lat, lng);
+    // Após OSRM: se GPS ativo, muda para câmera de navegação (zoom 18 seguindo entregador)
+    if (_navSegindoGPS) navMoverCameraAtiva(lat, lng);
   } else {
-    // Fallback: linha reta imediata
-    _navDesenharGeometriaNoAtivo({ type:'LineString', coordinates:[[lng,lat],[dLng,dLat]] });
+    // Fallback: linha reta já está desenhada — só atualiza texto
     const distM = navDistM(lat, lng, dLat, dLng);
     const el = document.getElementById('nav-dist-instrucao');
     const elR = document.getElementById('nav-rua-instrucao');
