@@ -1564,7 +1564,12 @@ window.onload=()=>{
   const bg=$('login-bg-img');if(bg)bg.src=HEADER_BG_URL;
   try{
     const _us=carregarU();
-    if(_us&&_us.id&&_us.tipo){U=_us;showPg(U.tipo);}
+    if(_us&&_us.id&&_us.tipo){
+      U=_us;
+      // Verifica reset pendente antes de mostrar tela
+      await verificarResetPendente();
+      showPg(U.tipo);
+    }
   }catch(e){console.warn('onload: erro ao restaurar sessão',e);}
   // Inicia agendador de auto-logout às 03:00h
   agendarAutoLogout();
@@ -1573,6 +1578,52 @@ window.onload=()=>{
 // ============================================================
 // AUTO-LOGOUT ÀS 03:00 E 16:59 — desvincular de todas as lojas
 // ============================================================
+// Verifica se passou do horário de reset DESDE o último acesso
+// Chamado ao logar e ao restaurar sessão
+async function verificarResetPendente(){
+  if(!U||!U.tipo||U.tipo==='admin')return;
+  const agora=new Date();
+  const h=agora.getHours(),m=agora.getMinutes();
+  // Horários de reset: 03:00 e 17:00
+  // Se agora está entre 03:00–17:00 e último login foi antes das 03:00 → precisa resetar
+  // Se agora está entre 17:00–03:00 e último login foi antes das 17:00 → precisa resetar
+  const ultima=U._ultimo_acesso_ts?new Date(U._ultimo_acesso_ts):null;
+  const hAgora=h*60+m; // minutos desde meia-noite
+  const hReset1=3*60;   // 03:00
+  const hReset2=17*60;  // 17:00
+  let precisaReset=false;
+  if(ultima){
+    const hUlt=ultima.getHours()*60+ultima.getMinutes();
+    const mesmoDia=ultima.toDateString()===agora.toDateString();
+    // Passou pelo reset das 03:00?
+    if(mesmoDia&&hUlt<hReset1&&hAgora>=hReset1) precisaReset=true;
+    // Passou pelo reset das 17:00?
+    if(mesmoDia&&hUlt<hReset2&&hAgora>=hReset2) precisaReset=true;
+    // Dia diferente = certamente passou por algum reset
+    if(!mesmoDia) precisaReset=true;
+  }
+  // Atualiza timestamp de acesso
+  U._ultimo_acesso_ts=agora.toISOString();
+  salvarU();
+  if(!precisaReset)return;
+  console.log('[ResetTurno] Detectado reset pendente — desvinculando entregadores...');
+  try{
+    if(U.tipo==='loja'){
+      const{data:assoc}=await db.from('loja_entregadores').select('entregador_id').eq('loja_id',U.id);
+      const ids=(assoc||[]).map(a=>a.entregador_id);
+      if(ids.length){
+        await db.from('usuarios').update({online:false,loja_ativa_id:null}).in('id',ids);
+        await db.from('loja_entregadores').delete().in('entregador_id',ids).eq('loja_id',U.id);
+      }
+    } else if(U.tipo==='entregador'){
+      await db.from('usuarios').update({online:false,loja_ativa_id:null}).eq('id',U.id);
+      await db.from('loja_entregadores').delete().eq('entregador_id',U.id);
+      U.online=false;U.loja_ativa_id=null;U._loja_ativa_nome=null;U._loja_ativa_codigo=null;
+      salvarU();
+    }
+  }catch(e){console.warn('[ResetTurno] Erro:',e);}
+}
+
 function agendarAutoLogout(){
   const agora=new Date();
 
@@ -2037,7 +2088,10 @@ async function fazerLogin(){
     if(!u){showM('login-msg','Usuario nao encontrado');return;}
     if(u.status==='bloqueado'){showM('login-msg','Acesso bloqueado.');return;}
     if(senha!==u.senha_hash){showM('login-msg','Senha incorreta');return;}
-    U=u;salvarU(u);showPg(u.tipo);
+    U=u;salvarU(u);
+    // Verifica se passou de algum horário de reset desde o último acesso
+    await verificarResetPendente();
+    showPg(u.tipo);
   }catch(e){showM('login-msg','Erro: '+e.message);}
   finally{btn.disabled=false;btn.textContent='Entrar';}
 }
@@ -5273,18 +5327,7 @@ async function carregarPedidos(){
             const initials=ent.nome?ent.nome.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase():'?';
             const _cardGrad=!online?'linear-gradient(135deg,#ef5350,#b71c1c)':temEntregas?'linear-gradient(135deg,#3b82f6,#1d4ed8)':'linear-gradient(135deg,#00C9A7,#007a65)';
             const _cardGlow=!online?'rgba(239,83,80,.25)':temEntregas?'rgba(59,130,246,.25)':'rgba(0,201,167,.25)';
-            return `<div onclick="atribuirEnt('${e.id}','${ent.id}')" style="
-              cursor:pointer;
-              background:${selecionado?'#f0f9ff':'#fff'};
-              border:2px solid ${selecionado?'#0284c7':'#f0f0f0'};
-              border-radius:14px;
-              padding:10px 12px;
-              display:flex;align-items:center;gap:10px;
-              min-width:140px;
-              transition:all .2s;
-              box-shadow:${selecionado?'0 4px 16px rgba(2,132,199,.2)':'0 2px 8px rgba(0,0,0,.05)'};
-            ">
-              <!-- Avatar -->
+            return `<div ${online?`onclick="atribuirEnt('${e.id}','${ent.id}')"`:'title="Entregador offline — não pode receber pedidos"'} style="\n              cursor:${online?'pointer':'not-allowed'};\n              opacity:${online?'1':'0.4'};\n              background:${selecionado?'#f0f9ff':'#fff'};\n              border:2px solid ${selecionado?'#0284c7':'#f0f0f0'};\n              border-radius:14px;\n              padding:10px 12px;\n              display:flex;align-items:center;gap:10px;\n              min-width:140px;\n              transition:all .2s;\n              box-shadow:${selecionado?'0 4px 16px rgba(2,132,199,.2)':'0 2px 8px rgba(0,0,0,.05)'};\n            ">\n              <!-- Avatar -->\n    <!-- Avatar -->
               <div style="position:relative;flex-shrink:0;">
                 ${ent.foto_url
                   ?`<img src="${ent.foto_url}" style="width:38px;height:38px;border-radius:12px;object-fit:cover;border:2px solid ${cor};box-shadow:0 3px 8px ${_cardGlow};">`
