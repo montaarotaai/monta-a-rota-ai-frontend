@@ -3885,8 +3885,9 @@ function semanaAtual() {
   return { ini: seg, fim: dom };
 }
 
-async function gerarCobrancasSemana() {
-  const { ini, fim } = semanaAtual();
+async function gerarCobrancasPeriodo(iniStr, fimStr) {
+  const ini = new Date(iniStr + 'T00:00:00');
+  const fim = new Date(fimStr + 'T23:59:59');
   const semRef = semanaISO(ini);
   const venc = proxQuarta(new Date());
   const { data: lojas } = await db.from('usuarios')
@@ -3906,12 +3907,13 @@ async function gerarCobrancasSemana() {
     const taxa = parseFloat(loja.taxa_sistema || 0.99);
     const valor = parseFloat((qtd * taxa).toFixed(2));
     const { data: exist } = await db.from('cobrancas_lojas')
-      .select('id').eq('loja_id', loja.id).eq('semana_ref', semRef).limit(1);
+      .select('id').eq('loja_id', loja.id)
+      .gte('periodo_ini', iniStr).lte('periodo_fim', fimStr).limit(1);
     if (exist && exist.length) { ignoradas++; continue; }
     await db.from('cobrancas_lojas').insert({
       loja_id: loja.id,
-      periodo_ini: ini.toISOString().split('T')[0],
-      periodo_fim: fim.toISOString().split('T')[0],
+      periodo_ini: iniStr,
+      periodo_fim: fimStr,
       semana_ref: semRef,
       qtd_entregas: qtd,
       taxa_unitaria: taxa,
@@ -3922,7 +3924,12 @@ async function gerarCobrancasSemana() {
     geradas++;
   }
   alert('Cobranças geradas: ' + geradas + '\nIgnoradas (sem entrega ou já cobradas): ' + ignoradas);
-  carregarCobrancas();
+  carregarCobrancas(null, iniStr, fimStr);
+}
+
+async function gerarCobrancasSemana() {
+  const { ini, fim } = semanaAtual();
+  await gerarCobrancasPeriodo(ini.toISOString().split('T')[0], fim.toISOString().split('T')[0]);
 }
 
 async function marcarPago(cobId, nomeLoja, valor) {
@@ -3931,6 +3938,39 @@ async function marcarPago(cobId, nomeLoja, valor) {
     .update({ status: 'pago', pago_em: new Date().toISOString() }).eq('id', cobId);
   if (error) { alert('Erro: ' + error.message); return; }
   carregarCobrancas();
+}
+
+async function marcarPagoPrevia(lojaId, nomeLoja, valor, iniStr, fimStr) {
+  if (!confirm('Marcar como PAGO (sem cobrança formal): ' + nomeLoja + ' — ' + fR(valor) + '?')) return;
+  const semRef = semanaISO(new Date(iniStr + 'T12:00:00'));
+  const venc = proxQuarta(new Date());
+  // Cria a cobrança e já marca como paga
+  const { data: exist } = await db.from('cobrancas_lojas')
+    .select('id').eq('loja_id', lojaId).gte('periodo_ini', iniStr).lte('periodo_fim', fimStr).limit(1);
+  let cobId;
+  if (exist && exist.length) {
+    cobId = exist[0].id;
+    await db.from('cobrancas_lojas').update({ status: 'pago', pago_em: new Date().toISOString() }).eq('id', cobId);
+  } else {
+    const { data: lojaData } = await db.from('usuarios').select('taxa_sistema').eq('id', lojaId).single();
+    const taxa = parseFloat(lojaData?.taxa_sistema || 0.99);
+    const qtd = Math.round(valor / taxa);
+    const { data: ins } = await db.from('cobrancas_lojas').insert({
+      loja_id: lojaId,
+      periodo_ini: iniStr,
+      periodo_fim: fimStr,
+      semana_ref: semRef,
+      qtd_entregas: qtd,
+      taxa_unitaria: taxa,
+      valor_total: valor,
+      status: 'pago',
+      pago_em: new Date().toISOString(),
+      vencimento: venc.toISOString().split('T')[0],
+    }).select('id').single();
+    cobId = ins?.id;
+  }
+  alert('✅ ' + nomeLoja + ' marcado como pago!');
+  carregarCobrancas(null, iniStr, fimStr);
 }
 
 async function cancelarCobranca(cobId) {
@@ -4091,7 +4131,16 @@ function abrirPixLoja(lojaId, nomeLoja, valorSugerido) {
   setTimeout(() => { const inp = document.getElementById('pix-avulso-val'); if(inp) inp.focus(); }, 100);
 }
 
+let _cobFiltroAtual = { lojaId: null, ini: null, fim: null };
 async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
+  // Se chamado sem args, usa o filtro atual salvo
+  if (filtroLojaId === undefined && filtroIni === undefined && filtroFim === undefined) {
+    filtroLojaId = _cobFiltroAtual.lojaId;
+    filtroIni = _cobFiltroAtual.ini;
+    filtroFim = _cobFiltroAtual.fim;
+  } else {
+    _cobFiltroAtual = { lojaId: filtroLojaId || null, ini: filtroIni || null, fim: filtroFim || null };
+  }
   const el = $('adm-cob-dados');
   if (!el) return;
   el.innerHTML = '<p style="text-align:center;padding:24px;color:#888;">Carregando...</p>';
@@ -4118,17 +4167,21 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
   const pIni = filtroIni ? new Date(filtroIni + 'T00:00:00') : sIni;
   const pFim = filtroFim ? new Date(filtroFim + 'T23:59:59') : sFim;
 
-  // ── Busca entregas do período selecionado ──
+  // ── Busca entregas do período selecionado (com detalhes para prévia) ──
   const { data: entsPeriodo = [] } = await db.from('entregas')
-    .select('loja_id,status,created_at')
+    .select('id,loja_id,status,created_at,numero_pedido,nome_cliente,endereco_destino')
     .eq('status','entregue')
     .gte('created_at', pIni.toISOString())
-    .lte('created_at', pFim.toISOString());
+    .lte('created_at', pFim.toISOString())
+    .order('created_at', { ascending: false });
 
-  // Conta entregas por loja no período
+  // Conta entregas por loja no período e agrupa pedidos
   const entPorLoja = {};
+  const pedidosPorLoja = {};
   (entsPeriodo || []).forEach(e => {
     entPorLoja[e.loja_id] = (entPorLoja[e.loja_id] || 0) + 1;
+    if (!pedidosPorLoja[e.loja_id]) pedidosPorLoja[e.loja_id] = [];
+    pedidosPorLoja[e.loja_id].push(e);
   });
 
   // Enriquece lojas com dados do período
@@ -4137,6 +4190,7 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
     l._taxaEnt = taxa;
     l._qtdPeriodo = entPorLoja[l.id] || 0;
     l._valorPeriodo = parseFloat((l._qtdPeriodo * taxa).toFixed(2));
+    l._pedidos = pedidosPorLoja[l.id] || [];
   });
 
   const hoje = new Date(); hoje.setHours(0,0,0,0);
@@ -4273,11 +4327,13 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
       '</div>';
   }
 
-  // Botão gerar semana
-  html += '<button onclick="gerarCobrancasSemana()" style="width:100%;background:linear-gradient(135deg,#004E89,#0077cc);color:white;border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;">' +
-    '⚡ Gerar Cobranças desta Semana' +
+  // Botão gerar cobranças para o período filtrado
+  const pIniStr = pIni.toISOString().split('T')[0];
+  const pFimStr = pFim.toISOString().split('T')[0];
+  html += '<button onclick="gerarCobrancasPeriodo(\'' + pIniStr + '\',\'' + pFimStr + '\')" style="width:100%;background:linear-gradient(135deg,#004E89,#0077cc);color:white;border:none;border-radius:10px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;">' +
+    '⚡ Gerar Cobranças do Período' +
     '<div style="font-size:10px;font-weight:500;opacity:.75;margin-top:3px;">' +
-    sIni.toLocaleDateString('pt-BR') + ' a ' + sFim.toLocaleDateString('pt-BR') +
+    pIni.toLocaleDateString('pt-BR') + ' a ' + pFim.toLocaleDateString('pt-BR') +
     ' &nbsp;·&nbsp; vence próxima quarta' +
     '</div></button>' +
     '</div>';
@@ -4293,6 +4349,30 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
     lojasPreview.sort((a,b) => b._valorPeriodo - a._valorPeriodo).forEach(l => {
       totalPrev += l._valorPeriodo;
       const ln = (l.nome_loja||l.nome).replace(/'/g,"\\'");
+      const pedidos = l._pedidos || [];
+      // Lista de pedidos individuais
+      let pedidosHtml = '';
+      if (pedidos.length > 0) {
+        pedidosHtml += '<div style="margin:8px 0;border:1px solid #ffe0b2;border-radius:8px;overflow:hidden;">' +
+          '<div style="background:#fff8ee;padding:5px 10px;font-size:9px;font-weight:800;color:#9a6f00;text-transform:uppercase;letter-spacing:.6px;">Pedidos Computados</div>';
+        pedidos.forEach(function(p, idx) {
+          const dt = new Date(p.created_at);
+          const dtStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+          const numPed = p.numero_pedido ? '#' + p.numero_pedido : ('#' + (idx+1));
+          const cliente = p.nome_cliente || '—';
+          pedidosHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;' +
+            (idx < pedidos.length-1 ? 'border-bottom:1px solid #feecd0;' : '') + '">' +
+            '<span style="font-size:11px;font-weight:800;color:#004E89;">' + numPed + '</span>' +
+            '<span style="font-size:11px;color:#333;margin-left:5px;flex:1;"> — ' + cliente + '</span>' +
+            '<span style="font-size:10px;color:#888;margin:0 8px;white-space:nowrap;">' + dtStr + '</span>' +
+            '<span style="font-size:11px;font-weight:800;color:#27ae60;">R$' + l._taxaEnt.toFixed(2) + '</span>' +
+            '</div>';
+        });
+        pedidosHtml += '<div style="display:flex;justify-content:space-between;padding:6px 10px;background:#fff8ee;font-size:11px;font-weight:800;border-top:1.5px solid #ffe0b2;">' +
+          '<span>Total da prévia</span><span style="color:#9a6f00;">' + fR(l._valorPeriodo) + '</span></div></div>';
+      }
+      const pIniS = pIni.toISOString().split('T')[0];
+      const pFimS = pFim.toISOString().split('T')[0];
       html += '<div style="border:1.5px solid #ffe0b2;border-radius:10px;padding:10px 12px;margin-bottom:8px;">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;">' +
         '<div>' +
@@ -4301,10 +4381,14 @@ async function carregarCobrancas(filtroLojaId, filtroIni, filtroFim) {
         '</div>' +
         '<div style="font-size:18px;font-weight:900;color:#9a6f00;">' + fR(l._valorPeriodo) + '</div>' +
         '</div>' +
-        '<div style="margin-top:8px;">' +
-        '<button class="cob-btn" style="width:100%;background:linear-gradient(135deg,#004E89,#0077cc);color:white;" ' +
+        pedidosHtml +
+        '<div style="margin-top:8px;display:flex;gap:6px;">' +
+        '<button class="cob-btn" style="flex:1;background:linear-gradient(135deg,#004E89,#0077cc);color:white;" ' +
         'onclick="gerarCobrancaLoja(\'' + l.id + '\',\'' + ln + '\',' + l._qtdPeriodo + ',' + l._taxaEnt + ',' + l._valorPeriodo + ')">' +
         '⚡ Gerar Cobrança + Pix</button>' +
+        '<button class="cob-btn" style="background:#27ae60;color:white;" ' +
+        'onclick="marcarPagoPrevia(\'' + l.id + '\',\'' + ln + '\',' + l._valorPeriodo + ',\'' + pIniS + '\',\'' + pFimS + '\')">' +
+        '✅ Pago</button>' +
         '</div></div>';
     });
     html += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;padding:8px 4px;border-top:2px solid #ffe0b2;margin-top:4px;">' +
