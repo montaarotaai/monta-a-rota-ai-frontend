@@ -696,9 +696,11 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
     <div class="menu">
       <div class="mitem" onclick="abrirNovoPedido()"><div class="ico">&#128247;</div><h3>Novo Pedido</h3></div>
       <div class="mitem" onclick="abrirPedidosLj()"><div class="ico">&#128230;</div><h3>Pedidos / Rota</h3></div>
-      <div class="mitem" onclick="abrirRelLj()"><div class="ico">&#128202;</div><h3>Relatorio</h3></div>
-      <!-- COBRANÇAS DA LOJA — preenchido dinamicamente -->
-      <div id="lj-cob-section" style="display:none;margin-bottom:14px;"></div>
+      <div class="mitem" onclick="abrirRelLj()" style="position:relative;">
+        <div class="ico">&#128202;</div>
+        <h3>Relatorio</h3>
+        <div id="rel-badge" style="display:none;position:absolute;top:8px;right:8px;background:#e74c3c;color:white;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;line-height:1;">!</div>
+      </div>
 
       <div class="mitem" onclick="abrirGerEnt()"><div class="ico">&#128101;</div><h3>Entregadores</h3></div>
       <div class="mitem" onclick="abrirCfgLj()" style="grid-column:1/-1;max-width:170px;margin:0 auto;"><div class="ico">&#9881;</div><h3>Configuracoes</h3></div>
@@ -924,8 +926,39 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <div style="font-size:11px;color:#888;margin-top:1px;">Visão completa por período</div>
     </div>
   </div>
+  <!-- TAXA DE SISTEMA — botão clicável dentro do relatório -->
+  <div id="lj-taxa-btn-wrap" style="margin-bottom:14px;display:none;">
+    <button onclick="abrirModalTaxaSistema()" id="lj-taxa-btn" style="width:100%;background:linear-gradient(135deg,#004E89,#0077cc);color:white;border:none;border-radius:14px;padding:14px 16px;cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;transition:opacity .15s;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:rgba(255,255,255,.18);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📋</div>
+        <div style="text-align:left;">
+          <div style="font-size:12px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;opacity:.85;">Taxa de Sistema</div>
+          <div id="lj-taxa-btn-sub" style="font-size:11px;opacity:.7;margin-top:2px;">Ver extrato de cobranças</div>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div id="lj-taxa-btn-valor" style="font-size:22px;font-weight:900;"></div>
+        <div id="lj-taxa-btn-status" style="font-size:10px;opacity:.8;margin-top:1px;"></div>
+      </div>
+    </button>
+  </div>
   <div id="rel-f" style="margin-bottom:14px;"></div>
   <div id="rel-dados"></div>
+</div></div>
+
+<!-- MODAL TAXA DE SISTEMA DETALHADO -->
+<div id="m-taxa-sistema" class="modal"><div class="modal-box" style="max-width:520px;">
+  <button class="modal-close" onclick="closeM('taxa-sistema')">&times;</button>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+    <div style="width:40px;height:40px;background:linear-gradient(135deg,#004E89,#0077cc);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📋</div>
+    <div>
+      <h2 style="margin:0;font-size:17px;">Taxa de Sistema</h2>
+      <div style="font-size:11px;color:#888;margin-top:1px;">Extrato completo de cobranças</div>
+    </div>
+  </div>
+  <div id="m-taxa-sistema-conteudo">
+    <p style="text-align:center;color:#aaa;padding:20px;">⏳ Carregando...</p>
+  </div>
 </div></div>
 
 <!-- Gerenciar Entregadores Loja -->
@@ -4255,7 +4288,18 @@ async function initLoja(){
 let _ljCobAtual = null;
 
 async function carregarCobLoja() {
-  const sec = $('lj-cob-section');
+  // Atualiza apenas o badge no botão de Relatório do menu
+  try {
+    const { data } = await db.from('cobrancas_lojas')
+      .select('id').eq('loja_id', U.id)
+      .in('status', ['pendente', 'aguardando_confirmacao']).limit(1);
+    const badge = $('rel-badge');
+    if (badge) {
+      badge.style.display = (data && data.length > 0) ? 'flex' : 'none';
+    }
+  } catch(e) {}
+  return; // resto da função abaixo ainda mantido para retrocompatibilidade
+  const sec = null;
   if (!sec) return;
 
   // 1. Busca cobranças formais (pendente / aguardando)
@@ -5852,6 +5896,247 @@ async function abrirRelLj(){
     _CalPicker.init('rel-f','semana',(per,range)=>{ carregarRel(); });
   }
   carregarRel();
+  carregarTaxaBotao();
+}
+
+async function carregarTaxaBotao(){
+  const wrap = $('lj-taxa-btn-wrap');
+  const btnValor = $('lj-taxa-btn-valor');
+  const btnSub = $('lj-taxa-btn-sub');
+  const btnStatus = $('lj-taxa-btn-status');
+  const btn = $('lj-taxa-btn');
+  if(!wrap) return;
+
+  // Cobranças formais pendentes
+  let cobs = [];
+  try {
+    const { data } = await db.from('cobrancas_lojas')
+      .select('*').eq('loja_id', U.id)
+      .in('status', ['pendente', 'aguardando_confirmacao'])
+      .order('periodo_ini', { ascending: false });
+    cobs = data || [];
+  } catch(e) { cobs = []; }
+
+  // Prévia da semana atual
+  let previaQtd = 0, previaValor = 0;
+  try {
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
+    const dom = new Date(seg); dom.setDate(seg.getDate()+6); dom.setHours(23,59,59,999);
+    const taxa = parseFloat(U.taxa_sistema || 0.99);
+    const { data: ents } = await db.from('entregas')
+      .select('id').eq('loja_id', U.id).eq('status', 'entregue')
+      .gte('created_at', seg.toISOString()).lte('created_at', dom.toISOString());
+    previaQtd = (ents || []).length;
+    previaValor = parseFloat((previaQtd * taxa).toFixed(2));
+  } catch(e) {}
+
+  // Atualiza badge no botão do menu
+  const badge = $('rel-badge');
+  if (badge) {
+    if (cobs.length > 0) { badge.style.display = 'flex'; }
+    else { badge.style.display = 'none'; }
+  }
+
+  if (!cobs.length && previaQtd === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  if (cobs.length > 0) {
+    const total = cobs.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+    btnValor.textContent = fR(total);
+    btnSub.textContent = cobs.length + ' cobrança(s) em aberto';
+    btnStatus.textContent = '⚠️ Pagamento pendente';
+    btn.style.background = 'linear-gradient(135deg,#7c1d1d,#c62828)';
+  } else {
+    const taxa = parseFloat(U.taxa_sistema || 0.99);
+    btnValor.textContent = fR(previaValor);
+    btnSub.textContent = previaQtd + ' entregas × R$' + taxa.toFixed(2) + ' esta semana';
+    btnStatus.textContent = 'Cobrança gerada na quarta-feira';
+    btn.style.background = 'linear-gradient(135deg,#004E89,#0077cc)';
+  }
+}
+
+async function abrirModalTaxaSistema(){
+  openM('taxa-sistema');
+  const cont = $('m-taxa-sistema-conteudo');
+  cont.innerHTML = '<p style="text-align:center;color:#aaa;padding:20px;">⏳ Carregando...</p>';
+
+  // Cobranças formais
+  let cobs = [];
+  try {
+    const { data } = await db.from('cobrancas_lojas')
+      .select('*').eq('loja_id', U.id)
+      .order('periodo_ini', { ascending: false }).limit(20);
+    cobs = data || [];
+  } catch(e) { cobs = []; }
+
+  // Prévia semana atual
+  let previaQtd = 0, previaValor = 0, previaEnts = [];
+  try {
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
+    const dom = new Date(seg); dom.setDate(seg.getDate()+6); dom.setHours(23,59,59,999);
+    const taxa = parseFloat(U.taxa_sistema || 0.99);
+    const { data: ents } = await db.from('entregas')
+      .select('id,numero_pedido,cliente_nome,created_at,status')
+      .eq('loja_id', U.id).eq('status', 'entregue')
+      .gte('created_at', seg.toISOString()).lte('created_at', dom.toISOString())
+      .order('created_at', { ascending: false });
+    previaEnts = ents || [];
+    previaQtd = previaEnts.length;
+    previaValor = parseFloat((previaQtd * taxa).toFixed(2));
+  } catch(e) {}
+
+  const taxa = parseFloat(U.taxa_sistema || 0.99);
+  const pendentes = cobs.filter(c => c.status === 'pendente' || c.status === 'aguardando_confirmacao');
+  const pagas = cobs.filter(c => c.status === 'pago' || c.status === 'confirmado');
+
+  let html = '';
+
+  // Resumo geral
+  const totalPendente = pendentes.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+  html += `<div style="background:#f8fafc;border-radius:14px;padding:14px;margin-bottom:16px;border:1.5px solid #e2e8f0;">
+    <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">📊 Resumo Geral</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:white;border-radius:10px;padding:10px;text-align:center;border:1.5px solid #e2e8f0;">
+        <div style="font-size:18px;font-weight:900;color:${pendentes.length > 0 ? '#c62828' : '#004E89'};">${fR(totalPendente)}</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">Em aberto</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:10px;text-align:center;border:1.5px solid #e2e8f0;">
+        <div style="font-size:18px;font-weight:900;color:#1a3a5c;">R$${taxa.toFixed(2)}</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">Por entrega</div>
+      </div>
+    </div>
+  </div>`;
+
+  // Prévia semana atual
+  if (previaQtd > 0 && pendentes.length === 0) {
+    const hoje = new Date();
+    const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
+    const dom = new Date(seg); dom.setDate(seg.getDate()+6);
+    const fmtDate = d => d.toLocaleDateString('pt-BR');
+    html += `<div style="border:2px solid #004E89;border-radius:14px;overflow:hidden;margin-bottom:14px;">
+      <div style="background:linear-gradient(135deg,#1a3a5c,#004E89);padding:12px 14px;color:white;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:10px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:.8px;">📅 Esta Semana — Prévia</div>
+            <div style="font-size:11px;opacity:.7;margin-top:3px;">${fmtDate(seg)} a ${fmtDate(dom)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:26px;font-weight:900;">${fR(previaValor)}</div>
+            <div style="font-size:10px;opacity:.7;">${previaQtd} entregas × R$${taxa.toFixed(2)}</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;background:rgba(255,255,255,.12);border-radius:8px;padding:7px 10px;font-size:11px;opacity:.85;">
+          ℹ️ Cobrança gerada pelo admin toda quarta-feira
+        </div>
+      </div>
+      <div style="background:white;padding:12px;">
+        <div style="font-size:11px;font-weight:800;color:#004E89;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Pedidos computados</div>
+        <div style="max-height:160px;overflow-y:auto;">
+          ${previaEnts.map((e,i) => {
+            const dt = new Date(e.created_at);
+            const dtFmt = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px;">
+              <div>
+                <span style="color:#64748b;font-weight:600;">#${e.numero_pedido||i+1}</span>
+                ${e.cliente_nome ? '<span style="color:#333;margin-left:5px;">— '+e.cliente_nome+'</span>' : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="color:#888;font-size:10px;">${dtFmt}</span>
+                <span style="color:#004E89;font-weight:800;">R$${taxa.toFixed(2)}</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:2px solid #e2e8f0;">
+          <span style="font-size:12px;font-weight:700;color:#333;">Total da semana</span>
+          <span style="font-size:16px;font-weight:900;color:#004E89;">${fR(previaValor)}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Cobranças formais pendentes
+  if (pendentes.length > 0) {
+    html += `<div style="font-size:11px;font-weight:800;color:#c62828;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">⚠️ Cobranças em Aberto</div>`;
+    pendentes.forEach((cob, idx) => {
+      const vencFmt = new Date(cob.vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+      const iniFmt  = new Date(cob.periodo_ini + 'T12:00:00').toLocaleDateString('pt-BR');
+      const fimFmt  = new Date(cob.periodo_fim + 'T12:00:00').toLocaleDateString('pt-BR');
+      const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(cob.valor_total), 'MontaRotai');
+      const qrUrl = pixQRUrl(emv);
+      const emvSafe = emv.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const isAguardando = cob.status === 'aguardando_confirmacao';
+      const hoje2 = new Date(); hoje2.setHours(0,0,0,0);
+      const vencida = new Date(cob.vencimento+'T00:00:00') < hoje2;
+      const statusCor = isAguardando ? '#d97706' : (vencida ? '#dc2626' : '#c62828');
+      const bgGrad = isAguardando ? 'linear-gradient(135deg,#78350f,#d97706)' : 'linear-gradient(135deg,#7c1d1d,#c62828)';
+      const statusLabel = isAguardando ? '🕐 Aguardando Confirmação' : (vencida ? '🚨 VENCIDA' : '⚠️ Pagamento Pendente');
+
+      html += `<div style="border:2px solid ${statusCor};border-radius:14px;overflow:hidden;margin-bottom:14px;">
+        <div style="background:${bgGrad};padding:12px 14px;color:white;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-size:10px;font-weight:800;opacity:.85;text-transform:uppercase;letter-spacing:.5px;">${statusLabel}</div>
+              <div style="font-size:11px;opacity:.75;margin-top:3px;">📅 ${iniFmt} a ${fimFmt}</div>
+              <div style="font-size:10px;opacity:.7;margin-top:2px;">${cob.qtd_entregas||0} entregas · R$${parseFloat(cob.taxa_unitaria||0.99).toFixed(2)}/entrega</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:28px;font-weight:900;">${fR(parseFloat(cob.valor_total))}</div>
+              <div style="font-size:10px;opacity:.75;">Vence ${vencFmt}</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:white;padding:14px;">
+          ${cob.qtd_entregas > 0 ? `
+          <div style="background:#f8fafc;border-radius:10px;padding:10px;margin-bottom:12px;">
+            <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Composição da cobrança</div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#555;margin-bottom:4px;">
+              <span>${cob.qtd_entregas} entregas</span>
+              <span>× R$${parseFloat(cob.taxa_unitaria||0.99).toFixed(2)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:#1a2a3a;border-top:1.5px solid #e2e8f0;padding-top:6px;margin-top:4px;">
+              <span>Total</span>
+              <span>${fR(parseFloat(cob.valor_total))}</span>
+            </div>
+          </div>` : ''}
+          ${!isAguardando ? `
+          <div style="font-size:12px;font-weight:800;color:#c62828;text-align:center;text-transform:uppercase;margin-bottom:10px;">Pix — Pague Agora</div>
+          <img src="${qrUrl}" width="160" height="160" style="display:block;margin:0 auto 10px;border-radius:8px;" alt="QR Pix">
+          <div style="font-size:8px;word-break:break-all;color:#64748b;font-family:monospace;background:#f8fafc;padding:8px;border-radius:6px;margin-bottom:10px;">${emv}</div>
+          <button id="ts-copy-${idx}" onclick="(function(btn,emv){navigator.clipboard.writeText(emv).then(function(){btn.textContent='✅ Copiado!';btn.style.background='#16a34a';setTimeout(function(){btn.textContent='📋 Copiar Código Pix';btn.style.background='#004E89';},2500);}).catch(function(){btn.textContent='⚠️ Copie o código acima';});})(document.getElementById('ts-copy-${idx}'),'${emvSafe}')"
+            style="width:100%;background:#004E89;color:#fff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;margin-bottom:8px;">📋 Copiar Código Pix</button>
+          <button onclick="lojaSolicitaConfirmacao('${cob.id}',this)"
+            style="width:100%;background:#fff;color:#c62828;border:2px solid #c62828;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">✅ Já Paguei — Informar Pagamento</button>
+          ` : `<div style="background:#fef3c7;border-radius:10px;padding:12px;text-align:center;font-size:12px;color:#92400e;font-weight:700;border:1.5px solid #fcd34d;">⏳ Pagamento enviado — aguardando confirmação do admin</div>`}
+        </div>
+      </div>`;
+    });
+  }
+
+  // Histórico de pagas
+  if (pagas.length > 0) {
+    html += `<div style="font-size:11px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;margin-top:4px;">✅ Histórico — Pagas</div>`;
+    pagas.forEach(cob => {
+      const iniFmt = new Date(cob.periodo_ini + 'T12:00:00').toLocaleDateString('pt-BR');
+      const fimFmt = new Date(cob.periodo_fim + 'T12:00:00').toLocaleDateString('pt-BR');
+      html += `<div style="border:1.5px solid #d1fae5;border-radius:12px;padding:12px 14px;margin-bottom:8px;background:#f0fdf4;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#166534;">✅ Pago</div>
+          <div style="font-size:11px;color:#555;margin-top:2px;">📅 ${iniFmt} a ${fimFmt}</div>
+          <div style="font-size:10px;color:#888;margin-top:1px;">${cob.qtd_entregas||0} entregas</div>
+        </div>
+        <div style="font-size:18px;font-weight:900;color:#166534;">${fR(parseFloat(cob.valor_total))}</div>
+      </div>`;
+    });
+  }
+
+  if (!html.includes('border')) {
+    html = '<p style="text-align:center;color:#aaa;padding:20px;">Nenhuma cobrança encontrada.</p>';
+  }
+
+  cont.innerHTML = html;
 }
 async function carregarRel(){
   const _cpR=_cpVal('rel-f'), p=_cpR.per, _cpRange=_cpR.range, el=$('rel-dados');
