@@ -2356,31 +2356,37 @@ async function navIniciarModoAtivo(entregas) {
     _navDestinoMarkersAtivo.push(L.marker([lat,lng],{icon,zIndexOffset:900}).addTo(_navMapAtivo));
   });
 
-  // ── PASSO 6: marcador do entregador + linha + câmera ──────────────
+  // ── PASSO 6: marcador + linha azul + câmera ──────────────────────
   if (_navPosAnterior) {
     _navInicializarMarcadorAtivo(_navPosAnterior.lat, _navPosAnterior.lng);
 
-    // Linha reta IMEDIATA — não depende de OSRM
-    if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
-      _navDesenharGeometriaNoAtivo({
-        type: 'LineString',
-        coordinates: [
-          [_navPosAnterior.lng, _navPosAnterior.lat],
-          [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
-        ]
-      });
+    // LINHA AZUL: desenhada IMEDIATAMENTE, sem esperar OSRM
+    // Se tem cache da visão geral → usa rota real  
+    // Se não tem → linha reta (aparece na hora, substituída pela rota real em segundos)
+    const geoParaDesenhar = _navGeometriaCache || (eAtual?.lat_entrega && eAtual?.lng_entrega ? {
+      type: 'LineString',
+      coordinates: [
+        [_navPosAnterior.lng, _navPosAnterior.lat],
+        [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
+      ]
+    } : null);
+
+    if (geoParaDesenhar) {
+      _navDesenharGeometriaNoAtivo(geoParaDesenhar);
     }
 
-    // Se cache disponível, usa rota real já calculada
-    if (_navGeometriaCache) {
-      _navDesenharGeometriaNoAtivo(_navGeometriaCache);
-      if (_navStepsCache.length) navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
+    if (_navGeometriaCache && _navStepsCache.length) {
+      navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
     }
 
     navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
+  }
 
-    // Busca rota OSRM em background (atualiza linha reta com rota real)
-    navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas);
+  // Busca rota OSRM — substitui a linha com rota precisa pelas ruas
+  // Roda mesmo sem posição GPS (usa coords do destino para enquadrar)
+  const _posParaOSRM = _navPosAnterior;
+  if (_posParaOSRM) {
+    navDesenharRotaAtiva(_posParaOSRM.lat, _posParaOSRM.lng, entregas);
   }
 }
 
@@ -2531,86 +2537,6 @@ function _navInicializarMarcadorAtivo(lat, lng) {
   _navUserMarkerAtivo.bringToFront();
 }
 
-function navAtualizarPainelAtivo(entregas) {
-  const e = entregas[_navEntregaAtual];
-  if (!e) return;
-  document.getElementById('nav-ativo-cliente').textContent = `${_navEntregaAtual+1}/${entregas.length} · ${e.cliente_nome||'Entrega'}`;
-  document.getElementById('nav-ativo-end').textContent = e.endereco_entrega;
-
-  const lojaLat = e.loja?.loja_lat||RP_LAT, lojaLng = e.loja?.loja_lng||RP_LNG;
-  const st = e.status_detalhado||e.status;
-
-  // Botão Entregue: SEMPRE disponível como ação principal
-  const fnEntr = `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
-
-  let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕</button>`;
-
-  // Botões de status de fluxo (secundários)
-  if (st==='aceito'||st==='pendente')
-    btns += `<button onclick="navEntStatus('${e.id}','chegou_loja',${lojaLat},${lojaLng})" style="background:#004E89;color:white;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🏪 Na Loja</button>`;
-  if (st==='chegou_loja')
-    btns += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:11px 12px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;">🛵 Saindo</button>`;
-
-  // Entregue sempre presente e em destaque
-  btns += `<button onclick="${fnEntr}" style="background:#1B5E20;color:white;border:none;padding:11px 0;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;flex:1;">✅ Entregue</button>`;
-
-  document.getElementById('nav-acoes-ativas').innerHTML = btns;
-}
-
-function navPararModoAtivo() {
-  _navModoAtivo = false;
-  _navSegindoGPS = false;
-  navPararMapaAtivo();
-  document.getElementById('nav-modo-geral').style.display = 'flex';
-  document.getElementById('nav-modo-ativo').style.display = 'none';
-  const btn = document.getElementById('nav-btn-recentrar');
-  if (btn) btn.style.display = 'none';
-}
-
-function navPararMapaAtivo() {
-  if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
-  _navUserMarkerAtivo = null;
-  _navRotaLayerAtivo = null; _navRotaSombraAtivo = null;
-  _navDestinoMarkersAtivo = [];
-}
-
-async function navAtualizarPosAtiva(lat, lng, entregas) {
-  if (!_navMapAtivo) return;
-  _navInicializarMarcadorAtivo(lat, lng);
-  if (_navSegindoGPS) navMoverCameraAtiva(lat, lng);
-
-  const e = entregas[_navEntregaAtual];
-  if (e?.lat_entrega) {
-    const distM = navDistM(lat,lng,parseFloat(e.lat_entrega),parseFloat(e.lng_entrega));
-    const etaMin = Math.max(1, Math.round(distM/200));
-    const elT = document.getElementById('nav-ativo-tempo');
-    const elD = document.getElementById('nav-ativo-dist');
-    if (elT) elT.textContent = `${etaMin} min`;
-    if (elD) elD.textContent = distM<1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
-    if (distM < 80) {
-      const elS = document.getElementById('nav-seta-instrucao');
-      const elR = document.getElementById('nav-rua-instrucao');
-      if (elS) elS.textContent = '🎯';
-      if (elR) elR.textContent = 'Chegando ao destino!';
-    }
-  }
-
-  if (_navGPSContagem % 5 === 1) {
-    await navDesenharRotaAtiva(lat, lng, entregas);
-  } else {
-    navAtualizarInstrucao(lat, lng);
-  }
-}
-
-function navMoverCameraAtiva(lat, lng) {
-  if (!_navMapAtivo) return;
-  const sinH = Math.sin(_navHeading * Math.PI / 180);
-  const cosH = Math.cos(_navHeading * Math.PI / 180);
-  const avanco = 0.0003;
-  const aheadLat = lat + avanco * cosH;
-  const aheadLng = lng + avanco * sinH;
-  _navMapAtivo.setView([aheadLat, aheadLng], 18, { animate: true, duration: 0.5 });
-}
 
 // Servidores OSRM em ordem de preferencia
 const _OSRM_SERVERS = [
