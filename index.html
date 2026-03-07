@@ -4499,16 +4499,34 @@ async function _carregarCobrancasInterno(filtroLojaId, filtroIni, filtroFim) {
   html += '<div class="cob-card"><div class="cob-title">⚙️ Taxa por Entrega — por Loja</div>';
   lojas.forEach(l => {
     const ln = (l.nome_loja||l.nome).replace(/'/g,"\\'");
+    // Calcula qtd/valor já cobrados (qualquer status exceto cancelado) no período
+    const cobsLoja = cobs.filter(c => c.loja_id === l.id && c.status !== 'cancelado');
+    const qtdJaCobrado = cobsLoja.reduce((s,c) => s + (parseInt(c.qtd_entregas)||0), 0);
+    const valorJaCobrado = cobsLoja.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+    const qtdSaldo = Math.max(0, l._qtdPeriodo - qtdJaCobrado);
+    const valorSaldo = parseFloat((qtdSaldo * l._taxaEnt).toFixed(2));
+    // Info de resumo
+    let infoHtml = '';
+    if (l._qtdPeriodo === 0) {
+      infoHtml = '<div style="font-size:10px;color:#94a3b8;">Sem entregas no período</div>';
+    } else if (qtdJaCobrado > 0 && qtdSaldo === 0) {
+      infoHtml = '<div style="font-size:10px;color:#2e7d32;">✅ ' + l._qtdPeriodo + ' entregas · ' + fR(valorJaCobrado) + ' já cobrado</div>';
+    } else if (qtdJaCobrado > 0 && qtdSaldo > 0) {
+      infoHtml = '<div style="font-size:10px;color:#9a6f00;">⚠️ ' + qtdSaldo + ' entrega(s) ainda não cobrada(s) · ' + fR(valorSaldo) + '</div>' +
+        '<div style="font-size:9px;color:#94a3b8;">' + qtdJaCobrado + ' já cobradas · ' + l._qtdPeriodo + ' total no período</div>';
+    } else {
+      infoHtml = '<div style="font-size:10px;color:#9a6f00;">' + l._qtdPeriodo + ' entregas · ' + fR(l._valorPeriodo) + ' a cobrar</div>';
+    }
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f5f7fa;">' +
       '<div style="flex:1;">' +
       '<div style="font-size:12px;font-weight:800;color:#004E89;">' + (l.nome_loja||l.nome) + '</div>' +
-      (l._qtdPeriodo > 0 ? '<div style="font-size:10px;color:#9a6f00;">' + l._qtdPeriodo + ' entregas no período · ' + fR(l._valorPeriodo) + '</div>' : '<div style="font-size:10px;color:#94a3b8;">Sem entregas no período</div>') +
+      infoHtml +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:6px;">' +
       '<span style="font-size:10px;color:#94a3b8;">R$</span>' +
       '<input type="number" id="taxa-inp-' + l.id + '" class="taxa-inp" value="' + l._taxaEnt.toFixed(2) + '" step="0.01" min="0">' +
       '<button class="cob-btn" onclick="salvarTaxaLoja(\'' + l.id + '\')" style="background:#004E89;color:white;">💾</button>' +
-      '<button class="cob-btn" onclick="abrirPixLoja(\'' + l.id + '\',\'' + ln + '\',' + l._valorPeriodo + ')" style="background:#6366f1;color:white;">💸</button>' +
+      (qtdSaldo > 0 ? '<button class="cob-btn" onclick="abrirPixLoja(\'' + l.id + '\',\'' + ln + '\',' + valorSaldo + ')" style="background:#6366f1;color:white;">💸</button>' : '') +
       '</div></div>';
   });
   html += '</div>';
