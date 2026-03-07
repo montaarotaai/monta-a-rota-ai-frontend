@@ -2100,8 +2100,22 @@ function _reordenarNearestNeighbor(entregas, origemLat, origemLng) {
   return [...emAndamento, ...ordenados];
 }
 
-function abrirNavInterna(entregas) {
+async function abrirNavInterna(entregas) {
   if (!entregas || !entregas.length) { alert('Sem entregas.'); return; }
+
+  // Geocodifica TODAS as entregas sem coordenadas antes de abrir qualquer mapa
+  for (const e of entregas) {
+    if (!parseFloat(e.lat_entrega||0) || !parseFloat(e.lng_entrega||0)) {
+      try {
+        const geo = await geocode(e.endereco_entrega || '');
+        if (geo) {
+          e.lat_entrega  = geo.lat;
+          e.lng_entrega  = geo.lng;
+          db.from('entregas').update({ lat_entrega: geo.lat, lng_entrega: geo.lng }).eq('id', e.id).then(()=>{});
+        }
+      } catch(err) { console.warn('[geocode]', err); }
+    }
+  }
 
   // Reordena pela posição atual do entregador (nearest-neighbor)
   const oriLat = myLat || RP_LAT;
@@ -2298,34 +2312,10 @@ function navAtualizarPosGeral(lat, lng) {
 
 // ══ MODO NAVEGAÇÃO ATIVA — estilo Google Maps ══════════════════════
 
-// Garante geocode antes de abrir o mapa — sem coordenadas não tem linha
+// Geocode já foi feito em abrirNavInterna — aqui só inicia o modo ativo
 async function navIniciarComGeocode() {
   const entregas = _rotaEntData;
   if (!entregas?.length) { alert('Sem entregas para navegar.'); return; }
-
-  const btn = document.getElementById('nav-btn-iniciar');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Calculando...'; }
-
-  // Geocodifica TODAS as entregas que estão sem coordenadas
-  for (const e of entregas) {
-    if (!e.lat_entrega || !e.lng_entrega) {
-      try {
-        const geo = await geocode(e.endereco_entrega || '');
-        if (geo) {
-          e.lat_entrega  = geo.lat;
-          e.lng_entrega  = geo.lng;
-          // Salva no banco em background
-          db.from('entregas').update({ lat_entrega: geo.lat, lng_entrega: geo.lng }).eq('id', e.id).then(() => {});
-        } else {
-          console.warn('[geocode] falhou para:', e.endereco_entrega);
-        }
-      } catch(err) {
-        console.warn('[geocode erro]', err);
-      }
-    }
-  }
-
-  if (btn) { btn.disabled = false; btn.textContent = '▶  Iniciar Navegação'; }
   navIniciarModoAtivo(entregas);
 }
 
