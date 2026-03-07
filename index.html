@@ -2016,7 +2016,8 @@ async function geocode(addr){
       const rpRes = d.find(x=>dentroDeRP(parseFloat(x.lat),parseFloat(x.lon)));
       const res   = rpRes||d[0];
       const lat   = parseFloat(res.lat), lng = parseFloat(res.lon);
-      if(!dentroDeRP(lat,lng)) continue; // resultado fora de RP — tenta próxima variante
+      // Se não está em RP mas é a última variante, aceita mesmo assim (entregas fora da cidade)
+      if(!dentroDeRP(lat,lng) && variantes.indexOf(q) < variantes.length-1) continue;
       const out = {lat,lng};
       geocodeCache[addr] = out;
       return out;
@@ -2357,31 +2358,43 @@ async function navIniciarModoAtivo(entregas) {
     _navDestinoMarkersAtivo.push(L.marker([lat,lng],{icon,zIndexOffset:900}).addTo(_navMapAtivo));
   });
 
-  // ── PASSO 6: marcador + linha azul + câmera ──────────────────────
+  // ── PASSO 6: geocode se necessário, depois linha azul + câmera ────
   if (_navPosAnterior) {
     _navInicializarMarcadorAtivo(_navPosAnterior.lat, _navPosAnterior.lng);
+  }
 
-    // LINHA AZUL: desenhada IMEDIATAMENTE, sem esperar OSRM
-    // Se tem cache da visão geral → usa rota real  
-    // Se não tem → linha reta (aparece na hora, substituída pela rota real em segundos)
-    const geoParaDesenhar = _navGeometriaCache || (eAtual?.lat_entrega && eAtual?.lng_entrega ? {
-      type: 'LineString',
-      coordinates: [
-        [_navPosAnterior.lng, _navPosAnterior.lat],
-        [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
-      ]
-    } : null);
+  // Se lat_entrega está faltando, geocodifica agora antes de desenhar
+  if (eAtual && (!eAtual.lat_entrega || !eAtual.lng_entrega) && eAtual.endereco_entrega) {
+    const elR = document.getElementById('nav-rua-instrucao');
+    if (elR) elR.textContent = 'Calculando rota...';
+    try {
+      const geo = await geocode(eAtual.endereco_entrega);
+      if (geo) {
+        eAtual.lat_entrega = geo.lat;
+        eAtual.lng_entrega = geo.lng;
+        // Salva no banco para não geocodificar de novo
+        db.from('entregas').update({lat_entrega: geo.lat, lng_entrega: geo.lng}).eq('id', eAtual.id).then(()=>{});
+      }
+    } catch(e) { console.warn('[geocode nav]', e); }
+  }
 
-    if (geoParaDesenhar) {
-      _navDesenharGeometriaNoAtivo(geoParaDesenhar);
-    }
-
-    if (_navGeometriaCache && _navStepsCache.length) {
-      navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
-    }
-
-    // Câmera: mostra entregador + destino para linha azul ficar VISÍVEL
+  if (_navPosAnterior) {
+    // LINHA AZUL IMEDIATA — linha reta do entregador ao destino
     if (eAtual?.lat_entrega && eAtual?.lng_entrega) {
+      const geoReta = _navGeometriaCache || {
+        type: 'LineString',
+        coordinates: [
+          [_navPosAnterior.lng, _navPosAnterior.lat],
+          [parseFloat(eAtual.lng_entrega), parseFloat(eAtual.lat_entrega)]
+        ]
+      };
+      _navDesenharGeometriaNoAtivo(geoReta);
+
+      if (_navGeometriaCache && _navStepsCache.length) {
+        navAtualizarInstrucao(_navPosAnterior.lat, _navPosAnterior.lng);
+      }
+
+      // Câmera: enquadra entregador + destino — linha fica VISÍVEL na tela
       const dLat = parseFloat(eAtual.lat_entrega), dLng = parseFloat(eAtual.lng_entrega);
       const bounds = L.latLngBounds(
         [_navPosAnterior.lat, _navPosAnterior.lng],
@@ -2393,9 +2406,9 @@ async function navIniciarModoAtivo(entregas) {
     }
   }
 
-  // Busca rota OSRM em background — substitui linha reta pela rota real pelas ruas
+  // OSRM em background — substitui linha reta pela rota real pelas ruas
   const _posParaOSRM = _navPosAnterior;
-  if (_posParaOSRM) {
+  if (_posParaOSRM && eAtual?.lat_entrega) {
     navDesenharRotaAtiva(_posParaOSRM.lat, _posParaOSRM.lng, entregas);
   }
 }
