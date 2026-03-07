@@ -2586,6 +2586,21 @@ function _navInicializarMarcadorAtivo(lat, lng) {
 
 // ── Roteamento: OSRM com fallback Valhalla ─────────────────────────
 
+function _rotaToast(msg, cor) {
+  let el = document.getElementById('_rota_debug');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = '_rota_debug';
+    el.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:' + (cor||'#333') + ';color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:99999;max-width:90vw;text-align:center;';
+    document.body.appendChild(el);
+  }
+  el.style.background = cor || '#333';
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { if(el) el.style.display='none'; }, 6000);
+}
+
 // Decodifica encoded polyline do Valhalla (precisão 6 casas decimais)
 function _decodePoly6(str) {
   const coords = [];
@@ -2615,6 +2630,7 @@ async function _fetchOSRM(coordsOSRM) {
     'https://routing.openstreetmap.de/routed-car',
     'https://router.project-osrm.org',
   ];
+  _rotaToast('⏳ Calculando rota...', '#555');
   for (const server of OSRM_SERVERS) {
     try {
       const ctrl = new AbortController();
@@ -2622,16 +2638,18 @@ async function _fetchOSRM(coordsOSRM) {
       const url = `${server}/route/v1/driving/${coordsOSRM}?overview=full&geometries=geojson&steps=true`;
       const r = await fetch(url, { signal: ctrl.signal });
       clearTimeout(t);
-      if (!r.ok) continue;
+      if (!r.ok) { _rotaToast('OSRM HTTP ' + r.status, '#c00'); continue; }
       const d = await r.json();
       if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
+        _rotaToast('✅ Rota OSRM OK', '#1B5E20');
         return d.routes[0];
       }
-    } catch(e) { /* próximo */ }
+    } catch(e) { _rotaToast('OSRM falhou: ' + e.message, '#c00'); }
   }
 
   // 2) Fallback: Valhalla (openstreetmap.de)
   // Shape vem como encoded polyline com 6 casas decimais
+  _rotaToast('⏳ Tentando Valhalla...', '#555');
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 9000);
@@ -2670,6 +2688,7 @@ async function _fetchOSRM(coordsOSRM) {
         }
       }
       if (allCoords.length > 1) {
+        _rotaToast('✅ Rota Valhalla OK (' + allCoords.length + ' pts)', '#1B5E20');
         return {
           geometry: { type: 'LineString', coordinates: allCoords },
           legs: [{ steps: allSteps }],
@@ -2678,8 +2697,9 @@ async function _fetchOSRM(coordsOSRM) {
         };
       }
     }
-  } catch(e) { console.warn('[Valhalla] erro:', e.message); }
+  } catch(e) { _rotaToast('Valhalla erro: ' + e.message, '#c00'); }
 
+  _rotaToast('❌ Roteamento falhou — linha reta', '#c00');
   return null;
 }
 
