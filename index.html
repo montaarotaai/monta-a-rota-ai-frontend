@@ -7584,6 +7584,7 @@ async function carregarRotaEnt(){
   const{data}=await db.from('entregas').select('*,loja:loja_id(nome_loja,nome,endereco,loja_lat,loja_lng)').eq('entregador_id',U.id).in('status',['aceito','em_rota','chegou_loja','saiu_entrega','pendente']).order('ordem_rota');
   const el=$('rota-ent-lst');
   if(!data||!data.length){el.innerHTML='<p style="color:#999;text-align:center;padding:20px">Nenhuma entrega atribuida.</p>';return;}
+  _rotaEntData = data; // ← SALVA GLOBALMENTE para o botão Navegar usar
   const ends=data.map(e=>encodeURIComponent(e.endereco_entrega));
   const dest=ends[ends.length-1],wp=ends.slice(0,-1).join('|');
   // Waze: melhor para motos no Brasil
@@ -7602,7 +7603,7 @@ async function carregarRotaEnt(){
     </div>` : ''}
     <p style="font-size:11px;color:#888;margin-bottom:6px;text-align:center;">📍 ${totalEnts === 1 ? 'Navegar para a entrega' : 'Rota completa com '+totalEnts+' paradas'}</p>
     <div class="row" style="gap:7px;">
-      <button onclick="_rotaEntData=data;abrirNavInterna(data)" style="flex:2;background:linear-gradient(135deg,#004E89,#1a73e8);color:white;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;">🗺️ Navegar</button>
+      <button onclick="abrirNavInterna(_rotaEntData)" style="flex:2;background:linear-gradient(135deg,#004E89,#1a73e8);color:white;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;">🗺️ Navegar</button>
       <a href="${mapsUrlRota}" target="_blank" style="flex:1;">
         <button class="btn btn-blue" style="padding:10px;width:100%;font-size:13px;">↗️ Maps</button>
       </a>
