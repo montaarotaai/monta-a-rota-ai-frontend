@@ -4258,6 +4258,7 @@ async function carregarCobLoja() {
   const sec = $('lj-cob-section');
   if (!sec) return;
 
+  // 1. Busca cobranças formais (pendente / aguardando)
   let cobs = [];
   try {
     const { data } = await db.from('cobrancas_lojas')
@@ -4266,67 +4267,101 @@ async function carregarCobLoja() {
       .in('status', ['pendente', 'aguardando_confirmacao'])
       .order('periodo_ini', { ascending: false });
     cobs = data || [];
-  } catch(e) { sec.style.display='none'; return; }
+  } catch(e) { cobs = []; }
 
-  if (!cobs.length) { sec.style.display='none'; return; }
+  // 2. Busca entregas da semana atual para mostrar prévia mesmo sem cobrança gerada
+  let previaQtd = 0, previaValor = 0;
+  try {
+    // Calcula semana atual (seg-dom)
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
+    const dom = new Date(seg); dom.setDate(seg.getDate()+6); dom.setHours(23,59,59,999);
+    const taxa = parseFloat(U.taxa_sistema || 0.99);
+    const { data: ents } = await db.from('entregas')
+      .select('id')
+      .eq('loja_id', U.id)
+      .eq('status', 'entregue')
+      .gte('created_at', seg.toISOString())
+      .lte('created_at', dom.toISOString());
+    previaQtd = (ents || []).length;
+    previaValor = parseFloat((previaQtd * taxa).toFixed(2));
+  } catch(e) {}
 
-  // Guarda a mais recente para funções legadas
-  _ljCobAtual = cobs[0];
+  // Se não tem nada pra mostrar, oculta seção
+  if (!cobs.length && previaQtd === 0) { sec.style.display = 'none'; return; }
 
-  const totalDevido = cobs.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+  _ljCobAtual = cobs[0] || null;
+
+  const totalCobs = cobs.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+  const totalGeral = totalCobs + (cobs.length === 0 ? previaValor : 0); // prévia só se não há cobrança formal
 
   let html = '';
 
-  // Banner vermelho de aviso
-  html += '<div style="background:linear-gradient(135deg,#7c1d1d,#c62828);border-radius:16px;padding:16px;color:white;margin-bottom:8px;">' +
-    '<div style="font-size:11px;opacity:.8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">⚠️ Cobrança(s) Pendente(s)</div>' +
-    '<div style="font-size:28px;font-weight:900;line-height:1;">' + fR(totalDevido) + '</div>' +
-    '<div style="font-size:11px;opacity:.8;margin-top:2px;">' + cobs.length + ' cobrança(s) em aberto</div>' +
-    '</div>';
-
-  // Uma card por cobrança
-  cobs.forEach((cob, idx) => {
-    const vencFmt = new Date(cob.vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
-    const iniFmt  = new Date(cob.periodo_ini + 'T12:00:00').toLocaleDateString('pt-BR');
-    const fimFmt  = new Date(cob.periodo_fim + 'T12:00:00').toLocaleDateString('pt-BR');
-    const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(cob.valor_total), 'MontaRotai');
-    const qrUrl = pixQRUrl(emv);
-    const emvSafe = emv.replace(/'/g, "\\'");
-    const isAguardando = cob.status === 'aguardando_confirmacao';
-    const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const vencida = new Date(cob.vencimento+'T00:00:00') < hoje;
-    const borderColor = isAguardando ? '#f59e0b' : (vencida ? '#c62828' : '#c62828');
-
-    html += '<div style="border:2px solid ' + borderColor + ';border-radius:16px;overflow:hidden;margin-bottom:12px;background:white;">' +
-      // Header
-      '<div style="background:' + (isAguardando ? 'linear-gradient(135deg,#78350f,#f59e0b)' : 'linear-gradient(135deg,#7c1d1d,#c62828)') + ';padding:14px 16px;color:white;">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+  // ── Prévia da semana (se não há cobrança formal ainda) ──
+  if (previaQtd > 0 && cobs.length === 0) {
+    const taxa = parseFloat(U.taxa_sistema || 0.99);
+    html += '<div style="background:linear-gradient(135deg,#1a3a5c,#004E89);border-radius:16px;padding:16px;color:white;margin-bottom:10px;">' +
+      '<div style="font-size:10px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📊 Taxa de Sistema — Esta Semana</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
       '<div>' +
-      '<div style="font-size:10px;opacity:.8;font-weight:700;text-transform:uppercase;">' +
-      (isAguardando ? '🕐 Aguardando Confirmação' : (vencida ? '🚨 VENCIDA' : '⚠️ Cobrança Pendente')) + '</div>' +
-      '<div style="font-size:11px;margin-top:3px;opacity:.9;">' + iniFmt + ' a ' + fimFmt + '</div>' +
+      '<div style="font-size:13px;opacity:.85;">' + previaQtd + ' entregas × R$' + taxa.toFixed(2) + '</div>' +
+      '<div style="font-size:11px;opacity:.65;margin-top:2px;">Cobrança gerada pelo admin na quarta-feira</div>' +
       '</div>' +
-      '<div style="text-align:right;">' +
-      '<div style="font-size:26px;font-weight:900;">' + fR(parseFloat(cob.valor_total)) + '</div>' +
-      '<div style="font-size:10px;opacity:.8;">Vence ' + vencFmt + '</div>' +
-      '</div></div>' +
-      '<div style="margin-top:8px;background:rgba(255,255,255,.15);border-radius:8px;padding:8px;font-size:11px;text-align:center;">' +
-      (cob.qtd_entregas||0) + ' entregas × R$' + parseFloat(cob.taxa_unitaria||0.99).toFixed(2) + '/entrega' +
-      '</div></div>' +
-      // QR Pix
-      '<div style="padding:14px;background:white;">' +
-      '<div style="font-size:10px;color:#c62828;font-weight:800;text-transform:uppercase;text-align:center;margin-bottom:10px;">Pix — Escaneie e Pague Agora</div>' +
-      '<img src="' + qrUrl + '" width="200" height="200" style="display:block;margin:0 auto 10px;border-radius:8px;" alt="QR Pix">' +
-      '<div style="font-size:8px;word-break:break-all;color:#64748b;font-family:monospace;background:#f8fafc;padding:8px;border-radius:6px;max-height:52px;overflow-y:auto;margin-bottom:10px;" id="lj-emv-' + idx + '">' + emv + '</div>' +
-      '<button onclick="(function(){navigator.clipboard.writeText(\'' + emvSafe + '\').then(()=>{var b=document.getElementById(\'lj-copy-' + idx + '\');b.textContent=\'✅ Copiado!\';b.style.background=\'#27ae60\';setTimeout(()=>{b.textContent=\'📋 Copiar Código Pix\';b.style.background=\'#004E89\';},2500);}).catch(()=>{});})();" ' +
-      'id="lj-copy-' + idx + '" ' +
-      'style="width:100%;background:#004E89;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:800;cursor:pointer;margin-bottom:8px;">📋 Copiar Código Pix</button>' +
-      (isAguardando
-        ? '<div style="background:#fff8e1;border-radius:8px;padding:10px;text-align:center;font-size:11px;color:#78350f;font-weight:700;">⏳ Pagamento enviado — aguardando confirmação do admin</div>'
-        : '<button onclick="lojaSolicitaConfirmacao(\'' + cob.id + '\',this)" style="width:100%;background:white;color:#c62828;border:2px solid #c62828;border-radius:8px;padding:10px;font-size:12px;font-weight:900;cursor:pointer;">✅ Já Paguei — Informar Pagamento</button>'
-      ) +
-      '</div></div>';
-  });
+      '<div style="font-size:28px;font-weight:900;">' + fR(previaValor) + '</div>' +
+      '</div>' +
+      '</div>';
+  }
+
+  // ── Cobranças formais ──
+  if (cobs.length > 0) {
+    // Banner total
+    html += '<div style="background:linear-gradient(135deg,#7c1d1d,#c62828);border-radius:16px;padding:14px 16px;color:white;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">' +
+      '<div>' +
+      '<div style="font-size:10px;font-weight:800;opacity:.8;text-transform:uppercase;letter-spacing:1px;">⚠️ Cobranças em Aberto</div>' +
+      '<div style="font-size:12px;opacity:.75;margin-top:2px;">' + cobs.length + ' cobrança(s) pendente(s)</div>' +
+      '</div>' +
+      '<div style="font-size:28px;font-weight:900;">' + fR(totalCobs) + '</div>' +
+      '</div>';
+
+    // Card por cobrança
+    cobs.forEach((cob, idx) => {
+      const vencFmt = new Date(cob.vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+      const iniFmt  = new Date(cob.periodo_ini + 'T12:00:00').toLocaleDateString('pt-BR');
+      const fimFmt  = new Date(cob.periodo_fim + 'T12:00:00').toLocaleDateString('pt-BR');
+      const emv = gerarPixEMV(ADM_PIX_CHAVE, ADM_PIX_NOME, parseFloat(cob.valor_total), 'MontaRotai');
+      const qrUrl = pixQRUrl(emv);
+      const emvSafe = emv.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const isAguardando = cob.status === 'aguardando_confirmacao';
+      const hoje2 = new Date(); hoje2.setHours(0,0,0,0);
+      const vencida = new Date(cob.vencimento+'T00:00:00') < hoje2;
+
+      html += '<div style="border:2px solid ' + (isAguardando ? '#f59e0b' : '#c62828') + ';border-radius:16px;overflow:hidden;margin-bottom:12px;background:white;">' +
+        // Header vermelho/amarelo
+        '<div style="background:' + (isAguardando ? 'linear-gradient(135deg,#78350f,#d97706)' : 'linear-gradient(135deg,#7c1d1d,#c62828)') + ';padding:12px 14px;color:white;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<div>' +
+        '<div style="font-size:10px;font-weight:800;opacity:.85;text-transform:uppercase;">' + (isAguardando ? '🕐 Aguardando Confirmação' : (vencida ? '🚨 VENCIDA' : '⚠️ Pagar')) + '</div>' +
+        '<div style="font-size:11px;opacity:.8;margin-top:2px;">' + iniFmt + ' a ' + fimFmt + '</div>' +
+        '<div style="font-size:10px;opacity:.7;">' + (cob.qtd_entregas||0) + ' entregas · R$' + parseFloat(cob.taxa_unitaria||0.99).toFixed(2) + '/ent</div>' +
+        '</div>' +
+        '<div style="text-align:right;">' +
+        '<div style="font-size:26px;font-weight:900;">' + fR(parseFloat(cob.valor_total)) + '</div>' +
+        '<div style="font-size:10px;opacity:.75;">Vence ' + vencFmt + '</div>' +
+        '</div></div></div>' +
+        // Corpo branco com QR
+        '<div style="padding:14px;background:#fff;">' +
+        '<div style="font-size:11px;font-weight:800;color:#c62828;text-align:center;text-transform:uppercase;margin-bottom:10px;">Pix — Pague Agora</div>' +
+        '<img src="' + qrUrl + '" width="180" height="180" style="display:block;margin:0 auto 10px;border-radius:8px;" alt="QR Pix">' +
+        '<div style="font-size:8px;word-break:break-all;color:#64748b;font-family:monospace;background:#f8fafc;padding:8px;border-radius:6px;margin-bottom:10px;">' + emv + '</div>' +
+        '<button id="lj-copy-' + idx + '" onclick="(function(btn,emv){navigator.clipboard.writeText(emv).then(function(){btn.textContent=\'✅ Copiado!\';btn.style.background=\'#16a34a\';setTimeout(function(){btn.textContent=\'📋 Copiar Código Pix\';btn.style.background=\'#004E89\';},2500);}).catch(function(){btn.textContent=\'⚠️ Copie o código acima\';});})(document.getElementById(\'lj-copy-' + idx + '\'),\'' + emvSafe + '\')" ' +
+        'style="width:100%;background:#004E89;color:#fff;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;margin-bottom:8px;letter-spacing:.3px;">📋 Copiar Código Pix</button>' +
+        (isAguardando
+          ? '<div style="background:#fef3c7;border-radius:10px;padding:10px;text-align:center;font-size:12px;color:#92400e;font-weight:700;border:1.5px solid #fcd34d;">⏳ Pagamento enviado — aguardando confirmação</div>'
+          : '<button onclick="lojaSolicitaConfirmacao(\'' + cob.id + '\',this)" style="width:100%;background:#fff;color:#c62828;border:2px solid #c62828;border-radius:10px;padding:12px;font-size:13px;font-weight:900;cursor:pointer;">✅ Já Paguei — Informar Pagamento</button>'
+        ) +
+        '</div></div>';
+    });
+  }
 
   sec.innerHTML = html;
   sec.style.display = 'block';
@@ -7749,13 +7784,13 @@ function atualizarUIChuva(){
   if(!btn||!statusEl)return;
   if(_chuvaAtiva){
     btn.textContent='⏹️ Desativar Incentivo';
-    btn.style.background='#e74c3c';
+    btn.style.cssText='background:#c62828;color:#fff;font-weight:900;';
     statusEl.classList.remove('hidden');
     const inicio=_chuvaInicio?new Date(_chuvaInicio).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'--:--';
     statusEl.textContent='🌧️ PROMOÇÃO CHUVA ATIVA desde '+inicio+' — Entregas a partir deste horário recebem o valor extra.';
   }else{
     btn.textContent='🌧️ Ativar Incentivo';
-    btn.style.background='#004E89';
+    btn.style.cssText='background:#004E89;color:#fff;font-weight:900;';
     statusEl.classList.add('hidden');
   }
 }
