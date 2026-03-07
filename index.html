@@ -5994,27 +5994,50 @@ async function abrirModalTaxaSistema(){
   let html = '';
 
   // Resumo geral
+  // "Em aberto" = cobranças formais pendentes + prévia da semana (se não há cobrança formal)
   const totalPendente = pendentes.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+  const valorEmAberto = pendentes.length > 0 ? totalPendente : previaValor;
+  const labelEmAberto = pendentes.length > 0 ? 'Cobrança pendente' : (previaQtd > 0 ? 'Prévia desta semana' : 'Em aberto');
+  const corEmAberto = pendentes.length > 0 ? '#c62828' : (previaQtd > 0 ? '#004E89' : '#888');
+  const totalPago = pagas.reduce((s,c) => s + parseFloat(c.valor_total||0), 0);
+
   html += `<div style="background:#f8fafc;border-radius:14px;padding:14px;margin-bottom:16px;border:1.5px solid #e2e8f0;">
     <div style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">📊 Resumo Geral</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <div style="background:white;border-radius:10px;padding:10px;text-align:center;border:1.5px solid #e2e8f0;">
-        <div style="font-size:18px;font-weight:900;color:${pendentes.length > 0 ? '#c62828' : '#004E89'};">${fR(totalPendente)}</div>
-        <div style="font-size:10px;color:#888;margin-top:2px;">Em aberto</div>
+        <div style="font-size:18px;font-weight:900;color:${corEmAberto};">${fR(valorEmAberto)}</div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">${labelEmAberto}</div>
       </div>
       <div style="background:white;border-radius:10px;padding:10px;text-align:center;border:1.5px solid #e2e8f0;">
         <div style="font-size:18px;font-weight:900;color:#1a3a5c;">R$${taxa.toFixed(2)}</div>
         <div style="font-size:10px;color:#888;margin-top:2px;">Por entrega</div>
       </div>
     </div>
+    ${totalPago > 0 ? `<div style="background:#f0fdf4;border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border:1px solid #bbf7d0;">
+      <span style="font-size:11px;color:#166534;font-weight:700;">✅ Total já pago (histórico)</span>
+      <span style="font-size:14px;font-weight:900;color:#166534;">${fR(totalPago)}</span>
+    </div>` : ''}
   </div>`;
 
-  // Prévia semana atual
-  if (previaQtd > 0 && pendentes.length === 0) {
-    const hoje = new Date();
-    const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
-    const dom = new Date(seg); dom.setDate(seg.getDate()+6);
-    const fmtDate = d => d.toLocaleDateString('pt-BR');
+  // Prévia semana atual — mostra sempre que há entregas nesta semana E não há cobrança formal DESTA semana pendente
+  const hoje = new Date();
+  const seg = new Date(hoje); seg.setDate(hoje.getDate() - ((hoje.getDay()+6)%7));
+  const fmtDate = d => d.toLocaleDateString('pt-BR');
+  const dom = new Date(seg); dom.setDate(seg.getDate()+6);
+
+  // Verifica se já existe cobrança formal para esta semana especificamente
+  const semRefAtual = seg.toISOString().split('T')[0]; // ex: "2026-03-02"
+  const cobSemanaAtual = cobs.find(c => {
+    if (!c.periodo_ini) return false;
+    const cIni = c.periodo_ini.substring(0, 10);
+    const cFim = (c.periodo_fim || '').substring(0, 10);
+    const semDom = dom.toISOString().split('T')[0];
+    // Cobrança se sobrepõe com esta semana
+    return cIni <= semDom && cFim >= semRefAtual &&
+      (c.status === 'pendente' || c.status === 'aguardando_confirmacao');
+  });
+
+  if (previaQtd > 0 && !cobSemanaAtual) {
     html += `<div style="border:2px solid #004E89;border-radius:14px;overflow:hidden;margin-bottom:14px;">
       <div style="background:linear-gradient(135deg,#1a3a5c,#004E89);padding:12px 14px;color:white;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
