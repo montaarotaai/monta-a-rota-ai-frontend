@@ -2072,8 +2072,41 @@ let _navGeometriaCache = null;  // Geometria raw do OSRM — usada para rota ins
 
 // ══ ABRIR / FECHAR ════════════════════════════════════════════════
 
+function _reordenarNearestNeighbor(entregas, origemLat, origemLng) {
+  // Separa os que já estão em andamento (não reordena) dos pendentes/aceitos
+  const emAndamento = entregas.filter(e => e.status_detalhado === 'saiu_entrega' || e.status === 'em_rota');
+  const paraOrdenar = entregas.filter(e => e.status_detalhado !== 'saiu_entrega' && e.status !== 'em_rota');
+  if (paraOrdenar.length <= 1) return entregas;
+
+  const restantes = [...paraOrdenar];
+  const ordenados = [];
+  let curLat = origemLat, curLng = origemLng;
+
+  while (restantes.length) {
+    let melhorIdx = 0, melhorDist = Infinity;
+    for (let i = 0; i < restantes.length; i++) {
+      const lat = parseFloat(restantes[i].lat_entrega||0);
+      const lng = parseFloat(restantes[i].lng_entrega||0);
+      if (!lat || !lng) { melhorIdx = i; melhorDist = 0; break; }
+      const d = distKm(curLat, curLng, lat, lng);
+      if (d < melhorDist) { melhorDist = d; melhorIdx = i; }
+    }
+    const proximo = restantes.splice(melhorIdx, 1)[0];
+    ordenados.push(proximo);
+    curLat = parseFloat(proximo.lat_entrega) || curLat;
+    curLng = parseFloat(proximo.lng_entrega) || curLng;
+  }
+  return [...emAndamento, ...ordenados];
+}
+
 function abrirNavInterna(entregas) {
   if (!entregas || !entregas.length) { alert('Sem entregas.'); return; }
+
+  // Reordena pela posição atual do entregador (nearest-neighbor)
+  const oriLat = myLat || RP_LAT;
+  const oriLng = myLng || RP_LNG;
+  const entregasOrdenadas = _reordenarNearestNeighbor(entregas, oriLat, oriLng);
+
   _navEntregaAtual = 0;
   _navModoAtivo = false;
   _navSegindoGPS = true;
@@ -2090,7 +2123,7 @@ function abrirNavInterna(entregas) {
   document.getElementById('nav-modo-ativo').style.display = 'none';
   document.body.style.overflow = 'hidden';
   closeM('rota-ent');
-  setTimeout(() => navInicializarMapaGeral(entregas), 150);
+  setTimeout(() => navInicializarMapaGeral(entregasOrdenadas), 150);
 }
 
 function fecharNavInterna() {
@@ -2364,9 +2397,8 @@ function navAtualizarPainelAtivo(entregas) {
   const st = e.status_detalhado || e.status;
 
   // Função de confirmação de entrega
-  const fnEntr = e.codigo_confirmacao
-    ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
-    : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
+  // Modal de confirmação SEMPRE aparece — independente de codigo_confirmacao
+  const fnEntr = `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
 
   let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕ Sair</button>`;
 
@@ -2509,9 +2541,7 @@ function navAtualizarPainelAtivo(entregas) {
   const st = e.status_detalhado||e.status;
 
   // Botão Entregue: SEMPRE disponível como ação principal
-  const fnEntr = e.codigo_confirmacao
-    ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
-    : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
+  const fnEntr = `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
 
   let btns = `<button onclick="navPararModoAtivo()" style="background:#555;color:white;border:none;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">✕</button>`;
 
@@ -2729,9 +2759,7 @@ function navAtualizarPainel(entregas, idx) {
   if (st==='chegou_loja')
     acoes += `<button onclick="navEntStatus('${e.id}','saiu_entrega',${lojaLat},${lojaLng})" style="background:#F5A800;color:#333;border:none;padding:14px 14px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;">🛵</button>`;
   if (st==='saiu_entrega'||st==='em_rota') {
-    const fn = e.codigo_confirmacao
-      ? `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`
-      : `navConfirmarEntrega('${e.id}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
+    const fn = `confirmarEntregaComCodigo('${e.id}','${e.numero_pedido||''}',${e.lat_entrega||RP_LAT},${e.lng_entrega||RP_LNG})`;
     acoes += `<button onclick="${fn}" style="background:#1e8449;color:white;border:none;padding:14px 14px;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">✅ Entregue</button>`;
   }
   const acoesEl = document.getElementById('nav-acoes'); if (acoesEl) acoesEl.innerHTML = acoes;
