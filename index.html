@@ -3310,17 +3310,20 @@ async function marcarPago(cobId, nomeLoja, valor) {
 // Admin marca prévia como paga diretamente (sem esperar loja informar)
 async function marcarPagoPreviа(lojaId, nomeLoja, qtd, taxa, valor, periodoIni, periodoFim) {
   if (!confirm('Confirmar recebimento de ' + fR(valor) + ' de ' + nomeLoja + '?\n\nIsso vai registrar a cobrança como PAGA.')) return;
-  const vencStr = periodoFim; // usa fim do período como vencimento
+  const vencStr = periodoFim;
   const semRef = periodoIni.substring(0,7);
   try {
     // Verifica se já existe
-    const { data: ex } = await db.from('cobrancas_lojas')
+    const { data: ex, error: selErr } = await db.from('cobrancas_lojas')
       .select('id').eq('loja_id', lojaId).eq('periodo_ini', periodoIni).limit(1);
+    if (selErr) { alert('Erro ao buscar cobrança:\n' + selErr.message); return; }
+
     if (ex && ex.length) {
-      await db.from('cobrancas_lojas')
+      const { error: updErr } = await db.from('cobrancas_lojas')
         .update({ status: 'pago', pago_em: new Date().toISOString() }).eq('id', ex[0].id);
+      if (updErr) { alert('Erro ao atualizar:\n' + updErr.message); return; }
     } else {
-      await db.from('cobrancas_lojas').insert({
+      const { error: insErr } = await db.from('cobrancas_lojas').insert({
         loja_id: lojaId,
         periodo_ini: periodoIni,
         periodo_fim: periodoFim,
@@ -3332,9 +3335,11 @@ async function marcarPagoPreviа(lojaId, nomeLoja, qtd, taxa, valor, periodoIni,
         vencimento: vencStr,
         pago_em: new Date().toISOString(),
       });
+      if (insErr) { alert('Erro ao inserir:\n' + insErr.message); return; }
     }
+    alert('✅ Pagamento de ' + nomeLoja + ' registrado como PAGO!');
     carregarCobrancas();
-  } catch(e) { alert('Erro: ' + e.message); }
+  } catch(e) { alert('Erro inesperado: ' + (e.message || JSON.stringify(e))); }
 }
 
 async function cancelarCobranca(cobId) {
@@ -4501,22 +4506,19 @@ async function lojaInformarPagamentoPreviа(valor, periodoIni, periodoFim, qtd, 
     const vencStr = proxSeg.toISOString().split('T')[0];
     const semRef = periodoIni.substring(0,7) + '-W' + Math.ceil(new Date(periodoIni).getDate()/7);
 
-    // Verifica se já existe cobrança para esta semana
-    const { data: ex } = await db.from('cobrancas_lojas')
+    const { data: ex, error: selErr } = await db.from('cobrancas_lojas')
       .select('id,status').eq('loja_id', U.id).eq('periodo_ini', periodoIni).limit(1);
+    if (selErr) throw new Error('Erro ao buscar: ' + selErr.message);
 
-    let cobId = null;
     if (ex && ex.length) {
-      cobId = ex[0].id;
-      // Já existe — apenas marca como aguardando se ainda pendente
       if (ex[0].status === 'pendente') {
-        await db.from('cobrancas_lojas')
+        const { error: updErr } = await db.from('cobrancas_lojas')
           .update({ status: 'aguardando_confirmacao', notificado_em: new Date().toISOString() })
-          .eq('id', cobId);
+          .eq('id', ex[0].id);
+        if (updErr) throw new Error('Erro ao atualizar: ' + updErr.message);
       }
     } else {
-      // Cria a cobrança formal já em aguardando_confirmacao
-      const { data: nova } = await db.from('cobrancas_lojas').insert({
+      const { error: insErr } = await db.from('cobrancas_lojas').insert({
         loja_id: U.id,
         periodo_ini: periodoIni,
         periodo_fim: periodoFim,
@@ -4527,19 +4529,17 @@ async function lojaInformarPagamentoPreviа(valor, periodoIni, periodoFim, qtd, 
         status: 'aguardando_confirmacao',
         vencimento: vencStr,
         notificado_em: new Date().toISOString(),
-      }).select('id').single();
-      cobId = nova?.id;
+      });
+      if (insErr) throw new Error('Erro ao registrar: ' + insErr.message);
     }
 
-    if (btnEl) { btnEl.textContent = '✅ Informado! Aguardando admin confirmar'; btnEl.style.background = '#fef3c7'; btnEl.style.color = '#92400e'; btnEl.style.borderColor = '#fcd34d'; }
-    // Atualiza badge e botão no menu
+    if (btnEl) { btnEl.textContent = '✅ Aguardando confirmação do admin'; btnEl.style.background = '#fef3c7'; btnEl.style.color = '#92400e'; btnEl.style.borderColor = '#fcd34d'; }
     await carregarCobLoja();
-    // Recarrega modal após 1s para mostrar status atualizado
-    setTimeout(() => abrirModalTaxaSistema(), 1200);
+    setTimeout(() => abrirModalTaxaSistema(), 1000);
   } catch(e) {
     const msg = e?.message || JSON.stringify(e) || 'Erro desconhecido';
     if (btnEl) { btnEl.textContent = '❌ Erro — tente novamente'; btnEl.disabled = false; }
-    alert('❌ Erro ao registrar pagamento:\n' + msg + '\n\nSe o problema persistir, peça ao admin para verificar o banco de dados.');
+    alert('❌ Erro ao registrar:\n' + msg);
     console.error(e);
   }
 }
