@@ -2054,6 +2054,7 @@ let _navMap = null;
 let _navMapAtivo = null;
 let _navWatchId = null;
 let _navPosInicialAtivo = null;
+let _navRotaOSRMOk = false; // true quando OSRM/Valhalla respondeu com rota real
 let _navUserMarker = null;
 let _navUserMarkerAtivo = null;
 let _navRotaLayer = null;
@@ -2131,6 +2132,7 @@ async function abrirNavInterna(entregas) {
   _navRotaAjustada = false;
   _navStepsCache = [];
   _navGeometriaCache = null;
+  _navRotaOSRMOk = false;
   try { localStorage.setItem('nav_ativa','1'); localStorage.setItem('nav_ent_idx','0'); } catch(e){}
 
   const pg = document.getElementById('pg-nav-interna');
@@ -2283,7 +2285,8 @@ async function navOnGPS(pos, entregas) {
     await navAtualizarPosAtiva(lat, lng, entregas);
   } else {
     navAtualizarPosGeral(lat, lng);
-    if (_navGPSContagem % 8 === 1) navDesenharRotaGeral(entregas, {lat,lng});
+    // Só redesenha rota se ainda não temos rota OSRM real (evita apagar rota real com linha reta)
+    if (_navGPSContagem % 8 === 1 && !_navRotaOSRMOk) navDesenharRotaGeral(entregas, {lat,lng});
   }
 
   // Badge de distância (visão geral)
@@ -2642,6 +2645,7 @@ async function _fetchOSRM(coordsOSRM) {
       const d = await r.json();
       if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
         _rotaToast('✅ Rota OSRM OK', '#1B5E20');
+        _navRotaOSRMOk = true;
         return d.routes[0];
       }
     } catch(e) { _rotaToast('OSRM falhou: ' + e.message, '#c00'); }
@@ -2688,6 +2692,7 @@ async function _fetchOSRM(coordsOSRM) {
         }
       }
       if (allCoords.length > 1) {
+        _navRotaOSRMOk = true;
         _rotaToast('✅ Rota Valhalla OK (' + allCoords.length + ' pts)', '#1B5E20');
         return {
           geometry: { type: 'LineString', coordinates: allCoords },
