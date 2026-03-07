@@ -2584,32 +2584,83 @@ function _navInicializarMarcadorAtivo(lat, lng) {
 }
 
 
-// Servidores OSRM em ordem de preferencia
-const _OSRM_SERVERS = [
-  'https://routing.openstreetmap.de/routed-car',
-  'https://router.project-osrm.org',
-];
-let _osrmServerIdx = 0;
+// ── Roteamento: tenta OSRM, fallback Valhalla ──────────────────────
+async function _fetchOSRM(coordsOSRM) {
+  // coordsOSRM = "lng1,lat1;lng2,lat2" (formato OSRM)
+  const partes = coordsOSRM.split(';').map(p => {
+    const [lng, lat] = p.split(',').map(Number);
+    return { lat, lng };
+  });
 
-async function _fetchOSRM(coords) {
-  const params = '?overview=full&geometries=geojson&steps=true';
-  for (let i = 0; i < _OSRM_SERVERS.length; i++) {
-    const server = _OSRM_SERVERS[(_osrmServerIdx + i) % _OSRM_SERVERS.length];
+  // 1) Tenta OSRM primeiro (mais rápido quando disponível)
+  const OSRM_SERVERS = [
+    'https://routing.openstreetmap.de/routed-car',
+    'https://router.project-osrm.org',
+  ];
+  for (const server of OSRM_SERVERS) {
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 8000);
-      const r = await fetch(`${server}/route/v1/driving/${coords}${params}`, { signal: ctrl.signal });
+      const t = setTimeout(() => ctrl.abort(), 6000);
+      const url = `${server}/route/v1/driving/${coordsOSRM}?overview=full&geometries=geojson&steps=true`;
+      const r = await fetch(url, { signal: ctrl.signal });
       clearTimeout(t);
-      if (!r.ok) { console.warn('[OSRM]', server, r.status); continue; }
+      if (!r.ok) continue;
       const d = await r.json();
       if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
-        _osrmServerIdx = (_osrmServerIdx + i) % _OSRM_SERVERS.length;
-        console.log('[OSRM] OK:', server);
         return d.routes[0];
       }
-    } catch(e) { console.warn('[OSRM] falhou:', server, e.message); }
+    } catch(e) { /* próximo */ }
   }
-  console.warn('[OSRM] todos os servidores falharam para:', coords);
+
+  // 2) Fallback: Valhalla (openstreetmap.de) — gratuito, sem chave, funciona globalmente
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const body = {
+      locations: partes.map(p => ({ lon: p.lng, lat: p.lat })),
+      costing: 'motorcycle',
+      directions_options: { units: 'km' },
+      shape_format: 'geojson'
+    };
+    const r = await fetch('https://valhalla.openstreetmap.de/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (!r.ok) throw new Error('Valhalla ' + r.status);
+    const d = await r.json();
+    // Converte resposta Valhalla para formato OSRM
+    if (d.trip?.legs) {
+      const allCoords = [];
+      const allSteps = [];
+      for (const leg of d.trip.legs) {
+        if (leg.shape?.coordinates) {
+          allCoords.push(...leg.shape.coordinates);
+        }
+        if (leg.maneuvers) {
+          for (const m of leg.maneuvers) {
+            allSteps.push({
+              distance: (m.length || 0) * 1000,
+              name: m.street_names?.[0] || '',
+              maneuver: {
+                type: m.type <= 1 ? 'depart' : m.type >= 4 && m.type <= 7 ? 'turn' : 'straight',
+                modifier: m.type === 5 ? 'left' : m.type === 7 ? 'right' : 'straight'
+              }
+            });
+          }
+        }
+      }
+      return {
+        geometry: { type: 'LineString', coordinates: allCoords },
+        legs: [{ steps: allSteps }],
+        distance: d.trip.summary?.length * 1000 || 0,
+        duration: d.trip.summary?.time || 0
+      };
+    }
+  } catch(e) { console.warn('[Valhalla] falhou:', e.message); }
+
   return null;
 }
 
