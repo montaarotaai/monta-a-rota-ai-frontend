@@ -2191,32 +2191,41 @@ async function navInicializarMapaGeral(entregas) {
 
 // Desenha polyline no mapa geral com coordenadas [lat,lng][]
 function _desenharPolylineGeral(latlngs) {
+  if (!latlngs || latlngs.length < 2) { console.warn('[polylineGeral] sem coordenadas'); return; }
   try {
     if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} _navRotaSombra = null; }
     if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer); }catch(e){} _navRotaLayer  = null; }
-    _navMap.invalidateSize({ animate:false });
+
     _navRotaSombra = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round' }).addTo(_navMap);
     _navRotaLayer  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round' }).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => { try { dm.marker.bringToFront(); } catch(e){} });
     if (_navUserMarker) { try { _navUserMarker.bringToFront(); } catch(e){} }
-    // Sempre enquadra câmera na rota após desenhar
-    const b = _navRotaLayer.getBounds();
-    console.log('[polylineGeral] bounds:', JSON.stringify(b));
-    if (b.isValid()) {
-      _navMap.fitBounds(b, { padding:[50,50], animate:false });
-      console.log('[polylineGeral] fitBounds executado');
-    } else {
-      console.warn('[polylineGeral] bounds inválido! latlngs[0]:', JSON.stringify(latlngs[0]), 'total:', latlngs.length);
-    }
-    // Força repaint do SVG overlay (necessário no Android Chrome após fitBounds programático)
+
+    // Calcula centro e zoom manualmente a partir dos pontos (não depende de getBounds)
+    const lats = latlngs.map(p => p[0]);
+    const lngs = latlngs.map(p => p[1]);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const cLat = (minLat + maxLat) / 2;
+    const cLng = (minLng + maxLng) / 2;
+    // Calcula zoom baseado na extensão
+    const latDiff = maxLat - minLat;
+    const lngDiff = maxLng - minLng;
+    const maxDiff = Math.max(latDiff, lngDiff);
+    let zoom = 13;
+    if (maxDiff < 0.01) zoom = 16;
+    else if (maxDiff < 0.05) zoom = 14;
+    else if (maxDiff < 0.15) zoom = 13;
+    else zoom = 12;
+
+    console.log('[polylineGeral]', latlngs.length, 'pts, centro:', cLat, cLng, 'zoom:', zoom);
+    _navMap.setView([cLat, cLng], zoom, { animate:false });
+
+    // Repaint após setView
     setTimeout(() => {
-      if (_navMap) {
-        _navMap.invalidateSize({ animate:false });
-        if (_navRotaLayer) _navRotaLayer.redraw();
-        if (_navRotaSombra) _navRotaSombra.redraw();
-      }
-    }, 100);
-    console.log('[polylineGeral] desenhada:', latlngs.length, 'pontos');
+      if (_navMap) _navMap.invalidateSize({ animate:false });
+      if (_navRotaLayer) _navRotaLayer.redraw();
+    }, 150);
   } catch(e) { console.error('[polylineGeral]', e); }
 }
 
