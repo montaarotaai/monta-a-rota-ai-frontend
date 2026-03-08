@@ -2173,9 +2173,7 @@ async function navInicializarMapaGeral(entregas) {
   _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false, preferCanvas:false })
              .setView([origemLat, origemLng], zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
-  _navMap.createPane('rotaPane');
-  _navMap.getPane('rotaPane').style.zIndex = 450;
-  _navMap.getPane('rotaPane').style.pointerEvents = 'none';
+
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
 
   // Popula _navPosAnterior imediatamente com posicao conhecida
@@ -2232,8 +2230,8 @@ async function navDesenharRotaGeral(entregas, origemLL) {
     if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} }
     if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer);}catch(e){} }
     const latlngs = rota.geometry.coordinates.map(c => [c[1], c[0]]);
-    _navRotaSombra = L.polyline(latlngs, {color:'#000', weight:12, opacity:.15, pane:'rotaPane'}).addTo(_navMap);
-    _navRotaLayer  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round', pane:'rotaPane'}).addTo(_navMap);
+    _navRotaSombra = L.polyline(latlngs, {color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round'}).addTo(_navMap);
+    _navRotaLayer  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round'}).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => { try{dm.marker.bringToFront();}catch(e){} });
     if (_navUserMarker) { try{_navUserMarker.bringToFront();}catch(e){} }
     // Reajusta câmera para mostrar a rota completa pelas ruas
@@ -2386,11 +2384,6 @@ async function navIniciarModoAtivo(entregas) {
   }).setView([posAtual.lat, posAtual.lng], 15);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(_navMapAtivo);
-
-  // Pane dedicado para rota — z-index acima dos tiles (400) e abaixo dos markers (600)
-  _navMapAtivo.createPane('rotaPane');
-  _navMapAtivo.getPane('rotaPane').style.zIndex = 450;
-  _navMapAtivo.getPane('rotaPane').style.pointerEvents = 'none';
 
   _navMapAtivo.invalidateSize({ animate: false });
 
@@ -2563,19 +2556,47 @@ async function navConfirmarEntrega(id, refLat, refLng) {
 }
 
 
-// Desenha geometria GeoJSON no mapa ativo usando L.polyline (mais confiável)
+// Desenha geometria GeoJSON no mapa ativo — versão robusta
 function _navDesenharGeometriaNoAtivo(geo) {
-  if (!_navMapAtivo) return;
+  if (!_navMapAtivo) { console.warn('[rota] mapa ativo nulo'); return; }
   try {
-    if (_navRotaSombraAtivo) { _navMapAtivo.removeLayer(_navRotaSombraAtivo); _navRotaSombraAtivo = null; }
-    if (_navRotaLayerAtivo)  { _navMapAtivo.removeLayer(_navRotaLayerAtivo);  _navRotaLayerAtivo  = null; }
+    // Remove layers antigas
+    try { if (_navRotaSombraAtivo) _navMapAtivo.removeLayer(_navRotaSombraAtivo); } catch(e){}
+    try { if (_navRotaLayerAtivo)  _navMapAtivo.removeLayer(_navRotaLayerAtivo);  } catch(e){}
+    _navRotaSombraAtivo = null;
+    _navRotaLayerAtivo  = null;
+
+    if (!geo || !geo.coordinates || geo.coordinates.length < 2) {
+      console.warn('[rota] geometria inválida', geo);
+      return;
+    }
+
     // geo.coordinates = [[lng,lat], ...] — Leaflet quer [lat,lng]
     const latlngs = geo.coordinates.map(c => [c[1], c[0]]);
-    _navRotaSombraAtivo = L.polyline(latlngs, {color:'#000', weight:12, opacity:.15, pane:'rotaPane'}).addTo(_navMapAtivo);
-    _navRotaLayerAtivo  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round', pane:'rotaPane'}).addTo(_navMapAtivo);
-    _navDestinoMarkersAtivo.forEach(m => { try{m.bringToFront();}catch(e){} });
-    if (_navUserMarkerAtivo) _navUserMarkerAtivo.bringToFront();
-  } catch(e) { console.warn('[geo]',e); }
+    console.log('[rota] desenhando', latlngs.length, 'pontos no mapa ativo');
+
+    // Sombra (contorno escuro)
+    _navRotaSombraAtivo = L.polyline(latlngs, {
+      color: '#003090', weight: 11, opacity: 0.35,
+      lineCap: 'round', lineJoin: 'round'
+    }).addTo(_navMapAtivo);
+
+    // Linha azul principal
+    _navRotaLayerAtivo = L.polyline(latlngs, {
+      color: '#1a73e8', weight: 7, opacity: 1,
+      lineCap: 'round', lineJoin: 'round'
+    }).addTo(_navMapAtivo);
+
+    console.log('[rota] polyline adicionada ao mapa OK');
+
+    // Enquadra câmera na rota
+    const b = _navRotaLayerAtivo.getBounds();
+    if (b.isValid()) {
+      _navMapAtivo.fitBounds(b, { padding: [70, 70], maxZoom: 17, animate: false });
+    }
+  } catch(e) {
+    console.error('[rota] erro ao desenhar:', e);
+  }
 }
 
 // Cria/atualiza marcador do entregador (círculo azul simples)
@@ -2713,26 +2734,31 @@ async function _fetchOSRM(coordsOSRM) {
 }
 
 async function navDesenharRotaAtiva(lat, lng, entregas) {
-  if (!_navMapAtivo) return;
+  if (!_navMapAtivo) { console.warn('[navDesenharRotaAtiva] mapa nulo'); return; }
   const e = entregas[_navEntregaAtual];
-  if (!e?.lat_entrega || !e?.lng_entrega) return;
+  if (!e?.lat_entrega || !e?.lng_entrega) { console.warn('[navDesenharRotaAtiva] entrega sem coordenadas'); return; }
   const dLat = parseFloat(e.lat_entrega), dLng = parseFloat(e.lng_entrega);
 
+  console.log('[rota] buscando OSRM:', lat, lng, '->', dLat, dLng);
   const rota = await _fetchOSRM(`${lng},${lat};${dLng},${dLat}`);
-  if (rota && _navMapAtivo) {
+
+  if (!_navMapAtivo) return; // mapa pode ter sido fechado durante a espera
+
+  if (rota && rota.geometry && rota.geometry.coordinates && rota.geometry.coordinates.length > 1) {
+    console.log('[rota] OSRM retornou', rota.geometry.coordinates.length, 'pontos');
     _navGeometriaCache = rota.geometry;
     _navRotaAtivaOk = true;
     _navDesenharGeometriaNoAtivo(rota.geometry);
     _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
     navAtualizarInstrucao(lat, lng);
-    console.log('[OSRM ativo] rota desenhada, pontos:', rota.geometry.coordinates.length);
-    // Enquadra câmera para mostrar entregador + rota completa até o destino
-    if (_navRotaLayerAtivo) {
-      const b = _navRotaLayerAtivo.getBounds();
-      if (b.isValid()) _navMapAtivo.fitBounds(b, {padding:[60,60], maxZoom:17, animate:true});
-    }
   } else {
-    _rotaToast('⚠️ Roteamento indisponível. Verifique sua conexão.', '#D4A017');
+    // Fallback: desenha linha direta para o destino com aviso
+    console.warn('[rota] OSRM falhou, usando linha direta');
+    _rotaToast('⚠️ Sem roteamento — linha direta', '#D4A017');
+    _navDesenharGeometriaNoAtivo({
+      type: 'LineString',
+      coordinates: [[lng, lat], [dLng, dLat]]
+    });
     const distM = navDistM(lat, lng, dLat, dLng);
     const el = document.getElementById('nav-dist-instrucao');
     const elR = document.getElementById('nav-rua-instrucao');
