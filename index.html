@@ -2155,26 +2155,23 @@ async function navInicializarMapaGeral(entregas) {
   const origemLat = myLat || RP_LAT;
   const origemLng = myLng || RP_LNG;
 
-  // Aguarda browser calcular tamanho real do container flex
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  await new Promise(r => setTimeout(r, 100));
+  // Força altura explícita ANTES de criar o mapa — resolve bug Leaflet em flex container
+  const alturaDisponivel = window.innerHeight - 180; // desconta header + painel inferior
+  el.style.height = alturaDisponivel + 'px';
+  el.style.flex = 'none';
+  console.log('[mapa] altura forçada:', alturaDisponivel + 'px');
 
-  // Força tamanho explícito no container antes de criar o mapa
-  const elRect = el.getBoundingClientRect();
-  console.log('[mapa] container size:', elRect.width, 'x', elRect.height);
-  if (elRect.height < 10) {
-    // Container sem altura — força altura mínima
-    el.style.height = (window.innerHeight - 180) + 'px';
-    console.warn('[mapa] forçando altura:', el.style.height);
-  }
+  // Aguarda browser aplicar o estilo
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
              .setView([origemLat, origemLng], myLat ? 15 : 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
 
-  // invalidateSize OBRIGATÓRIO após criar mapa em container flex
+  // invalidateSize logo após criar — garante que Leaflet conhece o tamanho real
   _navMap.invalidateSize({ animate:false });
+  console.log('[mapa] size após invalidate:', _navMap.getSize());
 
   if (myLat && myLng && !_navPosAnterior) _navPosAnterior = { lat: myLat, lng: myLng };
 
