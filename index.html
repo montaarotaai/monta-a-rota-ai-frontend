@@ -2170,9 +2170,12 @@ async function navInicializarMapaGeral(entregas) {
   const origemLng = myLng || -47.8103;
   const zoom = myLat ? 15 : 13;
 
-  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false, preferCanvas:true })
+  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false, preferCanvas:false })
              .setView([origemLat, origemLng], zoom);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
+  _navMap.createPane('rotaPane');
+  _navMap.getPane('rotaPane').style.zIndex = 450;
+  _navMap.getPane('rotaPane').style.pointerEvents = 'none';
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
 
   // Popula _navPosAnterior imediatamente com posicao conhecida
@@ -2229,8 +2232,8 @@ async function navDesenharRotaGeral(entregas, origemLL) {
     if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} }
     if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer);}catch(e){} }
     const latlngs = rota.geometry.coordinates.map(c => [c[1], c[0]]);
-    _navRotaSombra = L.polyline(latlngs, {color:'#000', weight:12, opacity:.15}).addTo(_navMap);
-    _navRotaLayer  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round'}).addTo(_navMap);
+    _navRotaSombra = L.polyline(latlngs, {color:'#000', weight:12, opacity:.15, pane:'rotaPane'}).addTo(_navMap);
+    _navRotaLayer  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round', pane:'rotaPane'}).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => { try{dm.marker.bringToFront();}catch(e){} });
     if (_navUserMarker) { try{_navUserMarker.bringToFront();}catch(e){} }
     // Reajusta câmera para mostrar a rota completa pelas ruas
@@ -2379,10 +2382,16 @@ async function navIniciarModoAtivo(entregas) {
   _navDestinoMarkersAtivo = [];
 
   _navMapAtivo = L.map('nav-mapa-ativo', {
-    zoomControl: false, attributionControl: false, preferCanvas: true
+    zoomControl: false, attributionControl: false, preferCanvas: false
   }).setView([posAtual.lat, posAtual.lng], 15);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(_navMapAtivo);
+
+  // Pane dedicado para rota — z-index acima dos tiles (400) e abaixo dos markers (600)
+  _navMapAtivo.createPane('rotaPane');
+  _navMapAtivo.getPane('rotaPane').style.zIndex = 450;
+  _navMapAtivo.getPane('rotaPane').style.pointerEvents = 'none';
+
   _navMapAtivo.invalidateSize({ animate: false });
 
   _navMapAtivo.on('dragstart', () => {
@@ -2562,8 +2571,8 @@ function _navDesenharGeometriaNoAtivo(geo) {
     if (_navRotaLayerAtivo)  { _navMapAtivo.removeLayer(_navRotaLayerAtivo);  _navRotaLayerAtivo  = null; }
     // geo.coordinates = [[lng,lat], ...] — Leaflet quer [lat,lng]
     const latlngs = geo.coordinates.map(c => [c[1], c[0]]);
-    _navRotaSombraAtivo = L.polyline(latlngs, {color:'#000', weight:12, opacity:.15}).addTo(_navMapAtivo);
-    _navRotaLayerAtivo  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round'}).addTo(_navMapAtivo);
+    _navRotaSombraAtivo = L.polyline(latlngs, {color:'#000', weight:12, opacity:.15, pane:'rotaPane'}).addTo(_navMapAtivo);
+    _navRotaLayerAtivo  = L.polyline(latlngs, {color:'#1a73e8', weight:7, opacity:1, lineCap:'round', lineJoin:'round', pane:'rotaPane'}).addTo(_navMapAtivo);
     _navDestinoMarkersAtivo.forEach(m => { try{m.bringToFront();}catch(e){} });
     if (_navUserMarkerAtivo) _navUserMarkerAtivo.bringToFront();
   } catch(e) { console.warn('[geo]',e); }
