@@ -2156,10 +2156,15 @@ async function navInicializarMapaGeral(entregas) {
   const origemLng = myLng || RP_LNG;
 
   // Força altura explícita ANTES de criar o mapa — resolve bug Leaflet em flex container
-  const alturaDisponivel = window.innerHeight - 180; // desconta header + painel inferior
-  el.style.height = alturaDisponivel + 'px';
+  // Mede o header e painel inferior reais para calcular a altura disponível
+  const navHeader = document.querySelector('#nav-modo-geral > div:first-child');
+  const navPainel = document.querySelector('#nav-modo-geral > div:last-child');
+  const headerH = navHeader ? navHeader.getBoundingClientRect().height : 70;
+  const painelH = navPainel ? navPainel.getBoundingClientRect().height : 120;
+  const alturaDisponivel = window.innerHeight - headerH - painelH;
+  el.style.height = Math.max(200, alturaDisponivel) + 'px';
   el.style.flex = 'none';
-  console.log('[mapa] altura forçada:', alturaDisponivel + 'px');
+  console.log('[mapa] header:', headerH, 'painel:', painelH, 'mapa:', alturaDisponivel + 'px');
 
   // Aguarda browser aplicar o estilo
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
