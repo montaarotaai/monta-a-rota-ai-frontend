@@ -2629,59 +2629,84 @@ function _rotaToast(msg, cor) {
   el._t = setTimeout(() => { if(el) el.style.display='none'; }, 6000);
 }
 
-// Decodifica encoded polyline do Valhalla (precisão 6 casas decimais)
-function _decodePoly6(str) {
-  const coords = [];
-  let idx = 0, lat = 0, lng = 0;
+// Decodifica polyline encoded (padrão Google, precisão 1e-5)
+function _decodePoly5(str) {
+  const coords = []; let idx=0, lat=0, lng=0;
   while (idx < str.length) {
-    let b, shift = 0, result = 0;
-    do { b = str.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-    shift = 0; result = 0;
-    do { b = str.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-    // Valhalla usa [lng, lat] para GeoJSON
-    coords.push([lng / 1e6, lat / 1e6]);
+    let b, shift=0, result=0;
+    do { b=str.charCodeAt(idx++)-63; result|=(b&0x1f)<<shift; shift+=5; } while(b>=0x20);
+    lat += (result&1)?~(result>>1):(result>>1);
+    shift=0; result=0;
+    do { b=str.charCodeAt(idx++)-63; result|=(b&0x1f)<<shift; shift+=5; } while(b>=0x20);
+    lng += (result&1)?~(result>>1):(result>>1);
+    coords.push([lng/1e5, lat/1e5]); // [lng,lat] para GeoJSON
+  }
+  return coords;
+}
+
+// Decodifica polyline encoded Valhalla (precisão 1e-6)
+function _decodePoly6(str) {
+  const coords = []; let idx=0, lat=0, lng=0;
+  while (idx < str.length) {
+    let b, shift=0, result=0;
+    do { b=str.charCodeAt(idx++)-63; result|=(b&0x1f)<<shift; shift+=5; } while(b>=0x20);
+    lat += (result&1)?~(result>>1):(result>>1);
+    shift=0; result=0;
+    do { b=str.charCodeAt(idx++)-63; result|=(b&0x1f)<<shift; shift+=5; } while(b>=0x20);
+    lng += (result&1)?~(result>>1):(result>>1);
+    coords.push([lng/1e6, lat/1e6]);
   }
   return coords;
 }
 
 async function _fetchOSRM(coordsOSRM) {
-  // coordsOSRM = "lng1,lat1;lng2,lat2" (formato OSRM)
+  // coordsOSRM = "lng1,lat1;lng2,lat2"
   const partes = coordsOSRM.split(';').map(p => {
     const [lng, lat] = p.split(',').map(Number);
     return { lat, lng };
   });
 
-  // 1) Tenta OSRM
-  const OSRM_SERVERS = [
-    'https://routing.openstreetmap.de/routed-car',
-    'https://router.project-osrm.org',
-  ];
-  _rotaToast('⏳ Calculando rota...', '#555');
-  for (const server of OSRM_SERVERS) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 7000);
-      const url = `${server}/route/v1/driving/${coordsOSRM}?overview=full&geometries=geojson&steps=true`;
-      const r = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(t);
-      if (!r.ok) { _rotaToast('OSRM HTTP ' + r.status, '#c00'); continue; }
+  _rotaToast('⏳ Calculando rota...', '#1565C0');
+
+  // ── 1) OSRM router.project-osrm.org ────────────────────────────────
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordsOSRM}?overview=full&geometries=geojson&steps=true`;
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) {
       const d = await r.json();
-      if (d.code === 'Ok' && d.routes?.[0]?.geometry) {
-        _rotaToast('✅ Rota OSRM OK', '#1B5E20');
+      if (d.code === 'Ok' && d.routes?.[0]?.geometry?.coordinates?.length > 1) {
+        _rotaToast('✅ Rota calculada!', '#1B5E20');
         _navRotaOSRMOk = true;
         return d.routes[0];
       }
-    } catch(e) { _rotaToast('OSRM falhou: ' + e.message, '#c00'); }
-  }
+    }
+  } catch(e) { console.warn('[OSRM1]', e.message); }
 
-  // 2) Fallback: Valhalla (openstreetmap.de)
-  // Shape vem como encoded polyline com 6 casas decimais
-  _rotaToast('⏳ Tentando Valhalla...', '#555');
+  // ── 2) OSRM routing.openstreetmap.de ──────────────────────────────
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 9000);
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const url = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${coordsOSRM}?overview=full&geometries=geojson&steps=true`;
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.code === 'Ok' && d.routes?.[0]?.geometry?.coordinates?.length > 1) {
+        _rotaToast('✅ Rota calculada!', '#1B5E20');
+        _navRotaOSRMOk = true;
+        return d.routes[0];
+      }
+    }
+  } catch(e) { console.warn('[OSRM2]', e.message); }
+
+  // ── 3) Valhalla openstreetmap.de ──────────────────────────────────
+  _rotaToast('⏳ Tentando servidor alternativo...', '#555');
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
     const body = {
       locations: partes.map(p => ({ lon: p.lng, lat: p.lat })),
       costing: 'motorcycle',
@@ -2694,42 +2719,64 @@ async function _fetchOSRM(coordsOSRM) {
       signal: ctrl.signal
     });
     clearTimeout(t);
-    if (!r.ok) throw new Error('Valhalla HTTP ' + r.status);
-    const d = await r.json();
-    if (d.trip?.legs?.length) {
-      const allCoords = [];
-      const allSteps  = [];
-      for (const leg of d.trip.legs) {
-        // shape é string encoded polyline — decodifica
-        if (typeof leg.shape === 'string') {
-          allCoords.push(..._decodePoly6(leg.shape));
+    if (r.ok) {
+      const d = await r.json();
+      if (d.trip?.legs?.length) {
+        const allCoords = [], allSteps = [];
+        for (const leg of d.trip.legs) {
+          if (typeof leg.shape === 'string') allCoords.push(..._decodePoly6(leg.shape));
+          for (const m of (leg.maneuvers||[])) {
+            allSteps.push({
+              distance: (m.length||0)*1000,
+              name: m.street_names?.[0]||'',
+              maneuver: {
+                type: m.type<=1?'depart':'turn',
+                modifier: (m.type===5||m.type===15)?'left':(m.type===7||m.type===17)?'right':'straight'
+              }
+            });
+          }
         }
-        for (const m of (leg.maneuvers || [])) {
-          allSteps.push({
-            distance: (m.length || 0) * 1000,
-            name: m.street_names?.[0] || '',
-            maneuver: {
-              type: m.type <= 1 ? 'depart' : 'turn',
-              modifier: m.type === 5 || m.type === 15 ? 'left'
-                      : m.type === 7 || m.type === 17 ? 'right' : 'straight'
-            }
-          });
+        if (allCoords.length > 1) {
+          _rotaToast('✅ Rota calculada!', '#1B5E20');
+          _navRotaOSRMOk = true;
+          return {
+            geometry: { type:'LineString', coordinates: allCoords },
+            legs: [{ steps: allSteps }],
+            distance: (d.trip.summary?.length||0)*1000,
+            duration: d.trip.summary?.time||0
+          };
         }
-      }
-      if (allCoords.length > 1) {
-        _navRotaOSRMOk = true;
-        _rotaToast('✅ Rota Valhalla OK (' + allCoords.length + ' pts)', '#1B5E20');
-        return {
-          geometry: { type: 'LineString', coordinates: allCoords },
-          legs: [{ steps: allSteps }],
-          distance: (d.trip.summary?.length || 0) * 1000,
-          duration: d.trip.summary?.time || 0
-        };
       }
     }
-  } catch(e) { _rotaToast('Valhalla erro: ' + e.message, '#c00'); }
+  } catch(e) { console.warn('[Valhalla]', e.message); }
 
-  _rotaToast('❌ Roteamento falhou — linha reta', '#c00');
+  // ── 4) GraphHopper (gratuito, sem chave para uso básico) ───────────
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const pts = partes.map(p => `point=${p.lat},${p.lng}`).join('&');
+    const url = `https://graphhopper.com/api/1/route?${pts}&vehicle=car&locale=pt&points_encoded=true&key=LijBPDQGfu7Iiq80ebFCtWMuznIa0kwdOQHEKQZS`;
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.paths?.[0]?.points) {
+        const coords = _decodePoly5(d.paths[0].points);
+        if (coords.length > 1) {
+          _rotaToast('✅ Rota calculada!', '#1B5E20');
+          _navRotaOSRMOk = true;
+          return {
+            geometry: { type:'LineString', coordinates: coords },
+            legs: [{ steps: [] }],
+            distance: d.paths[0].distance||0,
+            duration: (d.paths[0].time||0)/1000
+          };
+        }
+      }
+    }
+  } catch(e) { console.warn('[GraphHopper]', e.message); }
+
+  _rotaToast('❌ Sem conexão com servidores de rota', '#c00');
   return null;
 }
 
