@@ -2201,8 +2201,12 @@ function _desenharPolylineGeral(latlngs) {
     if (_navUserMarker) { try { _navUserMarker.bringToFront(); } catch(e){} }
     // Sempre enquadra câmera na rota após desenhar
     const b = _navRotaLayer.getBounds();
+    console.log('[polylineGeral] bounds:', JSON.stringify(b));
     if (b.isValid()) {
       _navMap.fitBounds(b, { padding:[50,50], animate:false });
+      console.log('[polylineGeral] fitBounds executado');
+    } else {
+      console.warn('[polylineGeral] bounds inválido! latlngs[0]:', JSON.stringify(latlngs[0]), 'total:', latlngs.length);
     }
     // Força repaint do SVG overlay (necessário no Android Chrome após fitBounds programático)
     setTimeout(() => {
@@ -2240,13 +2244,6 @@ async function navDesenharRotaGeral(entregas, origemLL) {
     // OSRM retorna [lng,lat] — converter para [lat,lng]
     const latlngs = rota.geometry.coordinates.map(c => [c[1], c[0]]);
     _desenharPolylineGeral(latlngs);
-    if (!_navRotaAjustaComRota) {
-      _navRotaAjustaComRota = true;
-      if (_navRotaLayer) {
-        const b = _navRotaLayer.getBounds();
-        if (b.isValid()) _navMap.fitBounds(b, { padding:[55,55], animate:false });
-      }
-    }
     console.log('[rota geral] OK:', rota.geometry.coordinates.length, 'pontos');
   } else {
     // Fallback: linha direta entre pontos
