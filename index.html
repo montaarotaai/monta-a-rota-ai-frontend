@@ -2131,7 +2131,7 @@ async function abrirNavInterna(entregas) {
   document.getElementById('nav-modo-ativo').style.display = 'none';
   document.body.style.overflow = 'hidden';
   closeM('rota-ent');
-  setTimeout(() => navInicializarMapaGeral(entregasOrdenadas), 150);
+  setTimeout(() => navInicializarMapaGeral(entregasOrdenadas), 300);
 }
 
 function fecharNavInterna() {
@@ -2155,10 +2155,26 @@ async function navInicializarMapaGeral(entregas) {
   const origemLat = myLat || RP_LAT;
   const origemLng = myLng || RP_LNG;
 
+  // Aguarda browser calcular tamanho real do container flex
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise(r => setTimeout(r, 100));
+
+  // Força tamanho explícito no container antes de criar o mapa
+  const elRect = el.getBoundingClientRect();
+  console.log('[mapa] container size:', elRect.width, 'x', elRect.height);
+  if (elRect.height < 10) {
+    // Container sem altura — força altura mínima
+    el.style.height = (window.innerHeight - 180) + 'px';
+    console.warn('[mapa] forçando altura:', el.style.height);
+  }
+
   _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
              .setView([origemLat, origemLng], myLat ? 15 : 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
+
+  // invalidateSize OBRIGATÓRIO após criar mapa em container flex
+  _navMap.invalidateSize({ animate:false });
 
   if (myLat && myLng && !_navPosAnterior) _navPosAnterior = { lat: myLat, lng: myLng };
 
@@ -2175,7 +2191,7 @@ async function navInicializarMapaGeral(entregas) {
 
   navAtualizarPainel(entregas, 0);
 
-  // Enquadra câmera antes do OSRM responder
+  // Enquadra câmera em entregador + destinos
   const todosOsPontos = [[origemLat, origemLng],
     ...entregas.filter(e => parseFloat(e.lat_entrega||0)).map(e => [parseFloat(e.lat_entrega), parseFloat(e.lng_entrega)])
   ];
@@ -2184,7 +2200,9 @@ async function navInicializarMapaGeral(entregas) {
     _navMap.fitBounds(L.latLngBounds(todosOsPontos), { padding:[55,55], animate:false });
   }
 
-  // Desenha rota pelas ruas
+  // Aguarda tiles carregarem, depois desenha rota
+  await new Promise(r => setTimeout(r, 400));
+  _navMap.invalidateSize({ animate:false });
   await navDesenharRotaGeral(entregas, { lat: origemLat, lng: origemLng });
   navIniciarGPS(entregas);
 }
