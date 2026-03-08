@@ -996,8 +996,8 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
 <div id="pg-nav-interna" style="display:none;position:fixed;inset:0;z-index:2000;flex-direction:column;background:#e8e0d8;">
 
   <!-- MODO VISÃO GERAL -->
-  <div id="nav-modo-geral" style="display:flex;flex-direction:column;height:100%;overflow:visible;">
-    <div style="background:linear-gradient(135deg,#004E89,#003060);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.4);">
+  <div id="nav-modo-geral" style="display:flex;flex-direction:column;height:100%;position:relative;">
+    <div id="nav-header-geral" style="background:linear-gradient(135deg,#004E89,#003060);padding:10px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.4);">
       <button onclick="fecharNavInterna()" style="background:rgba(255,255,255,.18);border:none;color:white;width:42px;height:42px;border-radius:50%;font-size:22px;cursor:pointer;flex-shrink:0;font-weight:700;">←</button>
       <div style="flex:1;min-width:0;">
         <div id="nav-destino-label" style="color:white;font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Calculando rota...</div>
@@ -1005,7 +1005,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       </div>
       <div id="nav-dist-badge" style="background:#F5A800;color:#1a1a1a;border-radius:20px;padding:6px 13px;font-size:14px;font-weight:800;flex-shrink:0;display:none;"></div>
     </div>
-    <div id="nav-mapa" style="width:100%;position:relative;height:calc(100vh - 235px);">
+    <div id="nav-mapa" style="flex:1;width:100%;position:relative;min-height:0;">
       <div id="nav-gps-status" style="position:absolute;top:10px;right:10px;z-index:600;background:rgba(0,0,0,.65);color:white;border-radius:20px;padding:5px 11px;font-size:11px;font-weight:700;">📡 GPS...</div>
       <div style="position:absolute;top:10px;left:10px;z-index:600;display:flex;flex-direction:column;gap:0;">
         <button onclick="if(_navMap)_navMap.zoomIn()" style="background:white;border:none;border-bottom:1px solid #ddd;width:40px;height:40px;border-radius:10px 10px 0 0;font-size:22px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);line-height:1;">+</button>
@@ -1014,7 +1014,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       <button onclick="navVerRotaCompleta()" style="position:absolute;bottom:74px;right:10px;z-index:600;background:white;border:none;width:46px;height:46px;border-radius:12px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25);">🗺️</button>
       <button onclick="navCentralizarGeral()" style="position:absolute;bottom:18px;right:10px;z-index:600;background:white;border:none;width:46px;height:46px;border-radius:12px;font-size:20px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25);">📍</button>
     </div>
-    <div style="background:white;border-radius:16px 16px 0 0;padding:14px 16px 18px;flex-shrink:0;box-shadow:0 -4px 20px rgba(0,0,0,.12);">
+    <div id="nav-painel-geral" style="background:white;border-radius:16px 16px 0 0;padding:14px 16px 18px;flex-shrink:0;box-shadow:0 -4px 20px rgba(0,0,0,.12);">
       <div style="width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 12px;"></div>
       <div id="nav-entrega-info" style="margin-bottom:10px;font-size:13px;"></div>
       <div id="nav-acoes" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
@@ -2153,7 +2153,19 @@ async function navInicializarMapaGeral(entregas) {
   const origemLat = myLat || RP_LAT;
   const origemLng = myLng || RP_LNG;
 
-  // Simples — igual ao padrão Leaflet sem forçar altura
+  // Mede alturas reais do header e painel ANTES de criar o mapa
+  // para que o container nav-mapa tenha tamanho correto
+  const header = document.getElementById('nav-header-geral');
+  const painel = document.getElementById('nav-painel-geral');
+  const hH = header ? header.offsetHeight : 70;
+  const pH = painel ? painel.offsetHeight : 165;
+  const mapaEl = document.getElementById('nav-mapa');
+  const alturaMap = window.innerHeight - hH - pH;
+  if (mapaEl && alturaMap > 100) {
+    mapaEl.style.height = alturaMap + 'px';
+    mapaEl.style.flex = 'none';
+  }
+
   _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
              .setView([origemLat, origemLng], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
@@ -2173,8 +2185,8 @@ async function navInicializarMapaGeral(entregas) {
   });
 
   navAtualizarPainel(entregas, 0);
-  await navDesenharRotaGeral(entregas, { lat: origemLat, lng: origemLng });
   navIniciarGPS(entregas);
+  await navDesenharRotaGeral(entregas, { lat: origemLat, lng: origemLng });
 }
 
 // Desenha polyline no mapa geral com coordenadas [lat,lng][]
