@@ -2055,6 +2055,7 @@ let _navMapAtivo = null;
 let _navWatchId = null;
 let _navPosInicialAtivo = null;
 let _navRotaOSRMOk = false; // true quando OSRM/Valhalla respondeu com rota real
+let _navRotaAtivaOk = false;  // true quando rota do modo ativo foi desenhada com sucesso
 let _navUserMarker = null;
 let _navUserMarkerAtivo = null;
 let _navRotaLayer = null;
@@ -2345,59 +2346,43 @@ async function navIniciarComGeocode() {
 }
 
 async function navIniciarModoAtivo(entregas) {
-  _navModoAtivo  = true;
-  _navSegindoGPS = true;
-  // Garante posição de referência para a guarda da câmera — usa qualquer fonte disponível
-  const _posRef = (myLat && myLng) ? {lat:myLat,lng:myLng} : _navPosAnterior;
-  _navPosInicialAtivo = _posRef ? {lat:_posRef.lat, lng:_posRef.lng} : {lat:RP_LAT, lng:RP_LNG};
+  _navModoAtivo   = true;
+  _navSegindoGPS  = true;
+  _navRotaLayerAtivo  = null;
+  _navRotaSombraAtivo = null;
+  _navRotaAtivaOk     = false;
 
-  // ── PASSO 1: garante posição GPS imediata ──────────────────────────
   if (!_navPosAnterior && myLat && myLng) {
     _navPosAnterior = { lat: myLat, lng: myLng };
   }
+  const posAtual = _navPosAnterior || { lat: myLat || RP_LAT, lng: myLng || RP_LNG };
+  _navPosInicialAtivo = { lat: posAtual.lat, lng: posAtual.lng };
 
-  // ── PASSO 2: exibe modo ativo e atualiza painéis ───────────────────
   document.getElementById('nav-modo-geral').style.display = 'none';
   document.getElementById('nav-modo-ativo').style.display = 'block';
   navAtualizarPainelAtivo(entregas);
 
-  // Header: não deixa "Aguardando GPS..." — mostra destino imediatamente
   const eAtual = entregas[_navEntregaAtual];
-  if (eAtual) {
-    const elS = document.getElementById('nav-seta-instrucao');
-    const elD = document.getElementById('nav-dist-instrucao');
-    const elR = document.getElementById('nav-rua-instrucao');
-    if (elS) elS.textContent = '↑';
-    if (elR) elR.textContent = eAtual.cliente_nome || eAtual.endereco_entrega || 'Calculando rota...';
-    if (elD && _navPosAnterior && eAtual.lat_entrega) {
-      const dm = navDistM(_navPosAnterior.lat, _navPosAnterior.lng,
-                          parseFloat(eAtual.lat_entrega), parseFloat(eAtual.lng_entrega));
-      elD.textContent = dm < 1000 ? Math.round(dm) + 'm' : (dm/1000).toFixed(1) + 'km';
-    } else if (elD) { elD.textContent = '--'; }
-  }
+  const elS = document.getElementById('nav-seta-instrucao');
+  const elD = document.getElementById('nav-dist-instrucao');
+  const elR = document.getElementById('nav-rua-instrucao');
+  if (elS) elS.textContent = '↑';
+  if (elR) elR.textContent = eAtual ? (eAtual.cliente_nome || eAtual.endereco_entrega || 'Calculando...') : 'Calculando...';
+  if (elD) elD.textContent = '--';
 
-  // ── PASSO 3: aguarda reflow do browser (CRÍTICO para Leaflet) ──────
-  // Sem isso, nav-mapa-ativo tem dimensão 0x0 → tiles não carregam
+  // Aguarda reflow para Leaflet medir container corretamente
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // ── PASSO 4: destrói mapa anterior e recria ────────────────────────
+  // Recria mapa ativo
   if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
-  _navUserMarkerAtivo    = null;
-  _navRotaLayerAtivo     = null;
-  _navRotaSombraAtivo    = null;
+  _navUserMarkerAtivo     = null;
   _navDestinoMarkersAtivo = [];
-
-  const centro = _navPosAnterior
-    ? [_navPosAnterior.lat, _navPosAnterior.lng]
-    : [-21.1775, -47.8103];
 
   _navMapAtivo = L.map('nav-mapa-ativo', {
     zoomControl: false, attributionControl: false, preferCanvas: true
-  }).setView(centro, 18);
+  }).setView([posAtual.lat, posAtual.lng], 15);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 20 }).addTo(_navMapAtivo);
-
-  // Força Leaflet a re-medir o container após o reflow
   _navMapAtivo.invalidateSize({ animate: false });
 
   _navMapAtivo.on('dragstart', () => {
@@ -2406,7 +2391,7 @@ async function navIniciarModoAtivo(entregas) {
     if (btn) btn.style.display = 'block';
   });
 
-  // ── PASSO 5: marcadores dos destinos ──────────────────────────────
+  // Marcadores dos destinos
   entregas.forEach((e, i) => {
     const lat = parseFloat(e.lat_entrega||0), lng = parseFloat(e.lng_entrega||0);
     if (!lat || !lng) return;
@@ -2418,44 +2403,25 @@ async function navIniciarModoAtivo(entregas) {
     _navDestinoMarkersAtivo.push(L.marker([lat,lng],{icon,zIndexOffset:900}).addTo(_navMapAtivo));
   });
 
-  // ── PASSO 6: linha azul + câmera ──────────────────────────────────
-  if (_navPosAnterior) {
-    _navInicializarMarcadorAtivo(_navPosAnterior.lat, _navPosAnterior.lng);
-  }
+  // Marcador do entregador
+  _navInicializarMarcadorAtivo(posAtual.lat, posAtual.lng);
 
-  if (_navPosAnterior && eAtual?.lat_entrega && eAtual?.lng_entrega) {
+  // Enquadra câmera em entregador + destino imediatamente
+  if (eAtual && eAtual.lat_entrega && eAtual.lng_entrega) {
     const dLat = parseFloat(eAtual.lat_entrega);
     const dLng = parseFloat(eAtual.lng_entrega);
-
-    // Se já temos geometria em cache (calculada na visão geral), usa imediatamente
-    if (_navGeometriaCache) {
-      _navDesenharGeometriaNoAtivo(_navGeometriaCache);
-      const b = _navRotaLayerAtivo?.getBounds?.();
-      if (b?.isValid()) {
-        _navMapAtivo.fitBounds(b, { padding: [70, 70], maxZoom: 17, animate: false });
-      } else {
-        _navMapAtivo.fitBounds(
-          L.latLngBounds([_navPosAnterior.lat, _navPosAnterior.lng], [dLat, dLng]),
-          { padding: [70, 70], maxZoom: 16, animate: false }
-        );
-      }
-    } else {
-      // Sem cache: enquadra câmera e aguarda OSRM calcular a rota
-      _rotaToast('⏳ Calculando rota pelas ruas...', '#1565C0');
-      _navMapAtivo.fitBounds(
-        L.latLngBounds([_navPosAnterior.lat, _navPosAnterior.lng], [dLat, dLng]),
-        { padding: [70, 70], maxZoom: 16, animate: false }
-      );
-    }
-
-    // Solicita/atualiza rota OSRM para este destino específico
-    // Pequeno delay para garantir que o mapa terminou de renderizar
-    setTimeout(() => navDesenharRotaAtiva(_navPosAnterior.lat, _navPosAnterior.lng, entregas), 300);
-
-  } else if (_navPosAnterior) {
-    navMoverCameraAtiva(_navPosAnterior.lat, _navPosAnterior.lng);
+    _navMapAtivo.fitBounds(
+      L.latLngBounds([posAtual.lat, posAtual.lng], [dLat, dLng]),
+      { padding: [60, 60], maxZoom: 16, animate: false }
+    );
   }
+
+  // Aguarda mapa renderizar, depois calcula rota OSRM
+  _rotaToast('Calculando rota...', '#1565C0');
+  await new Promise(r => setTimeout(r, 600));
+  await navDesenharRotaAtiva(posAtual.lat, posAtual.lng, entregas);
 }
+
 
 function navAtualizarPainelAtivo(entregas) {
   const e = entregas[_navEntregaAtual];
@@ -2531,7 +2497,7 @@ async function navAtualizarPosAtiva(lat, lng, entregas) {
       if (elR) elR.textContent = 'Chegando ao destino!';
     }
   }
-  if (!_navRotaLayerAtivo || _navGPSContagem % 10 === 1) await navDesenharRotaAtiva(lat, lng, entregas);
+  if (!_navRotaAtivaOk || _navGPSContagem % 15 === 0) await navDesenharRotaAtiva(lat, lng, entregas);
   else navAtualizarInstrucao(lat, lng);
 }
 
@@ -2746,6 +2712,7 @@ async function navDesenharRotaAtiva(lat, lng, entregas) {
   const rota = await _fetchOSRM(`${lng},${lat};${dLng},${dLat}`);
   if (rota && _navMapAtivo) {
     _navGeometriaCache = rota.geometry;
+    _navRotaAtivaOk = true;
     _navDesenharGeometriaNoAtivo(rota.geometry);
     _navStepsCache = rota.legs?.flatMap(l => l.steps||[]) || [];
     navAtualizarInstrucao(lat, lng);
