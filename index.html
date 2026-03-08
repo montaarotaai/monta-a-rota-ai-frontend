@@ -2148,28 +2148,16 @@ function fecharNavInterna() {
 // ── Mapa Visão Geral ───────────────────────────────────────
 
 async function navInicializarMapaGeral(entregas) {
-  const el = document.getElementById('nav-mapa');
-  if (!el) return;
   if (_navMap) { _navMap.remove(); _navMap = null; }
 
   const origemLat = myLat || RP_LAT;
   const origemLng = myLng || RP_LNG;
 
-  // Altura do mapa = tela toda menos header (~70px) menos painel inferior (~165px)
-  el.style.height = (window.innerHeight - 235) + 'px';
-  el.style.flex = 'none';
-
-  // Aguarda browser aplicar o estilo
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
+  // Simples — igual ao padrão Leaflet sem forçar altura
   _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
-             .setView([origemLat, origemLng], myLat ? 15 : 13);
+             .setView([origemLat, origemLng], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
-
-  // invalidateSize logo após criar — garante que Leaflet conhece o tamanho real
-  _navMap.invalidateSize({ animate:false });
-  console.log('[mapa] size após invalidate:', _navMap.getSize());
 
   if (myLat && myLng && !_navPosAnterior) _navPosAnterior = { lat: myLat, lng: myLng };
 
@@ -2185,19 +2173,6 @@ async function navInicializarMapaGeral(entregas) {
   });
 
   navAtualizarPainel(entregas, 0);
-
-  // Enquadra câmera em entregador + destinos
-  const todosOsPontos = [[origemLat, origemLng],
-    ...entregas.filter(e => parseFloat(e.lat_entrega||0)).map(e => [parseFloat(e.lat_entrega), parseFloat(e.lng_entrega)])
-  ];
-  if (todosOsPontos.length > 1) {
-    _navRotaAjustada = true;
-    _navMap.fitBounds(L.latLngBounds(todosOsPontos), { padding:[55,55], animate:false });
-  }
-
-  // Aguarda tiles carregarem, depois desenha rota
-  await new Promise(r => setTimeout(r, 400));
-  _navMap.invalidateSize({ animate:false });
   await navDesenharRotaGeral(entregas, { lat: origemLat, lng: origemLng });
   navIniciarGPS(entregas);
 }
@@ -2367,28 +2342,13 @@ async function navIniciarModoAtivo(entregas) {
   if (elR) elR.textContent = eAtual ? (eAtual.cliente_nome || eAtual.endereco_entrega || 'Calculando...') : 'Calculando...';
   if (elD) elD.textContent = '--';
 
-  // Aguarda o browser renderizar o container
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-  // Recria mapa
+  // Recria mapa — simples, sem forçar tamanho
   if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
   _navUserMarkerAtivo = null; _navDestinoMarkersAtivo = [];
-
-  // Força tamanho explícito no container (mesmo fix do mapa geral)
-  const elAtivo = document.getElementById('nav-mapa-ativo');
-  if (elAtivo) {
-    elAtivo.style.position = 'absolute';
-    elAtivo.style.top = '0'; elAtivo.style.left = '0';
-    elAtivo.style.width = window.innerWidth + 'px';
-    elAtivo.style.height = window.innerHeight + 'px';
-  }
-  await new Promise(r => requestAnimationFrame(r));
 
   _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false })
     .setView([pos.lat, pos.lng], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMapAtivo);
-  _navMapAtivo.invalidateSize({ animate:false });
-  console.log('[mapaAtivo] size:', _navMapAtivo.getSize());
   _navMapAtivo.on('dragstart', () => {
     _navSegindoGPS = false;
     const btn = document.getElementById('nav-btn-recentrar');
