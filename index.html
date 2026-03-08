@@ -1005,7 +1005,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
       </div>
       <div id="nav-dist-badge" style="background:#F5A800;color:#1a1a1a;border-radius:20px;padding:6px 13px;font-size:14px;font-weight:800;flex-shrink:0;display:none;"></div>
     </div>
-    <div id="nav-mapa" style="flex:1;width:100%;position:relative;min-height:0;">
+    <div id="nav-mapa" style="flex:1;width:100%;position:relative;min-height:0;overflow:hidden;">
       <div id="nav-gps-status" style="position:absolute;top:10px;right:10px;z-index:600;background:rgba(0,0,0,.65);color:white;border-radius:20px;padding:5px 11px;font-size:11px;font-weight:700;">📡 GPS...</div>
       <div style="position:absolute;top:10px;left:10px;z-index:600;display:flex;flex-direction:column;gap:0;">
         <button onclick="if(_navMap)_navMap.zoomIn()" style="background:white;border:none;border-bottom:1px solid #ddd;width:40px;height:40px;border-radius:10px 10px 0 0;font-size:22px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2);line-height:1;">+</button>
@@ -1025,7 +1025,7 @@ select.ent-select{width:100%;padding:8px;border:1.5px solid #e0e0e0;border-radiu
   <div id="nav-modo-ativo" style="display:none;position:absolute;inset:0;">
 
     <!-- Mapa ocupa tela toda — tamanho fixo inset:0 para Leaflet carregar tiles corretamente -->
-    <div id="nav-mapa-ativo" style="position:absolute;inset:0;z-index:600;"></div>
+    <div id="nav-mapa-ativo" style="position:absolute;inset:0;"></div>
 
     <!-- Header verde estilo Google Maps -->
     <div id="nav-instrucao-ativa" style="position:absolute;top:0;left:0;right:0;z-index:700;background:#1B5E20;box-shadow:0 4px 20px rgba(0,0,0,.6);">
@@ -2155,7 +2155,8 @@ async function navInicializarMapaGeral(entregas) {
   const origemLat = myLat || RP_LAT;
   const origemLng = myLng || RP_LNG;
 
-  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
+  const _navRenderer = L.canvas({ padding: 0.5 });
+  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false, renderer: _navRenderer })
              .setView([origemLat, origemLng], myLat ? 15 : 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
@@ -2192,12 +2193,14 @@ async function navInicializarMapaGeral(entregas) {
 // Desenha polyline no mapa geral com coordenadas [lat,lng][]
 function _desenharPolylineGeral(latlngs) {
   try {
-    if (_navRotaSombra) { _navMap.removeLayer(_navRotaSombra); _navRotaSombra = null; }
-    if (_navRotaLayer)  { _navMap.removeLayer(_navRotaLayer);  _navRotaLayer  = null; }
-    _navRotaSombra = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round' }).addTo(_navMap);
-    _navRotaLayer  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round' }).addTo(_navMap);
+    if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} _navRotaSombra = null; }
+    if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer); }catch(e){} _navRotaLayer  = null; }
+    _navMap.invalidateSize({ animate:false });
+    _navRotaSombra = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMap);
+    _navRotaLayer  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => { try { dm.marker.bringToFront(); } catch(e){} });
     if (_navUserMarker) { try { _navUserMarker.bringToFront(); } catch(e){} }
+    console.log('[polylineGeral] desenhada:', latlngs.length, 'pontos');
   } catch(e) { console.error('[polylineGeral]', e); }
 }
 
@@ -2340,7 +2343,8 @@ async function navIniciarModoAtivo(entregas) {
   if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
   _navUserMarkerAtivo = null; _navDestinoMarkersAtivo = [];
 
-  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false })
+  const _navRendererAtivo = L.canvas({ padding: 0.5 });
+  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false, renderer: _navRendererAtivo })
     .setView([pos.lat, pos.lng], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMapAtivo);
   _navMapAtivo.invalidateSize({ animate:false });
@@ -2455,10 +2459,11 @@ function navMoverCameraAtiva(lat, lng) {
 function _desenharPolylineAtivo(latlngs) {
   if (!_navMapAtivo) return;
   try {
-    if (_navRotaSombraAtivo) { _navMapAtivo.removeLayer(_navRotaSombraAtivo); _navRotaSombraAtivo = null; }
-    if (_navRotaLayerAtivo)  { _navMapAtivo.removeLayer(_navRotaLayerAtivo);  _navRotaLayerAtivo  = null; }
-    _navRotaSombraAtivo = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round' }).addTo(_navMapAtivo);
-    _navRotaLayerAtivo  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round' }).addTo(_navMapAtivo);
+    if (_navRotaSombraAtivo) { try{_navMapAtivo.removeLayer(_navRotaSombraAtivo);}catch(e){} _navRotaSombraAtivo = null; }
+    if (_navRotaLayerAtivo)  { try{_navMapAtivo.removeLayer(_navRotaLayerAtivo); }catch(e){} _navRotaLayerAtivo  = null; }
+    _navMapAtivo.invalidateSize({ animate:false });
+    _navRotaSombraAtivo = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMapAtivo);
+    _navRotaLayerAtivo  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMapAtivo);
     _navDestinoMarkersAtivo.forEach(m => { try { m.bringToFront(); } catch(e){} });
     if (_navUserMarkerAtivo) { try { _navUserMarkerAtivo.bringToFront(); } catch(e){} }
     // Enquadra câmera na rota
