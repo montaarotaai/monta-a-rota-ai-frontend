@@ -2155,8 +2155,7 @@ async function navInicializarMapaGeral(entregas) {
   const origemLat = myLat || RP_LAT;
   const origemLng = myLng || RP_LNG;
 
-  const _navRenderer = L.canvas({ padding: 0.5 });
-  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false, renderer: _navRenderer })
+  _navMap = L.map('nav-mapa', { zoomControl:false, attributionControl:false })
              .setView([origemLat, origemLng], myLat ? 15 : 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMap);
   _navMap.on('dragstart', () => { _navSegindoGPS = false; });
@@ -2196,10 +2195,23 @@ function _desenharPolylineGeral(latlngs) {
     if (_navRotaSombra) { try{_navMap.removeLayer(_navRotaSombra);}catch(e){} _navRotaSombra = null; }
     if (_navRotaLayer)  { try{_navMap.removeLayer(_navRotaLayer); }catch(e){} _navRotaLayer  = null; }
     _navMap.invalidateSize({ animate:false });
-    _navRotaSombra = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMap);
-    _navRotaLayer  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMap);
+    _navRotaSombra = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round' }).addTo(_navMap);
+    _navRotaLayer  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round' }).addTo(_navMap);
     _navDestinoMarkers.forEach(dm => { try { dm.marker.bringToFront(); } catch(e){} });
     if (_navUserMarker) { try { _navUserMarker.bringToFront(); } catch(e){} }
+    // Sempre enquadra câmera na rota após desenhar
+    const b = _navRotaLayer.getBounds();
+    if (b.isValid()) {
+      _navMap.fitBounds(b, { padding:[50,50], animate:false });
+    }
+    // Força repaint do SVG overlay (necessário no Android Chrome após fitBounds programático)
+    setTimeout(() => {
+      if (_navMap) {
+        _navMap.invalidateSize({ animate:false });
+        if (_navRotaLayer) _navRotaLayer.redraw();
+        if (_navRotaSombra) _navRotaSombra.redraw();
+      }
+    }, 100);
     console.log('[polylineGeral] desenhada:', latlngs.length, 'pontos');
   } catch(e) { console.error('[polylineGeral]', e); }
 }
@@ -2343,8 +2355,7 @@ async function navIniciarModoAtivo(entregas) {
   if (_navMapAtivo) { _navMapAtivo.remove(); _navMapAtivo = null; }
   _navUserMarkerAtivo = null; _navDestinoMarkersAtivo = [];
 
-  const _navRendererAtivo = L.canvas({ padding: 0.5 });
-  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false, renderer: _navRendererAtivo })
+  _navMapAtivo = L.map('nav-mapa-ativo', { zoomControl:false, attributionControl:false })
     .setView([pos.lat, pos.lng], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:20 }).addTo(_navMapAtivo);
   _navMapAtivo.invalidateSize({ animate:false });
@@ -2462,13 +2473,21 @@ function _desenharPolylineAtivo(latlngs) {
     if (_navRotaSombraAtivo) { try{_navMapAtivo.removeLayer(_navRotaSombraAtivo);}catch(e){} _navRotaSombraAtivo = null; }
     if (_navRotaLayerAtivo)  { try{_navMapAtivo.removeLayer(_navRotaLayerAtivo); }catch(e){} _navRotaLayerAtivo  = null; }
     _navMapAtivo.invalidateSize({ animate:false });
-    _navRotaSombraAtivo = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMapAtivo);
-    _navRotaLayerAtivo  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round', renderer: L.canvas() }).addTo(_navMapAtivo);
+    _navRotaSombraAtivo = L.polyline(latlngs, { color:'#003090', weight:11, opacity:.35, lineCap:'round', lineJoin:'round' }).addTo(_navMapAtivo);
+    _navRotaLayerAtivo  = L.polyline(latlngs, { color:'#1a73e8',  weight:7,  opacity:1,   lineCap:'round', lineJoin:'round' }).addTo(_navMapAtivo);
     _navDestinoMarkersAtivo.forEach(m => { try { m.bringToFront(); } catch(e){} });
     if (_navUserMarkerAtivo) { try { _navUserMarkerAtivo.bringToFront(); } catch(e){} }
     // Enquadra câmera na rota
     const b = _navRotaLayerAtivo.getBounds();
     if (b.isValid()) _navMapAtivo.fitBounds(b, { padding:[80,80], maxZoom:17, animate:false });
+    // Força repaint
+    setTimeout(() => {
+      if (_navMapAtivo) {
+        _navMapAtivo.invalidateSize({ animate:false });
+        if (_navRotaLayerAtivo) _navRotaLayerAtivo.redraw();
+        if (_navRotaSombraAtivo) _navRotaSombraAtivo.redraw();
+      }
+    }, 100);
     console.log('[rota ativa] polyline desenhada OK:', latlngs.length, 'pontos');
   } catch(err) { console.error('[_desenharPolylineAtivo]', err); }
 }
